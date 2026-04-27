@@ -1147,7 +1147,7 @@ export default function BrainSparkAI(){
       </header>
 
       <div style={{display:"flex"}}>
-        <aside style={{width:200,background:"white",borderRight:"1px solid #E2E8F0",padding:"16px 9px",position:"sticky",top:55,height:"calc(100vh - 55px)",overflowY:"auto",flexShrink:0,display:"flex",flexDirection:"column",gap:3}}>
+        <aside style={{width:200,background:"white",borderRight:"1px solid #E2E8F0",padding:"16px 9px",position:"sticky",top:55,height:"calc(100vh - 55px)",overflowY:"auto",flexShrink:0,display:window.innerWidth<=768?"none":"flex",flexDirection:"column",gap:3}}>
           {tabs.map(t=>(
             <button key={t.id} onClick={()=>{setTab(t.id);setScreen("app");}} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",borderRadius:10,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,textAlign:"left",transition:"all .15s",background:screen==="app"&&tab===t.id?`linear-gradient(135deg,${t.col},${t.col}bb)`:"transparent",color:screen==="app"&&tab===t.id?"white":"#475569",fontFamily:"'Nunito',sans-serif"}}>
               <t.Icon size={15}/>{t.label}
@@ -1158,7 +1158,7 @@ export default function BrainSparkAI(){
           <button onClick={()=>setScreen("settings")} style={{display:"flex",alignItems:"center",gap:8,padding:"9px 12px",borderRadius:10,border:"none",cursor:"pointer",fontWeight:700,fontSize:13,textAlign:"left",background:screen==="settings"?"#EEF2FF":"transparent",color:screen==="settings"?"#6366F1":"#475569",fontFamily:"'Nunito',sans-serif"}}><Settings size={15}/>Settings</button>
         </aside>
 
-        <main style={{flex:1, padding:"22px 32px", paddingBottom:88, minWidth:0}}>
+        <main style={{flex:1, padding:"22px 32px", paddingBottom:88, minWidth:0, width:"100%"}}>
           <div style={{animation:"slideUp .25s ease-out"}}>
             {screen==="app"&&tab==="doubt" && <DoubtSolver onXP={v=>setXp(p=>p+v)}/>}
             {screen==="app"&&tab==="quiz"  && <QuizGenerator onXP={v=>setXp(p=>p+v)}/>}
