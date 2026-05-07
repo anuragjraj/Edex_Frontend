@@ -1,6 +1,6 @@
 /**
- * BrainSpark AI — Frontend v4.0
- * First code's features + Second code's UI polish
+ * BrainSpark AI — Frontend v4.0 (Full-Width Layout)
+ * All feature pages now fill the available screen width.
  *
  * REQUIRES in .env:
  *   VITE_API_URL=https://your-render-url.onrender.com
@@ -52,15 +52,78 @@ const CLASSES = ['Class 1','Class 2','Class 3','Class 4','Class 5',
 
 const CBSE_CHAPTERS = {
   Mathematics: {
-    'Class 10': ['Real Numbers','Polynomials','Linear Equations','Quadratic Equations','AP','Triangles','Coordinate Geometry','Trigonometry','Circles','Constructions','Areas Related to Circles','Surface Areas & Volumes','Statistics','Probability'],
-    'Class 9': ['Number Systems','Polynomials','Coordinate Geometry','Linear Equations','Euclid\'s Geometry','Lines & Angles','Triangles','Quadrilaterals','Areas of Parallelograms','Circles','Constructions','Heron\'s Formula','Surface Areas','Statistics','Probability']
+    'Class 6': ['Knowing Our Numbers','Whole Numbers','Playing with Numbers','Basic Geometrical Ideas','Understanding Elementary Shapes','Integers','Fractions','Decimals','Data Handling','Mensuration','Algebra','Ratio and Proportion','Symmetry','Practical Geometry'],
+    'Class 7': ['Integers','Fractions and Decimals','Data Handling','Simple Equations','Lines and Angles','The Triangle and its Properties','Congruence of Triangles','Comparing Quantities','Rational Numbers','Practical Geometry','Perimeter and Area','Algebraic Expressions','Exponents and Powers','Symmetry','Visualising Solid Shapes'],
+    'Class 8': ['Rational Numbers','Linear Equations in One Variable','Understanding Quadrilaterals','Practical Geometry','Data Handling','Squares and Square Roots','Cubes and Cube Roots','Comparing Quantities','Algebraic Expressions and Identities','Visualising Solid Shapes','Mensuration','Exponents and Powers','Direct and Inverse Proportions','Factorisation','Introduction to Graphs','Playing with Numbers'],
+    'Class 9': ['Number Systems','Polynomials','Coordinate Geometry','Linear Equations in Two Variables',"Euclid's Geometry",'Lines and Angles','Triangles','Quadrilaterals','Areas of Parallelograms and Triangles','Circles','Constructions',"Heron's Formula",'Surface Areas and Volumes','Statistics','Probability'],
+    'Class 10': ['Real Numbers','Polynomials','Pair of Linear Equations in Two Variables','Quadratic Equations','Arithmetic Progressions','Triangles','Coordinate Geometry','Introduction to Trigonometry','Some Applications of Trigonometry','Circles','Constructions','Areas Related to Circles','Surface Areas and Volumes','Statistics','Probability'],
+    'Class 11': ['Sets','Relations and Functions','Trigonometric Functions','Complex Numbers and Quadratic Equations','Linear Inequalities','Permutations and Combinations','Binomial Theorem','Sequences and Series','Straight Lines','Conic Sections','Introduction to Three Dimensional Geometry','Limits and Derivatives','Statistics','Probability'],
+    'Class 12': ['Relations and Functions','Inverse Trigonometric Functions','Matrices','Determinants','Continuity and Differentiability','Application of Derivatives','Integrals','Application of Integrals','Differential Equations','Vector Algebra','Three Dimensional Geometry','Linear Programming','Probability'],
   },
   Science: {
-    'Class 10': ['Chemical Reactions','Acids, Bases & Salts','Metals & Non-Metals','Carbon Compounds','Life Processes','Control & Coordination','Reproduction','Heredity','Light - Reflection','Human Eye','Electricity','Magnetic Effects','Management of Natural Resources'],
-    'Class 9': ['Matter in Our Surroundings','Is Matter Around Us Pure?','Atoms & Molecules','Structure of Atom','Cell Fundamentals','Tissues','Motion','Force & Laws of Motion','Gravitation','Work & Energy','Sound','Natural Resources']
+    'Class 6': ['Food: Where Does it Come From?','Components of Food','Fibre to Fabric','Sorting Materials into Groups','Separation of Substances','Changes Around Us','Getting to Know Plants','Body Movements','The Living Organisms – Characteristics and Habitats','Motion and Measurement of Distances','Light, Shadows and Reflections','Electricity and Circuits','Fun with Magnets','Water','Air Around Us','Garbage In, Garbage Out'],
+    'Class 7': ['Nutrition in Plants','Nutrition in Animals','Fibre to Fabric','Heat','Acids, Bases and Salts','Physical and Chemical Changes','Weather, Climate and Adaptations of Animals to Climate','Winds, Storms and Cyclones','Soil','Respiration in Organisms','Transportation in Animals and Plants','Reproduction in Plants','Motion and Time','Electric Current and its Effects','Light','Water: A Precious Resource','Forests: Our Lifeline','Wastewater Story'],
+    'Class 8': ['Crop Production and Management','Microorganisms: Friend and Foe','Synthetic Fibres and Plastics','Materials: Metals and Non-Metals','Coal and Petroleum','Combustion and Flame','Conservation of Plants and Animals','Cell – Structure and Functions','Reproduction in Animals','Reaching the Age of Adolescence','Force and Pressure','Friction','Sound','Chemical Effects of Electric Current','Some Natural Phenomena','Light','Stars and the Solar System','Pollution of Air and Water'],
+    'Class 9': ['Matter in Our Surroundings','Is Matter Around Us Pure?','Atoms and Molecules','Structure of the Atom','The Fundamental Unit of Life','Tissues','Diversity in Living Organisms','Motion','Force and Laws of Motion','Gravitation','Work and Energy','Sound','Why Do We Fall Ill?','Natural Resources','Improvement in Food Resources'],
+    'Class 10': ['Chemical Reactions and Equations','Acids, Bases and Salts','Metals and Non-Metals','Carbon and its Compounds','Periodic Classification of Elements','Life Processes','Control and Coordination','How Do Organisms Reproduce?','Heredity and Evolution','Light – Reflection and Refraction','The Human Eye and the Colourful World','Electricity','Magnetic Effects of Electric Current','Sources of Energy','Our Environment','Management of Natural Resources'],
+  },
+  Physics: {
+    'Class 11': ['Physical World','Units and Measurements','Motion in a Straight Line','Motion in a Plane','Laws of Motion','Work, Energy and Power','Systems of Particles and Rotational Motion','Gravitation','Mechanical Properties of Solids','Mechanical Properties of Fluids','Thermal Properties of Matter','Thermodynamics','Kinetic Theory','Oscillations','Waves'],
+    'Class 12': ['Electric Charges and Fields','Electrostatic Potential and Capacitance','Current Electricity','Moving Charges and Magnetism','Magnetism and Matter','Electromagnetic Induction','Alternating Current','Electromagnetic Waves','Ray Optics and Optical Instruments','Wave Optics','Dual Nature of Radiation and Matter','Atoms','Nuclei','Semiconductor Electronics: Materials, Devices and Simple Circuits'],
+  },
+  Chemistry: {
+    'Class 11': ['Some Basic Concepts of Chemistry','Structure of Atom','Classification of Elements and Periodicity in Properties','Chemical Bonding and Molecular Structure','States of Matter','Thermodynamics','Equilibrium','Redox Reactions','Hydrogen','The s-Block Elements','The p-Block Elements','Organic Chemistry: Some Basic Principles and Techniques','Hydrocarbons'],
+    'Class 12': ['The Solid State','Solutions','Electrochemistry','Chemical Kinetics','Surface Chemistry','General Principles and Processes of Isolation of Elements','The p-Block Elements','The d- and f-Block Elements','Coordination Compounds','Haloalkanes and Haloarenes','Alcohols, Phenols and Ethers','Aldehydes, Ketones and Carboxylic Acids','Amines','Biomolecules','Polymers','Chemistry in Everyday Life'],
+  },
+  Biology: {
+    'Class 11': ['The Living World','Biological Classification','Plant Kingdom','Animal Kingdom','Morphology of Flowering Plants','Anatomy of Flowering Plants','Structural Organisation in Animals','Cell: The Unit of Life','Biomolecules','Cell Cycle and Cell Division','Transport in Plants','Mineral Nutrition','Photosynthesis in Higher Plants','Cellular Respiration','Plant Growth and Development','Digestion and Absorption','Breathing and Exchange of Gases','Body Fluids and Circulation','Excretory Products and their Elimination','Locomotion and Movement','Neural Control and Coordination','Chemical Coordination and Integration'],
+    'Class 12': ['Sexual Reproduction in Flowering Plants','Human Reproduction','Reproductive Health','Principles of Inheritance and Variation','Molecular Basis of Inheritance','Evolution','Human Health and Disease','Microbes in Human Welfare','Biotechnology: Principles and Processes','Biotechnology and its Applications','Organisms and Populations','Ecosystem','Biodiversity and Conservation','Environmental Issues'],
+  },
+  'Social Science': {
+    'Class 6': ['What, Where, How and When?','On the Trail of the Earliest People','From Gathering to Growing Food','In the Earliest Cities','What Books and Burials Tell Us','Kingdoms, Kings and an Early Republic','New Questions and Ideas','Ashoka, the Emperor Who Gave Up War','Vital Villages, Thriving Towns','Traders, Kings and Pilgrims','New Empires and Kingdoms','Buildings, Paintings and Books','The Earth in the Solar System','Globe: Latitudes and Longitudes','Motions of the Earth','Maps','Major Domains of the Earth','Major Landforms of the Earth','Our Country – India','India: Climate, Vegetation and Wildlife','Understanding Diversity','Diversity and Discrimination','What is Government?','Panchayati Raj','Rural Administration','Urban Administration','Rural Livelihoods','Urban Livelihoods'],
+    'Class 7': ['Tracing Changes through a Thousand Years','New Kings and Kingdoms','The Delhi Sultans','The Mughal Empire','Rulers and Buildings','Towns, Traders and Craftspersons','Tribes, Nomads and Settled Communities','Devotional Paths to the Divine','The Making of Regional Cultures','Eighteenth-Century Political Formations','Environment','Inside Our Earth','Our Changing Earth','Air','Water','Natural Vegetation and Wildlife','Human Environment – Settlement, Transport and Communication','Human Environment Interactions: The Tropical and the Subtropical Region','Life in the Temperate Grasslands','Life in the Deserts','On Equality','Role of the Government in Health','How the State Government Works','Growing Up as Boys and Girls','Women Change the World','Understanding Media','Understanding Advertising','Markets Around Us','A Shirt in the Market'],
+    'Class 8': ['How, When and Where','From Trade to Territory: The Company Establishes Power','Ruling the Countryside','Tribals, Dikus and the Vision of a Golden Age','When People Rebel: 1857 and After','Weavers, Iron Smelters and Factory Owners','Civilising the "Native", Educating the Nation','Women, Caste and Reform','The Making of the National Movement: 1870s–1947','India After Independence','Resources','Land, Soil, Water, Natural Vegetation and Wildlife Resources','Mineral and Power Resources','Agriculture','Industries','Human Resources','The Indian Constitution','Understanding Secularism','Parliament and the Making of Laws','Judiciary','Understanding Marginalisation','Confronting Marginalisation','Public Facilities','Law and Social Justice'],
+    'Class 9': ['The French Revolution','Socialism in Europe and the Russian Revolution','Nazism and the Rise of Hitler','Forest Society and Colonialism','Pastoralists in the Modern World','India – Size and Location','Physical Features of India','Drainage','Climate','Natural Vegetation and Wildlife','Population','What is Democracy? Why Democracy?','Constitutional Design','Electoral Politics','Working of Institutions','Democratic Rights','The Story of Village Palampur','People as Resource','Poverty as a Challenge','Food Security in India'],
+    'Class 10': ['The Rise of Nationalism in Europe','Nationalism in India','The Making of a Global World','The Age of Industrialisation','Print Culture and the Modern World','Resources and Development','Forest and Wildlife Resources','Water Resources','Agriculture','Minerals and Energy Resources','Manufacturing Industries','Lifelines of National Economy','Power Sharing','Federalism','Gender, Religion and Caste','Political Parties','Outcomes of Democracy','Development','Sectors of the Indian Economy','Money and Credit','Globalisation and the Indian Economy','Consumer Rights'],
+  },
+  History: {
+    'Class 6': ['What, Where, How and When?','On the Trail of the Earliest People','From Gathering to Growing Food','In the Earliest Cities','What Books and Burials Tell Us','Kingdoms, Kings and an Early Republic','New Questions and Ideas','Ashoka, the Emperor Who Gave Up War','Vital Villages, Thriving Towns','Traders, Kings and Pilgrims','New Empires and Kingdoms','Buildings, Paintings and Books'],
+    'Class 7': ['Tracing Changes through a Thousand Years','New Kings and Kingdoms','The Delhi Sultans','The Mughal Empire','Rulers and Buildings','Towns, Traders and Craftspersons','Tribes, Nomads and Settled Communities','Devotional Paths to the Divine','The Making of Regional Cultures','Eighteenth-Century Political Formations'],
+    'Class 8': ['How, When and Where','From Trade to Territory: The Company Establishes Power','Ruling the Countryside','Tribals, Dikus and the Vision of a Golden Age','When People Rebel: 1857 and After','Weavers, Iron Smelters and Factory Owners','Civilising the "Native", Educating the Nation','Women, Caste and Reform','The Making of the National Movement: 1870s–1947','India After Independence'],
+    'Class 9': ['The French Revolution','Socialism in Europe and the Russian Revolution','Nazism and the Rise of Hitler','Forest Society and Colonialism','Pastoralists in the Modern World'],
+    'Class 10': ['The Rise of Nationalism in Europe','Nationalism in India','The Making of a Global World','The Age of Industrialisation','Print Culture and the Modern World'],
+    'Class 11': ['From the Beginning of Time','Writing and City Life','An Empire Across Three Continents','The Central Islamic Lands','Nomadic Empires','The Three Orders','Changing Cultural Traditions','Confrontation of Cultures','The Industrial Revolution','Displacing Indigenous Peoples','Paths to Modernisation'],
+    'Class 12': ['Bricks, Beads and Bones: The Harappan Civilisation','Kings, Farmers and Towns: Early States and Economies','Kinship, Caste and Class: Early Societies','Thinkers, Beliefs and Buildings: Cultural Developments','Through the Eyes of Travellers: Perceptions of Society','Bhakti-Sufi Traditions: Changes in Religious Beliefs','An Imperial Capital: Vijayanagara','Peasants, Zamindars and the State','Kings and Chronicles: The Mughal Courts','Colonialism and the Countryside','Rebels and the Raj: The 1857 Revolt','Colonial Cities: Urbanisation, Planning and Architecture','Mahatma Gandhi and the Nationalist Movement','Understanding Partition','Framing the Constitution'],
+  },
+  Geography: {
+    'Class 6': ['The Earth in the Solar System','Globe: Latitudes and Longitudes','Motions of the Earth','Maps','Major Domains of the Earth','Major Landforms of the Earth','Our Country – India','India: Climate, Vegetation and Wildlife'],
+    'Class 7': ['Environment','Inside Our Earth','Our Changing Earth','Air','Water','Natural Vegetation and Wildlife','Human Environment – Settlement, Transport and Communication','Human Environment Interactions: The Tropical and the Subtropical Region','Life in the Temperate Grasslands','Life in the Deserts'],
+    'Class 8': ['Resources','Land, Soil, Water, Natural Vegetation and Wildlife Resources','Mineral and Power Resources','Agriculture','Industries','Human Resources'],
+    'Class 9': ['India – Size and Location','Physical Features of India','Drainage','Climate','Natural Vegetation and Wildlife','Population'],
+    'Class 10': ['Resources and Development','Forest and Wildlife Resources','Water Resources','Agriculture','Minerals and Energy Resources','Manufacturing Industries','Lifelines of National Economy'],
+    'Class 11': ['Geography as a Discipline','The Origin and Evolution of the Earth','Interior of the Earth','Distribution of Oceans and Continents','Minerals and Rocks','Geomorphic Processes','Landforms and their Evolution','Composition and Structure of Atmosphere','Solar Radiation, Heat Balance and Temperature','Atmospheric Circulation and Weather Systems','Water in the Atmosphere','World Climate and Climate Change','Water (Oceans)','Movements of Ocean Water','Life on the Earth','Biodiversity and Conservation'],
+    'Class 12': ['Human Geography: Nature and Scope','The World Population: Distribution, Density and Growth','Population Composition','Human Development','Primary Activities','Secondary Activities','Tertiary and Quaternary Activities','Transport and Communication','International Trade','Human Settlements','Population: Distribution, Density, Growth and Composition','Migration: Types, Causes and Consequences','Land Resources and Agriculture','Water Resources','Mineral and Energy Resources','Manufacturing Industries','Planning and Sustainable Development in Indian Context','Geographical Perspective on Selected Issues and Problems'],
+  },
+  'Political Science': {
+    'Class 6': ['Understanding Diversity','Diversity and Discrimination','What is Government?','Panchayati Raj','Rural Administration','Urban Administration','Rural Livelihoods','Urban Livelihoods'],
+    'Class 7': ['On Equality','Role of the Government in Health','How the State Government Works','Growing Up as Boys and Girls','Women Change the World','Understanding Media','Understanding Advertising','Markets Around Us','A Shirt in the Market'],
+    'Class 8': ['The Indian Constitution','Understanding Secularism','Parliament and the Making of Laws','Judiciary','Understanding Marginalisation','Confronting Marginalisation','Public Facilities','Law and Social Justice'],
+    'Class 9': ['What is Democracy? Why Democracy?','Constitutional Design','Electoral Politics','Working of Institutions','Democratic Rights'],
+    'Class 10': ['Power Sharing','Federalism','Gender, Religion and Caste','Political Parties','Outcomes of Democracy'],
+    'Class 11': ['Political Theory: An Introduction','Freedom','Equality','Social Justice','Rights','Citizenship','Nationalism','Secularism','Peace','Development','Constitution: Why and How?','Rights in the Indian Constitution','Election and Representation','Executive','Legislature','Judiciary','Federalism','Local Governments','Constitution as a Living Document','The Philosophy of the Constitution'],
+    'Class 12': ['The Cold War Era','The End of Bipolarity','US Hegemony in World Politics','Alternative Centres of Power','Contemporary South Asia','International Organisations','Security in the Contemporary World','Environment and Natural Resources','Globalisation','Challenges of Nation Building','Era of One-Party Dominance','Politics of Planned Development',"India's External Relations",'Challenges to and Restoration of the Congress System','The Crisis of the Constitutional Order','Rise of Popular Movements','Regional Aspirations','Recent Developments in Indian Politics'],
+  },
+  Economics: {
+    'Class 9': ['The Story of Village Palampur','People as Resource','Poverty as a Challenge','Food Security in India'],
+    'Class 10': ['Development','Sectors of the Indian Economy','Money and Credit','Globalisation and the Indian Economy','Consumer Rights'],
+    'Class 11': ['Introduction to Statistics','Collection of Data','Organisation of Data','Presentation of Data','Measures of Central Tendency','Measures of Dispersion','Correlation','Index Numbers','Use of Statistical Tools','Indian Economy on the Eve of Independence','Indian Economy 1950–1990','Liberalisation, Privatisation and Globalisation','Poverty','Human Capital Formation in India','Rural Development','Employment: Growth, Informalisation and Other Issues','Infrastructure','Environment and Sustainable Development','Comparative Development Experiences of India and Its Neighbours'],
+    'Class 12': ['Introduction to Microeconomics','Theory of Consumer Behaviour','Production and Costs','The Theory of the Firm Under Perfect Competition','Market Equilibrium','Non-Competitive Markets','Introduction to Macroeconomics','National Income Accounting','Money and Banking','Determination of Income and Employment','Government Budget and the Economy','Open Economy Macroeconomics'],
   },
 }
-const getChapters = (subject, cls) => CBSE_CHAPTERS[subject]?.[cls] || Array.from({ length: 15 }, (_, i) => `Chapter ${i + 1}`)
+
+const getChapters = (subject, cls) =>
+  CBSE_CHAPTERS[subject]?.[cls] ||
+  Array.from({ length: 15 }, (_, i) => `Chapter ${i + 1}`)
 
 const LEVELS = [
   { min: 0,      label: 'Beginner',        color: '#94A3B8', emoji: '🌱' },
@@ -83,12 +146,6 @@ function getLevel(xp) {
 function getNextLevel(xp) { const cur = getLevel(xp); return LEVELS[cur.index + 1] || null }
 
 const DIFF_COLORS = { easy: '#22c55e', medium: '#f59e0b', hard: '#ef4444', legendary: '#8b5cf6' }
-
-const TOOL_COLORS = {
-  doubt: '#6366F1', notes: '#10B981', cheatsheet: '#F97316',
-  paper: '#8B5CF6', lessonplan: '#7C3AED', quiz: '#F59E0B', flashcards: '#EF4444',
-  dashboard: '#6366F1', achievements: '#F59E0B', profile: '#64748B',
-}
 
 // ══════════════════════════════════════════════════════════════
 //  API CLIENT
@@ -170,7 +227,6 @@ async function loadScript(src) {
 //  DESIGN TOKENS
 // ══════════════════════════════════════════════════════════════
 const T = {
-  // Card
   card: {
     background: 'var(--bg)',
     border: '1px solid var(--border)',
@@ -178,7 +234,6 @@ const T = {
     padding: '20px',
     boxShadow: '0 2px 12px rgba(0,0,0,.06)',
   },
-  // Label
   label: {
     display: 'block',
     fontSize: '10.5px',
@@ -189,7 +244,6 @@ const T = {
     marginBottom: '6px',
     fontFamily: "'Nunito', sans-serif",
   },
-  // Input
   input: {
     width: '100%',
     padding: '10px 14px',
@@ -203,7 +257,6 @@ const T = {
     outline: 'none',
     transition: 'border-color .2s',
   },
-  // Select
   select: {
     width: '100%',
     padding: '10px 14px',
@@ -220,7 +273,7 @@ const T = {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  BASE UI COMPONENTS
+//  BASE UI COMPONENTS  (unchanged)
 // ══════════════════════════════════════════════════════════════
 
 function PageHeader({ icon, title, subtitle, color }) {
@@ -353,7 +406,6 @@ function XPBadge({ amount, label }) {
   )
 }
 
-// Multi-chapter selector
 function ChapterSelector({ subject, cls, selected, onChange, max = 20 }) {
   const chapters = getChapters(subject, cls)
   const toggle = (ch) => {
@@ -392,7 +444,6 @@ function ChapterSelector({ subject, cls, selected, onChange, max = 20 }) {
   )
 }
 
-// Content renderer
 function ContentBox({ content, onDownload, downloadName, label = 'Generated Content' }) {
   const lines = (content || '').split('\n')
   return (
@@ -449,7 +500,7 @@ function FreeTierBanner({ user, onSubscribe }) {
 }
 
 // ══════════════════════════════════════════════════════════════
-//  AUTH PAGE
+//  AUTH PAGE  (unchanged — auth is centered by design)
 // ══════════════════════════════════════════════════════════════
 function AuthPage({ onAuth }) {
   useFonts()
@@ -524,14 +575,11 @@ function AuthPage({ onAuth }) {
   return (
     <div style={{ minHeight: '100vh', background: 'linear-gradient(135deg, #6366F1, #8B5CF6 50%, #A855F7)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, fontFamily: "'Nunito', sans-serif" }}>
       <div style={{ ...T.card, width: '100%', maxWidth: 430, boxShadow: '0 28px 70px rgba(0,0,0,.22)' }}>
-        {/* Logo */}
         <div style={{ textAlign: 'center', marginBottom: 24 }}>
           <div style={{ width: 52, height: 52, borderRadius: 14, background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 10px', fontSize: 26 }}>🧠</div>
           <h1 style={{ margin: 0, fontFamily: "'Sora', sans-serif", fontWeight: 900, fontSize: 22, color: 'var(--text-h)' }}>BrainSpark<span style={{ color: '#6366F1' }}> AI</span></h1>
           <p style={{ color: 'var(--text)', fontSize: 13, marginTop: 4 }}>Your AI-powered study companion</p>
         </div>
-
-        {/* Portal tabs */}
         <div style={{ display: 'flex', background: 'var(--code-bg)', borderRadius: 11, padding: 3, marginBottom: 20 }}>
           {[['personal', 'Personal'], ['school', '🏫 School']].map(([t, l]) => (
             <button key={t} onClick={() => { setTab(t); setErr('') }}
@@ -540,8 +588,6 @@ function AuthPage({ onAuth }) {
             </button>
           ))}
         </div>
-
-        {/* Role selector */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
           {[['student', '🎒 Student'], ['teacher', '👨‍🏫 Teacher']].map(([r, l]) => (
             <button key={r} onClick={() => setRole(r)}
@@ -550,7 +596,6 @@ function AuthPage({ onAuth }) {
             </button>
           ))}
         </div>
-
         {tab === 'personal' && <>
           <div style={{ display: 'flex', gap: 8, marginBottom: 20 }}>
             {[['login', 'Sign In'], ['register', 'Register']].map(([m, l]) => (
@@ -560,7 +605,6 @@ function AuthPage({ onAuth }) {
               </button>
             ))}
           </div>
-
           <form onSubmit={handlePersonal} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             {mode === 'register' && <Field label="Full Name"><BSInput value={form.name} onChange={set('name')} placeholder="Your full name" /></Field>}
             <Field label="Email Address"><BSInput value={form.email} onChange={set('email')} type="email" placeholder="your@email.com" /></Field>
@@ -576,30 +620,24 @@ function AuthPage({ onAuth }) {
               {busy ? <><Spinner /> {mode === 'register' ? 'Creating account...' : 'Signing in...'}</> : mode === 'register' ? 'Create Account' : 'Sign In'}
             </PrimaryBtn>
           </form>
-
           {mode === 'login' && <p style={{ textAlign: 'center', fontSize: 12.5, color: 'var(--text)', marginTop: 10 }}>
             <span onClick={() => onAuth('forgot')} style={{ color: 'var(--accent)', cursor: 'pointer', fontWeight: 700 }}>Forgot password?</span>
           </p>}
-
           <div style={{ display: 'flex', alignItems: 'center', gap: 8, margin: '18px 0' }}>
             <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
             <span style={{ fontSize: 12, color: 'var(--text)', fontWeight: 600 }}>OR</span>
             <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
           </div>
-
           <div ref={gBtnRef} style={{ display: 'flex', justifyContent: 'center', marginBottom: 10 }} />
-
           <button onClick={handleMicrosoft} disabled={busy}
             style={{ width: '100%', padding: '10px 16px', borderRadius: 10, border: '1.5px solid var(--border)', background: 'var(--bg)', color: 'var(--text-h)', fontSize: 14, fontWeight: 700, cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 10, fontFamily: "'Nunito', sans-serif" }}>
             <img src="https://learn.microsoft.com/favicon.ico" width={18} height={18} alt="" />
             Sign in with Microsoft
           </button>
-
           <p style={{ textAlign: 'center', fontSize: 11.5, color: 'var(--text)', marginTop: 12 }}>
             🕐 Free trial: 1 hour · then ₹{role === 'teacher' ? '180' : '150'}/month
           </p>
         </>}
-
         {tab === 'school' && (
           <form onSubmit={handleSchool} style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
             <div style={{ background: 'var(--accent-bg)', padding: '10px 14px', borderRadius: 10, fontSize: 13, color: 'var(--accent)', fontWeight: 600 }}>
@@ -702,14 +740,15 @@ function SubscriptionPage({ user, onSuccess, onBack }) {
   }
 
   return (
-    <div style={{ padding: 24, maxWidth: 640, margin: '0 auto', fontFamily: "'Nunito', sans-serif" }}>
+    // ── CHANGE: removed maxWidth:640 + margin:'0 auto' ──
+    <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif" }}>
       {onBack && <GhostBtn small onClick={onBack} style={{ marginBottom: 20 }}>← Back</GhostBtn>}
       <div style={{ textAlign: 'center', marginBottom: 32 }}>
         <div style={{ fontSize: 48, marginBottom: 8 }}>💎</div>
         <h2 style={{ fontFamily: "'Sora', sans-serif", fontWeight: 900, color: 'var(--text-h)', margin: '0 0 6px' }}>Upgrade BrainSpark AI</h2>
         <p style={{ color: 'var(--text)', fontSize: 14 }}>Unlimited access to all AI tools</p>
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 24 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(240px, 1fr))', gap: 16, marginBottom: 24, maxWidth: 700, margin: '0 auto 24px' }}>
         {plans.map(p => (
           <div key={p.id} style={{ ...T.card, position: 'relative', borderColor: p.popular ? 'var(--accent)' : 'var(--border)', borderWidth: p.popular ? 2 : 1, textAlign: 'center' }}>
             {p.popular && <div style={{ position: 'absolute', top: -13, left: '50%', transform: 'translateX(-50%)', background: 'var(--accent)', color: '#fff', borderRadius: 20, padding: '3px 14px', fontSize: 11, fontWeight: 800, fontFamily: "'Sora', sans-serif" }}>BEST VALUE</div>}
@@ -721,7 +760,7 @@ function SubscriptionPage({ user, onSuccess, onBack }) {
           </div>
         ))}
       </div>
-      <Card style={{ background: 'var(--accent-bg)' }}>
+      <Card style={{ background: 'var(--accent-bg)', maxWidth: 700, margin: '0 auto' }}>
         <h4 style={{ margin: '0 0 12px', color: 'var(--text-h)', fontFamily: "'Sora', sans-serif", fontWeight: 800 }}>✨ What's included:</h4>
         {['Unlimited AI-powered study sessions', 'Smart Doubt Solver', 'Comprehensive Chapter Notes', 'Multi-chapter Question Papers', 'Exam Cheat Sheets / Lesson Planner', 'Quizzes & Flashcards', 'Achievements & XP gamification', 'Content download & print'].map(f => (
           <div key={f} style={{ fontSize: 13.5, color: 'var(--text)', marginBottom: 5, display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -738,8 +777,8 @@ function SubscriptionPage({ user, onSuccess, onBack }) {
 //  DASHBOARD
 // ══════════════════════════════════════════════════════════════
 function Dashboard({ user, onNavigate }) {
-  const [stats,  setStats]   = useState(null)
-  const [achs,   setAchs]    = useState([])
+  const [stats,   setStats]   = useState(null)
+  const [achs,    setAchs]    = useState([])
   const [loading, setLoading] = useState(true)
 
   useEffect(() => {
@@ -751,20 +790,20 @@ function Dashboard({ user, onNavigate }) {
 
   if (loading) return <PageSpinner />
 
-  const xp       = stats?.stats?.total_xp || 0
-  const level    = getLevel(xp)
+  const xp        = stats?.stats?.total_xp || 0
+  const level     = getLevel(xp)
   const nextLevel = getNextLevel(xp)
-  const pct      = nextLevel ? Math.round(((xp - level.min) / (nextLevel.min - level.min)) * 100) : 100
-  const streak   = stats?.stats?.current_streak || 0
-  const unlocked = achs.filter(a => a.unlocked)
-  const locked   = achs.filter(a => !a.unlocked).slice(0, 6)
+  const pct       = nextLevel ? Math.round(((xp - level.min) / (nextLevel.min - level.min)) * 100) : 100
+  const streak    = stats?.stats?.current_streak || 0
+  const unlocked  = achs.filter(a => a.unlocked)
+  const locked    = achs.filter(a => !a.unlocked).slice(0, 6)
   const recentAchs = unlocked.slice(0, 3)
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
 
   return (
-    <div style={{ padding: 24, maxWidth: 900, margin: '0 auto', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
-      {/* Header */}
+    // ── CHANGE: removed maxWidth:900 + margin:'0 auto' ──
+    <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 24 }}>
         <div>
           <h2 style={{ margin: 0, fontFamily: "'Sora', sans-serif", fontWeight: 900, color: 'var(--text-h)', fontSize: 'clamp(1.1rem,2.5vw,1.5rem)' }}>{greeting}, {user.name.split(' ')[0]}! {level.emoji}</h2>
@@ -775,7 +814,6 @@ function Dashboard({ user, onNavigate }) {
         </div>
       </div>
 
-      {/* Stats */}
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 22 }}>
         {[
           { label: 'Total XP', value: xp.toLocaleString(), icon: '⚡', bg: '#EEF2FF', color: '#6366F1' },
@@ -793,7 +831,6 @@ function Dashboard({ user, onNavigate }) {
         ))}
       </div>
 
-      {/* Level progress */}
       <Card style={{ marginBottom: 20, background: 'linear-gradient(135deg, #6366F1, #8B5CF6, #A855F7)', border: 'none' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
           <div>
@@ -808,8 +845,7 @@ function Dashboard({ user, onNavigate }) {
         {nextLevel && <p style={{ fontSize: 12, color: 'rgba(255,255,255,.75)', margin: '8px 0 0', textAlign: 'right' }}>{(nextLevel.min - xp).toLocaleString()} XP to {nextLevel.label}</p>}
       </Card>
 
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-        {/* Recent achievements */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 16 }}>
         <Card>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
             <h3 style={{ margin: 0, fontSize: 15, fontFamily: "'Sora', sans-serif", fontWeight: 800, color: 'var(--text-h)' }}>🏆 Recent Achievements</h3>
@@ -838,14 +874,15 @@ function Dashboard({ user, onNavigate }) {
           </>}
         </Card>
 
-        {/* Quick actions */}
         <Card>
           <h3 style={{ margin: '0 0 14px', fontSize: 15, fontFamily: "'Sora', sans-serif", fontWeight: 800, color: 'var(--text-h)' }}>⚡ Quick Start</h3>
           {[
-            { icon: '🤔', label: 'Ask a Doubt', tab: 'doubt', color: '#6366F1' },
-            { icon: '📖', label: 'Generate Notes', tab: 'notes', color: '#10B981' },
-            ...(user.role === 'student' ? [{ icon: '📋', label: 'Exam Cheat Sheet', tab: 'cheatsheet', color: '#F97316' }] : [{ icon: '🎓', label: 'Lesson Planner', tab: 'lessonplan', color: '#7C3AED' }]),
-            { icon: '🎯', label: 'Take a Quiz', tab: 'quiz', color: '#F59E0B' },
+            { icon: '🤔', label: 'Ask a Doubt',    tab: 'doubt',      color: '#6366F1' },
+            { icon: '📖', label: 'Generate Notes', tab: 'notes',      color: '#10B981' },
+            ...(user.role === 'student'
+              ? [{ icon: '📋', label: 'Exam Cheat Sheet', tab: 'cheatsheet', color: '#F97316' }]
+              : [{ icon: '🎓', label: 'Lesson Planner',   tab: 'lessonplan', color: '#7C3AED' }]),
+            { icon: '🎯', label: 'Take a Quiz',    tab: 'quiz',       color: '#F59E0B' },
           ].map(item => (
             <button key={item.tab} onClick={() => onNavigate(item.tab)}
               style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 12, padding: '10px 14px', borderRadius: 10, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text-h)', cursor: 'pointer', marginBottom: 9, fontSize: 14, fontWeight: 600, fontFamily: "'Nunito', sans-serif", transition: 'all .15s' }}
@@ -903,15 +940,13 @@ Always be encouraging and supportive. Use **bold** for key terms only.`
     } finally { setLoading(false) }
   }
 
+  // ── CHANGE: width:100% instead of a fixed maxWidth ──
   return (
-    <div style={{ padding: 24, maxWidth: 820, margin: '0 auto', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 100px)', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
+    <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 100px)', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
       <PageHeader icon="🤔" title="AI Doubt Solver" subtitle="Ask anything — get clear, step-by-step CBSE explanations" color="#6366F1" />
-
       <div style={{ marginBottom: 14 }}>
         <BSSelect value={subject} onChange={setSubject} options={SUBJECTS} style={{ maxWidth: 220 }} />
       </div>
-
-      {/* Chat area */}
       <div style={{ ...T.card, flex: 1, overflowY: 'auto', marginBottom: 14, minHeight: 200, display: 'flex', flexDirection: 'column', gap: 14 }}>
         {messages.length === 0 ? (
           <div style={{ textAlign: 'center', padding: 48, color: 'var(--text)' }}>
@@ -942,7 +977,6 @@ Always be encouraging and supportive. Use **bold** for key terms only.`
         )}
         <div ref={bottomRef} />
       </div>
-
       <ErrMsg msg={err} />
       <div style={{ display: 'flex', gap: 10 }}>
         <input style={{ ...T.input, flex: 1 }} value={input} onChange={e => setInput(e.target.value)}
@@ -967,7 +1001,7 @@ function NotesMaker({ user }) {
   const [loading,  setLoading]  = useState(false)
   const [saved,    setSaved]    = useState(false)
   const [err,      setErr]      = useState('')
-  const chapters    = getChapters(subject, cls)
+  const chapters     = getChapters(subject, cls)
   const finalChapter = chapter || customCh || chapters[0]
 
   const buildPrompt = () => `You are a senior CBSE textbook author. Write comprehensive, exam-ready study notes for "${finalChapter}" — ${subject} ${cls} CBSE. Style: ${style_}. TARGET: 900-1200 words covering EVERY important concept.
@@ -1003,11 +1037,12 @@ MANDATORY: Cover EVERY subtopic. Minimum 900 words. Use **bold** for key terms o
     catch (e) { alert(e.message) }
   }
 
+  // ── CHANGE: removed maxWidth:900 + margin:'0 auto' ──
   return (
-    <div style={{ padding: 24, maxWidth: 900, margin: '0 auto', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
+    <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
       <PageHeader icon="📖" title="Chapter Notes Maker" subtitle="Textbook-quality comprehensive notes — download or print as PDF" color="#10B981" />
       <Card style={{ marginBottom: 18 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 4 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 4 }}>
           <Field label="Subject"><BSSelect value={subject} onChange={v => { setSubject(v); setChapter('') }} options={SUBJECTS} /></Field>
           <Field label="Class"><BSSelect value={cls} onChange={setCls} options={CLASSES} /></Field>
         </div>
@@ -1039,7 +1074,7 @@ MANDATORY: Cover EVERY subtopic. Minimum 900 words. Use **bold** for key terms o
 }
 
 // ══════════════════════════════════════════════════════════════
-//  CHEAT SHEET MAKER  (student only)
+//  CHEAT SHEET MAKER
 // ══════════════════════════════════════════════════════════════
 function CheatSheetMaker({ user }) {
   const [subject,  setSubject]  = useState('Mathematics')
@@ -1073,14 +1108,15 @@ ${chapters.map(ch => `## 📚 ${ch}\n### Key Formulas\n### Must-Know Definitions
     } finally { setLoading(false) }
   }
 
+  // ── CHANGE: removed maxWidth:900 + margin:'0 auto' ──
   return (
-    <div style={{ padding: 24, maxWidth: 900, margin: '0 auto', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
+    <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
         <PageHeader icon="📋" title="3-Hour Exam Cheat Sheet" subtitle="6-7 pages of exam-focused material: top questions, formulas, predictions, scoring strategy" color="#F97316" />
         <span style={{ background: 'var(--accent)', color: '#fff', borderRadius: 20, padding: '2px 12px', fontSize: 11, fontWeight: 800, fontFamily: "'Sora', sans-serif", flexShrink: 0, height: 'fit-content' }}>STUDENT ONLY</span>
       </div>
       <Card style={{ marginBottom: 18 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 4 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 4 }}>
           <Field label="Subject"><BSSelect value={subject} onChange={v => { setSubject(v); setChapters([]) }} options={SUBJECTS} /></Field>
           <Field label="Class"><BSSelect value={cls} onChange={v => { setCls(v); setChapters([]) }} options={CLASSES} /></Field>
         </div>
@@ -1100,7 +1136,8 @@ ${chapters.map(ch => `## 📚 ${ch}\n### Key Formulas\n### Must-Know Definitions
           downloadName={`cheatsheet-${subject}-${cls}.txt`}
           onDownload={() => downloadText(result, `cheatsheet-${subject}-${cls}.txt`)} />
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          {!saved ? <GhostBtn small onClick={async () => { try { await api.post('/api/user/cheatsheets', { subject, classLevel: cls, chapters, examDate, content: result }); setSaved(true) } catch (e) { alert(e.message) } }}>💾 Save to Library</GhostBtn>
+          {!saved
+            ? <GhostBtn small onClick={async () => { try { await api.post('/api/user/cheatsheets', { subject, classLevel: cls, chapters, examDate, content: result }); setSaved(true) } catch (e) { alert(e.message) } }}>💾 Save to Library</GhostBtn>
             : <SuccessMsg msg="Saved to Library!" />}
         </div>
       </>}
@@ -1139,11 +1176,12 @@ CRITICAL: Total = EXACTLY ${marks} marks. Plain text, no markdown.`
     } finally { setLoading(false) }
   }
 
+  // ── CHANGE: removed maxWidth:900 + margin:'0 auto' ──
   return (
-    <div style={{ padding: 24, maxWidth: 900, margin: '0 auto', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
+    <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
       <PageHeader icon="📄" title="Question Paper Maker" subtitle="Generate multi-chapter CBSE papers — download and print" color="#8B5CF6" />
       <Card style={{ marginBottom: 18 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 4 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 4 }}>
           <Field label="Subject"><BSSelect value={subject} onChange={v => { setSubject(v); setChapters([]) }} options={SUBJECTS} /></Field>
           <Field label="Class"><BSSelect value={cls} onChange={v => { setCls(v); setChapters([]) }} options={CLASSES} /></Field>
           <Field label="Total Marks"><BSSelect value={marks} onChange={setMarks} options={['10','20','25','30','40','50','60','70','80','100']} /></Field>
@@ -1165,7 +1203,8 @@ CRITICAL: Total = EXACTLY ${marks} marks. Plain text, no markdown.`
           downloadName={`${subject}-${marks}marks-paper.txt`}
           onDownload={() => downloadText(result, `${subject}-${cls}-${marks}M-paper.txt`)} />
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          {!saved ? <GhostBtn small onClick={async () => { try { await api.post('/api/user/papers', { subject, classLevel: cls, chapters, marks: parseInt(marks), duration, description: desc, content: result }); setSaved(true) } catch (e) { alert(e.message) } }}>💾 Save Paper</GhostBtn>
+          {!saved
+            ? <GhostBtn small onClick={async () => { try { await api.post('/api/user/papers', { subject, classLevel: cls, chapters, marks: parseInt(marks), duration, description: desc, content: result }); setSaved(true) } catch (e) { alert(e.message) } }}>💾 Save Paper</GhostBtn>
             : <SuccessMsg msg="Saved!" />}
         </div>
       </>}
@@ -1175,7 +1214,7 @@ CRITICAL: Total = EXACTLY ${marks} marks. Plain text, no markdown.`
 }
 
 // ══════════════════════════════════════════════════════════════
-//  LESSON PLANNER  (teacher only)
+//  LESSON PLANNER
 // ══════════════════════════════════════════════════════════════
 function LessonPlanner({ user }) {
   const [subject,  setSubject]  = useState('Mathematics')
@@ -1217,14 +1256,15 @@ MINIMUM 1500 words. Every instruction must be immediately actionable.
     } finally { setLoading(false) }
   }
 
+  // ── CHANGE: removed maxWidth:900 + margin:'0 auto' ──
   return (
-    <div style={{ padding: 24, maxWidth: 900, margin: '0 auto', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
+    <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 4 }}>
         <PageHeader icon="🎓" title="AI Lesson Planner" subtitle="Minute-by-minute plans with teaching scripts, real-world examples, and Socratic questions" color="#7C3AED" />
         <span style={{ background: '#7C3AED', color: '#fff', borderRadius: 20, padding: '2px 12px', fontSize: 11, fontWeight: 800, fontFamily: "'Sora', sans-serif", flexShrink: 0, height: 'fit-content', marginTop: 6 }}>TEACHER ONLY</span>
       </div>
       <Card style={{ marginBottom: 18, borderColor: '#7C3AED' }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 4 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 4 }}>
           <Field label="Subject"><BSSelect value={subject} onChange={setSubject} options={SUBJECTS} /></Field>
           <Field label="Class"><BSSelect value={cls} onChange={setCls} options={CLASSES} /></Field>
         </div>
@@ -1258,7 +1298,8 @@ MINIMUM 1500 words. Every instruction must be immediately actionable.
           {rating > 0 && <span style={{ fontSize: 12.5, color: '#16a34a', fontWeight: 700 }}>Thank you!</span>}
         </Card>
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
-          {!saved ? <GhostBtn small onClick={async () => { try { await api.post('/api/user/lessonplans', { subject, topic, classLevel: cls, durationMinutes: duration, customPrompt: notes, content: result }); setSaved(true) } catch (e) { alert(e.message) } }}>💾 Save to Library</GhostBtn>
+          {!saved
+            ? <GhostBtn small onClick={async () => { try { await api.post('/api/user/lessonplans', { subject, topic, classLevel: cls, durationMinutes: duration, customPrompt: notes, content: result }); setSaved(true) } catch (e) { alert(e.message) } }}>💾 Save to Library</GhostBtn>
             : <SuccessMsg msg="Saved!" />}
         </div>
       </>}
@@ -1307,12 +1348,13 @@ Return ONLY valid JSON (no markdown, no explanation):
   const score = submitted ? quiz.questions.filter((q, i) => answers[i] === q.answer).length : 0
   const pct   = submitted ? Math.round((score / quiz.questions.length) * 100) : 0
 
+  // ── CHANGE: removed maxWidth:700 + margin:'0 auto' ──
   return (
-    <div style={{ padding: 24, maxWidth: 700, margin: '0 auto', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
+    <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
       <PageHeader icon="🎯" title="Quiz Generator" subtitle="Auto-generate MCQ quizzes with instant scoring and explanations" color="#F59E0B" />
       {!quiz ? (
         <Card>
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 4 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 16, marginBottom: 4 }}>
             <Field label="Subject"><BSSelect value={subject} onChange={setSubject} options={SUBJECTS} /></Field>
             <Field label="Questions"><BSSelect value={num} onChange={setNum} options={['5', '8', '10', '15', '20']} /></Field>
           </div>
@@ -1339,44 +1381,45 @@ Return ONLY valid JSON (no markdown, no explanation):
               <GhostBtn small onClick={() => { setQuiz(null); setAnswers({}); setSubmitted(false) }} style={{ background: 'rgba(255,255,255,.2)', border: 'none', color: '#fff' }}>New Quiz</GhostBtn>
             </div>
           )}
-
           <h3 style={{ marginBottom: 18, fontFamily: "'Sora', sans-serif", color: 'var(--text-h)' }}>{quiz.title}</h3>
-          {quiz.questions.map((q, i) => {
-            const selected = answers[i]
-            const correct  = q.answer
-            const isRight  = submitted && selected === correct
-            const isWrong  = submitted && selected !== undefined && selected !== correct
-            return (
-              <Card key={i} style={{ marginBottom: 14, borderLeft: submitted ? `4px solid ${isRight ? '#22c55e' : isWrong ? '#ef4444' : 'var(--border)'}` : 'none' }}>
-                <p style={{ margin: '0 0 12px', fontWeight: 700, fontSize: 14.5, color: 'var(--text-h)' }}><span style={{ color: 'var(--accent)' }}>Q{i + 1}.</span> {q.q}</p>
-                <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
-                  {q.options.map((opt, j) => {
-                    const isSelected = selected === j
-                    const isAnswer   = j === correct
-                    let bg = 'var(--social-bg)', border = 'var(--border)', color = 'var(--text-h)'
-                    if (submitted) {
-                      if (isAnswer)                             { bg = '#dcfce7'; border = '#86efac'; color = '#166534' }
-                      else if (isSelected && !isAnswer)         { bg = '#fee2e2'; border = '#fca5a5'; color = '#991b1b' }
-                    } else if (isSelected) { bg = 'var(--accent-bg)'; border = 'var(--accent)'; color = 'var(--accent)' }
-                    return (
-                      <button key={j} disabled={submitted} onClick={() => setAnswers(a => ({ ...a, [i]: j }))}
-                        style={{ padding: '9px 12px', borderRadius: 9, border: `1.5px solid ${border}`, background: bg, color, cursor: submitted ? 'default' : 'pointer', textAlign: 'left', fontSize: 13.5, fontFamily: "'Nunito', sans-serif", fontWeight: 600, transition: 'all .15s' }}>
-                        <span style={{ fontWeight: 800, marginRight: 4 }}>{String.fromCharCode(65 + j)}.</span>{opt}
-                        {submitted && isAnswer && ' ✓'}
-                      </button>
-                    )
-                  })}
-                </div>
-                {submitted && q.explanation && (
-                  <div style={{ marginTop: 11, padding: '9px 13px', background: 'var(--code-bg)', borderRadius: 9, fontSize: 13, color: 'var(--text)' }}>
-                    💡 {q.explanation}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(420px, 1fr))', gap: 14 }}>
+            {quiz.questions.map((q, i) => {
+              const selected = answers[i]
+              const correct  = q.answer
+              const isRight  = submitted && selected === correct
+              const isWrong  = submitted && selected !== undefined && selected !== correct
+              return (
+                <Card key={i} style={{ borderLeft: submitted ? `4px solid ${isRight ? '#22c55e' : isWrong ? '#ef4444' : 'var(--border)'}` : 'none' }}>
+                  <p style={{ margin: '0 0 12px', fontWeight: 700, fontSize: 14.5, color: 'var(--text-h)' }}><span style={{ color: 'var(--accent)' }}>Q{i + 1}.</span> {q.q}</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    {q.options.map((opt, j) => {
+                      const isSelected = selected === j
+                      const isAnswer   = j === correct
+                      let bg = 'var(--social-bg)', border = 'var(--border)', color = 'var(--text-h)'
+                      if (submitted) {
+                        if (isAnswer)                       { bg = '#dcfce7'; border = '#86efac'; color = '#166534' }
+                        else if (isSelected && !isAnswer)   { bg = '#fee2e2'; border = '#fca5a5'; color = '#991b1b' }
+                      } else if (isSelected) { bg = 'var(--accent-bg)'; border = 'var(--accent)'; color = 'var(--accent)' }
+                      return (
+                        <button key={j} disabled={submitted} onClick={() => setAnswers(a => ({ ...a, [i]: j }))}
+                          style={{ padding: '9px 12px', borderRadius: 9, border: `1.5px solid ${border}`, background: bg, color, cursor: submitted ? 'default' : 'pointer', textAlign: 'left', fontSize: 13.5, fontFamily: "'Nunito', sans-serif", fontWeight: 600, transition: 'all .15s' }}>
+                          <span style={{ fontWeight: 800, marginRight: 4 }}>{String.fromCharCode(65 + j)}.</span>{opt}
+                          {submitted && isAnswer && ' ✓'}
+                        </button>
+                      )
+                    })}
                   </div>
-                )}
-              </Card>
-            )
-          })}
+                  {submitted && q.explanation && (
+                    <div style={{ marginTop: 11, padding: '9px 13px', background: 'var(--code-bg)', borderRadius: 9, fontSize: 13, color: 'var(--text)' }}>
+                      💡 {q.explanation}
+                    </div>
+                  )}
+                </Card>
+              )
+            })}
+          </div>
           {!submitted && (
-            <PrimaryBtn onClick={submit} disabled={Object.keys(answers).length < quiz.questions.length} color="#F59E0B">
+            <PrimaryBtn onClick={submit} disabled={Object.keys(answers).length < quiz.questions.length} color="#F59E0B" style={{ marginTop: 16 }}>
               Submit ({Object.keys(answers).length}/{quiz.questions.length} answered) →
             </PrimaryBtn>
           )}
@@ -1420,11 +1463,12 @@ Return ONLY valid JSON (no markdown):
 
   const card = cards[current]
 
+  // ── CHANGE: removed maxWidth:700 + margin:'0 auto' ──
   return (
-    <div style={{ padding: 24, maxWidth: 700, margin: '0 auto', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
+    <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
       <PageHeader icon="🃏" title="Flashcards" subtitle="Grid mode & Study mode for fast revision" color="#EF4444" />
       <Card style={{ marginBottom: 18 }}>
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16, marginBottom: 4 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 16, marginBottom: 4 }}>
           <Field label="Subject"><BSSelect value={subject} onChange={setSubject} options={SUBJECTS} /></Field>
           <Field label="Class"><BSSelect value={cls} onChange={setCls} options={CLASSES} /></Field>
         </div>
@@ -1448,7 +1492,7 @@ Return ONLY valid JSON (no markdown):
         </div>
 
         {mode === 'grid' ? (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(195px, 1fr))', gap: 14 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 14 }}>
             {cards.map((c, i) => (
               <div key={i} onClick={() => setFlipped(f => ({ ...f, [i]: !f[i] }))} style={{ height: 130, borderRadius: 14, cursor: 'pointer', perspective: 1000 }}>
                 <div style={{ width: '100%', height: '100%', position: 'relative', transformStyle: 'preserve-3d', transition: 'transform .5s', transform: flipped[i] ? 'rotateY(180deg)' : 'none' }}>
@@ -1464,7 +1508,7 @@ Return ONLY valid JSON (no markdown):
             ))}
           </div>
         ) : (
-          <Card style={{ textAlign: 'center' }}>
+          <Card style={{ textAlign: 'center', maxWidth: 600, margin: '0 auto' }}>
             <div style={{ fontSize: 12, color: 'var(--text)', marginBottom: 8, fontWeight: 700 }}>Card {current + 1} of {cards.length}</div>
             <div style={{ background: 'var(--border)', borderRadius: 999, height: 5, margin: '0 auto 18px', maxWidth: 240 }}>
               <div style={{ background: '#EF4444', width: `${((current + 1) / cards.length) * 100}%`, height: '100%', borderRadius: 999 }} />
@@ -1474,8 +1518,8 @@ Return ONLY valid JSON (no markdown):
               <span style={{ color: flipped[current] ? 'var(--text-h)' : '#fff', fontWeight: 800, fontSize: 16, lineHeight: 1.5 }}>{flipped[current] ? card.back : card.front}</span>
             </div>
             <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
-              <GhostBtn disabled={current === 0}             onClick={() => { setCurrent(c => c - 1); setFlipped({}) }}>← Prev</GhostBtn>
-              <PrimaryBtn color="#EF4444"                     onClick={() => setFlipped(f => ({ ...f, [current]: !f[current] }))}>Flip</PrimaryBtn>
+              <GhostBtn disabled={current === 0}                onClick={() => { setCurrent(c => c - 1); setFlipped({}) }}>← Prev</GhostBtn>
+              <PrimaryBtn color="#EF4444"                        onClick={() => setFlipped(f => ({ ...f, [current]: !f[current] }))}>Flip</PrimaryBtn>
               <GhostBtn disabled={current === cards.length - 1} onClick={() => { setCurrent(c => c + 1); setFlipped({}) }}>Next →</GhostBtn>
             </div>
           </Card>
@@ -1500,8 +1544,9 @@ function AchievementsPage() {
   const cats = ['all', 'unlocked', 'streak', 'xp', 'tools', 'special', 'legendary']
   const shown = achs.filter(a => filter === 'all' || (filter === 'unlocked' && a.unlocked) || a.category === filter)
 
+  // ── CHANGE: removed maxWidth:900 + margin:'0 auto' ──
   return (
-    <div style={{ padding: 24, maxWidth: 900, margin: '0 auto', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
+    <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
       <PageHeader icon="🏆" title={`Achievements (${unlocked.length}/${achs.length})`} subtitle="Unlock achievements by completing activities and earning XP" color="#F59E0B" />
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 22 }}>
         {cats.map(c => (
@@ -1511,7 +1556,7 @@ function AchievementsPage() {
           </button>
         ))}
       </div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(210px, 1fr))', gap: 13 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(240px, 1fr))', gap: 13 }}>
         {shown.map(a => (
           <Card key={a.id} style={{ opacity: a.unlocked ? 1 : .5, borderColor: a.unlocked ? DIFF_COLORS[a.difficulty] : 'var(--border)', position: 'relative' }}>
             {a.unlocked && <div style={{ position: 'absolute', top: 10, right: 10, width: 8, height: 8, background: '#22c55e', borderRadius: '50%' }} />}
@@ -1549,41 +1594,43 @@ function ProfilePage({ user, onUpdate }) {
     } catch (e) { setErr(e.message) } finally { setBusy(false) }
   }
 
+  // ── CHANGE: removed maxWidth:640 + margin:'0 auto'; form card stays at natural width ──
   return (
-    <div style={{ padding: 24, maxWidth: 640, margin: '0 auto', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
+    <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
       <PageHeader icon="👤" title="My Profile" subtitle="Update your personal information and preferences" color="#6366F1" />
-      <Card style={{ marginBottom: 18, textAlign: 'center' }}>
-        <div style={{ width: 66, height: 66, borderRadius: 18, background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30, margin: '0 auto 14px', fontWeight: 900, color: '#fff' }}>
-          {user.name?.[0]?.toUpperCase() || '?'}
-        </div>
-        <div style={{ fontWeight: 800, color: 'var(--text-h)', fontSize: 17, fontFamily: "'Sora', sans-serif" }}>{user.name}</div>
-        <div style={{ color: 'var(--text)', fontSize: 13.5, marginTop: 3 }}>{user.email}</div>
-        <div style={{ marginTop: 10 }}>
-          <span style={{ background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid var(--accent-border)', borderRadius: 20, padding: '3px 14px', fontSize: 12.5, fontWeight: 700 }}>
-            {user.type === 'school' ? `🏫 School ${user.role}` : `🌐 Personal ${user.role}`}
-          </span>
-        </div>
-      </Card>
-
-      <form onSubmit={save}>
-        <Card>
-          <Field label="Full Name"><BSInput value={form.name} onChange={set('name')} placeholder="Your full name" required /></Field>
-          <Field label="Bio"><BSTextarea value={form.bio} onChange={set('bio')} placeholder="Tell us about yourself..." rows={2} /></Field>
-          <Field label="Phone"><BSInput value={form.phone} onChange={set('phone')} placeholder="Optional" /></Field>
-          {user.role === 'student' && (
-            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
-              <Field label="Class"><BSSelect value={form.classLevel} onChange={set('classLevel')} options={[{ value: '', label: 'Select class' }, ...CLASSES.map(c => ({ value: c, label: c }))]} /></Field>
-              <Field label="Section"><BSInput value={form.section} onChange={set('section')} placeholder="e.g. A" /></Field>
-            </div>
-          )}
-          {user.role === 'teacher' && <Field label="Subject Specialization"><BSInput value={form.subjectSpecialization} onChange={set('subjectSpecialization')} placeholder="e.g. Mathematics, Physics" /></Field>}
-          <ErrMsg msg={err} />
-          {ok && <SuccessMsg msg="Profile updated successfully!" />}
-          <PrimaryBtn style={{ marginTop: 8 }} disabled={busy}>
-            {busy ? <><Spinner /> Saving...</> : '💾 Save Changes'}
-          </PrimaryBtn>
+      <div style={{ maxWidth: 680 }}>
+        <Card style={{ marginBottom: 18, textAlign: 'center' }}>
+          <div style={{ width: 66, height: 66, borderRadius: 18, background: 'linear-gradient(135deg, #6366F1, #8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 30, margin: '0 auto 14px', fontWeight: 900, color: '#fff' }}>
+            {user.name?.[0]?.toUpperCase() || '?'}
+          </div>
+          <div style={{ fontWeight: 800, color: 'var(--text-h)', fontSize: 17, fontFamily: "'Sora', sans-serif" }}>{user.name}</div>
+          <div style={{ color: 'var(--text)', fontSize: 13.5, marginTop: 3 }}>{user.email}</div>
+          <div style={{ marginTop: 10 }}>
+            <span style={{ background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid var(--accent-border)', borderRadius: 20, padding: '3px 14px', fontSize: 12.5, fontWeight: 700 }}>
+              {user.type === 'school' ? `🏫 School ${user.role}` : `🌐 Personal ${user.role}`}
+            </span>
+          </div>
         </Card>
-      </form>
+        <form onSubmit={save}>
+          <Card>
+            <Field label="Full Name"><BSInput value={form.name} onChange={set('name')} placeholder="Your full name" required /></Field>
+            <Field label="Bio"><BSTextarea value={form.bio} onChange={set('bio')} placeholder="Tell us about yourself..." rows={2} /></Field>
+            <Field label="Phone"><BSInput value={form.phone} onChange={set('phone')} placeholder="Optional" /></Field>
+            {user.role === 'student' && (
+              <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+                <Field label="Class"><BSSelect value={form.classLevel} onChange={set('classLevel')} options={[{ value: '', label: 'Select class' }, ...CLASSES.map(c => ({ value: c, label: c }))]} /></Field>
+                <Field label="Section"><BSInput value={form.section} onChange={set('section')} placeholder="e.g. A" /></Field>
+              </div>
+            )}
+            {user.role === 'teacher' && <Field label="Subject Specialization"><BSInput value={form.subjectSpecialization} onChange={set('subjectSpecialization')} placeholder="e.g. Mathematics, Physics" /></Field>}
+            <ErrMsg msg={err} />
+            {ok && <SuccessMsg msg="Profile updated successfully!" />}
+            <PrimaryBtn style={{ marginTop: 8 }} disabled={busy}>
+              {busy ? <><Spinner /> Saving...</> : '💾 Save Changes'}
+            </PrimaryBtn>
+          </Card>
+        </form>
+      </div>
     </div>
   )
 }
@@ -1650,7 +1697,6 @@ export default function App() {
   }
 
   const subExpired = user.subscription_status !== 'active' && user.free_tier_exhausted && user.type === 'personal'
-  const activeColor = tabs.find(t => t.id === tab)?.color || '#6366F1'
 
   return (
     <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column', fontFamily: "'Nunito', sans-serif" }}>
@@ -1714,7 +1760,7 @@ export default function App() {
           )}
         </nav>
 
-        {/* Main content */}
+        {/* Main content — fills all remaining width */}
         <main style={{ flex: 1, overflowY: 'auto', minWidth: 0 }}>
           <div style={{ padding: '16px 24px 0' }}>
             <FreeTierBanner user={user} onSubscribe={() => setTab('subscription')} />
