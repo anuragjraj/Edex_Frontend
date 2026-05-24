@@ -2382,100 +2382,845 @@ function AchievementsPage() {
 //  CHAPTER COURSES
 // ══════════════════════════════════════════════════════════════
 function ChapterCourses({ user }) {
-  const [subj,setSubj]=useState('Mathematics'); const [cls,setCls]=useState(user?.class_level||'Class 10')
-  const [chapter,setChapter]=useState(''); const [course,setCourse]=useState(null); const [loading,setLoading]=useState(false)
-  const [tab,setTab]=useState('notes'); const [qa,setQa]=useState([]); const [quiz,setQuiz]=useState([])
-  const [qaOpen,setQaOpen]=useState(null); const [ans,setAns]=useState({}); const [done,setDone]=useState(false); const [score,setScore]=useState(0); const [err,setErr]=useState('')
-  const chs=getChapters(subj,cls)
-  const cacheKey=ch=>`bsc-${subj.replace(/\W/g,'')}-${cls.replace(/\W/g,'')}-${ch.replace(/\W/g,'').slice(0,16)}`
+  const [subj,     setSubj]    = useState('Mathematics');
+  const [cls,      setCls]     = useState(user?.class_level || 'Class 10');
+  const [chapter,  setChapter] = useState('');
+  const [phase,    setPhase]   = useState('select');   // select | generating | course | module
+  const [courseKey, setCourseKey] = useState('');
+  const [modules,  setModules] = useState([]);
+  const [activeModuleId, setActiveModuleId] = useState(null);
+  const [moduleData, setModuleData] = useState(null);    // loaded module content
+  const [progress, setProgress] = useState({ done: 0, total: 0 });
+  const [statusMsg, setStatusMsg] = useState('');
+  const [err, setErr] = useState('');
+  const [completedIds, setCompletedIds] = useState(() => {
+    try { return new Set(JSON.parse(localStorage.getItem('bs_completed_modules') || '[]')); }
+    catch { return new Set(); }
+  });
 
-  const loadChapter=async ch=>{
-    setChapter(ch);setLoading(true);setCourse(null);setQa([]);setQuiz([]);setAns({});setDone(false);setTab('notes');setErr('')
-    const k=cacheKey(ch)
-    try{
-      const cached=await api.get(`/api/courses/${k}`)
-      if(cached?.notes){setCourse(cached.notes);setQa(cached.qa||[]);setQuiz(cached.quiz||[]);setLoading(false);return}
-    }catch{}
-    try{
-      const [notesR,qaR,quizR]=await Promise.all([
-        api.post('/api/ai/notes',{messages:[{role:'user',content:`Write CBSE exam-ready study notes for "${ch}" — ${cls} ${subj}. Use ## headings, **bold** key terms, include formulas, solved example, and exam tips. ~500 words.`}],subject:subj,chapter:ch}),
-        api.post('/api/ai/quiz',{messages:[{role:'user',content:`Generate 6 Q&A pairs for "${ch}" (${cls} ${subj}) CBSE. Return ONLY JSON: [{"q":"...","a":"...","d":"Easy|Medium|Hard"}]`}],subject:subj,chapter:ch}),
-        api.post('/api/ai/quiz',{messages:[{role:'user',content:`Generate 8 MCQ for "${ch}" (${cls} ${subj}) CBSE. Return ONLY JSON: [{"q":"...","opts":["A","B","C","D"],"ans":0,"exp":"..."}]`}],subject:subj,chapter:ch}),
-      ])
-      let pqa=[],pqz=[]
-      try{pqa=JSON.parse(qaR.content.replace(/```[\w]*\n?/g,'').trim())}catch{}
-      try{pqz=JSON.parse(quizR.content.replace(/```[\w]*\n?/g,'').trim())}catch{}
-      api.post('/api/courses',{cacheKey:k,notes:notesR.content,qa:pqa,quiz:pqz,subject:subj,cls,chapter:ch}).catch(()=>{})
-      setCourse(notesR.content);setQa(pqa);setQuiz(pqz)
-    }catch(e){setErr(e.status===402?'Subscribe to generate courses.':e.message)}
-    setLoading(false)
+  const chs    = getChapters(subj, cls);
+  const sseRef = useRef(null);
+
+  // ── Close SSE on unmount ──────────────────────────────────
+  useEffect(() => () => sseRef.current?.close(), []);
+
+  // ── Mark module complete ──────────────────────────────────
+  function markComplete(id) {
+    setCompletedIds(prev => {
+      const next = new Set([...prev, `${courseKey}-${id}`]);
+      localStorage.setItem('bs_completed_modules', JSON.stringify([...next]));
+      return next;
+    });
+  }
+  const isComplete = id => completedIds.has(`${courseKey}-${id}`);
+
+  // ── Generate course ───────────────────────────────────────
+  async function generateCourse() {
+    if (!chapter) return;
+    setErr(''); setPhase('generating'); setModules([]); setProgress({ done: 0, total: 0 });
+    setStatusMsg(`Designing modules for "${chapter}"…`);
+
+    try {
+      const { courseKey: key, existing } = await api.post('/api/chapter-courses/generate', {
+        subject: subj, cls, chapter,
+      });
+      setCourseKey(key);
+
+      if (existing) {
+        // Already cached — load directly
+        const cached = await api.get(`/api/chapter-courses/list/${key}`);
+        if (cached?.modules) {
+          setModules(cached.modules);
+          setProgress({ done: cached.modules.filter(m => m.status === 'done').length, total: cached.modules.length });
+          setPhase('course');
+          return;
+        }
+      }
+
+      // Connect SSE for live progress
+      connectSSE(key);
+    } catch (e) {
+      setErr(e.message);
+      setPhase('select');
+    }
   }
 
-  const submitQuiz=()=>{let s=0;quiz.forEach((q,i)=>{if(ans[i]===q.ans)s++});setScore(s);setDone(true)}
+  function connectSSE(key) {
+    const token = localStorage.getItem('bs_token');
+    const es    = new EventSource(`${API_URL}/api/chapter-courses/stream/${key}?token=${token}`);
+    sseRef.current = es;
+
+    es.onmessage = e => {
+      try {
+        const msg = JSON.parse(e.data);
+        handleSSEMessage(msg);
+      } catch {}
+    };
+
+    es.onerror = () => {
+      es.close();
+      // Fallback: poll once
+      api.get(`/api/chapter-courses/list/${key}`).then(cached => {
+        if (cached?.modules) { setModules(cached.modules); setPhase('course'); }
+      }).catch(() => {});
+    };
+  }
+
+  function handleSSEMessage(msg) {
+    switch (msg.type) {
+      case 'status':
+        setStatusMsg(msg.message);
+        break;
+
+      case 'modules_listed':
+        setModules(msg.modules || []);
+        setProgress({ done: 0, total: msg.modules?.length || 0 });
+        setStatusMsg('Searching YouTube & generating content for each module…');
+        break;
+
+      case 'module_building':
+        setModules(prev => prev.map(m => m.id === msg.moduleId ? { ...m, status: 'building' } : m));
+        setStatusMsg(`Building module ${msg.moduleId}: "${msg.title}"…`);
+        break;
+
+      case 'module_done':
+        setModules(prev => prev.map(m => m.id === msg.moduleId
+          ? { ...m, status: 'done', videoId: msg.videoId, transcriptStatus: msg.transcriptStatus } : m));
+        setProgress(p => ({ ...p, done: p.done + 1 }));
+        break;
+
+      case 'module_error':
+        setModules(prev => prev.map(m => m.id === msg.moduleId ? { ...m, status: 'error' } : m));
+        break;
+
+      case 'generation_complete':
+        if (msg.modules) setModules(msg.modules);
+        setPhase('course');
+        sseRef.current?.close();
+        break;
+
+      case 'already_done':
+        if (msg.data?.modules) setModules(msg.data.modules);
+        setPhase('course');
+        sseRef.current?.close();
+        break;
+
+      case 'error':
+        setErr(msg.message || 'Generation failed');
+        setPhase('select');
+        sseRef.current?.close();
+        break;
+    }
+  }
+
+  // ── Open a module ─────────────────────────────────────────
+  async function openModule(mod) {
+    if (mod.status !== 'done') return;
+    setActiveModuleId(mod.id);
+    setModuleData(null);
+    setPhase('module');
+
+    const modKey = buildModKey(subj, cls, chapter, mod.id);
+    try {
+      const data = await api.get(`/api/chapter-courses/module/${modKey}`);
+      setModuleData(data);
+    } catch (e) {
+      setErr('Could not load module content: ' + e.message);
+    }
+  }
+
+  function buildModKey(subject, cls, chapter, moduleId) {
+    const safe = s => s.replace(/[^a-zA-Z0-9]/g, '').toLowerCase().slice(0, 16);
+    return `bscm-mod-${safe(subject)}-${safe(cls)}-${safe(chapter)}-${moduleId}`;
+  }
+
+  // ── Render phases ─────────────────────────────────────────
+  if (phase === 'module' && activeModuleId !== null) {
+    const mod = modules.find(m => m.id === activeModuleId);
+    return (
+      <ModuleView
+        mod={mod}
+        moduleData={moduleData}
+        subject={subj}
+        cls={cls}
+        chapter={chapter}
+        courseKey={courseKey}
+        isComplete={isComplete(activeModuleId)}
+        onComplete={() => markComplete(activeModuleId)}
+        onBack={() => setPhase('course')}
+        onPrev={() => {
+          const idx = modules.findIndex(m => m.id === activeModuleId);
+          if (idx > 0) openModule(modules[idx - 1]);
+        }}
+        onNext={() => {
+          const idx = modules.findIndex(m => m.id === activeModuleId);
+          const next = modules.slice(idx + 1).find(m => m.status === 'done');
+          if (next) openModule(next);
+        }}
+        hasPrev={modules.findIndex(m => m.id === activeModuleId) > 0}
+        hasNext={modules.slice(modules.findIndex(m => m.id === activeModuleId) + 1).some(m => m.status === 'done')}
+      />
+    );
+  }
+
+  if (phase === 'generating') {
+    return (
+      <div style={{ padding: 24, fontFamily: "'Nunito', sans-serif", maxWidth: 800, margin: '0 auto' }}>
+        <GhostBtn small onClick={() => { sseRef.current?.close(); setPhase('select'); }} style={{ marginBottom: 20 }}>
+          ← Back
+        </GhostBtn>
+        <div style={{ marginBottom: 24 }}>
+          <h2 style={{ fontFamily: "'Sora', sans-serif", fontWeight: 900, color: 'var(--text-h)', margin: '0 0 6px' }}>
+            📚 Building Your Course
+          </h2>
+          <p style={{ color: 'var(--text)', margin: 0, fontSize: 13 }}>
+            {chapter} · {subj} · {cls}
+          </p>
+        </div>
+
+        {/* Progress bar */}
+        <Card style={{ marginBottom: 18 }}>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: 'var(--text-h)' }}>{statusMsg}</span>
+            {progress.total > 0 && (
+              <span style={{ fontSize: 13, color: 'var(--accent)', fontWeight: 800 }}>
+                {progress.done}/{progress.total}
+              </span>
+            )}
+          </div>
+          {progress.total > 0 && (
+            <div style={{ background: 'var(--border)', borderRadius: 999, height: 8 }}>
+              <div style={{ background: 'linear-gradient(90deg, #6366F1, #8B5CF6)', width: `${Math.round((progress.done / progress.total) * 100)}%`, height: '100%', borderRadius: 999, transition: 'width .5s ease' }} />
+            </div>
+          )}
+        </Card>
+
+        {/* Live module cards */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))', gap: 10 }}>
+          {modules.map(mod => (
+            <div key={mod.id} style={{
+              background: 'var(--bg2)', border: `1px solid ${mod.status === 'done' ? '#6366F1' : mod.status === 'building' ? '#F59E0B' : mod.status === 'error' ? '#EF4444' : 'var(--border)'}`,
+              borderRadius: 12, padding: '12px 14px', transition: 'border-color .3s',
+            }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <span style={{ fontSize: 20 }}>{mod.emoji}</span>
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontSize: 12.5, fontWeight: 700, color: 'var(--text-h)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {mod.title}
+                  </div>
+                </div>
+                <StatusDot status={mod.status} />
+              </div>
+              {mod.status === 'building' && (
+                <div style={{ fontSize: 11, color: '#F59E0B', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <Spinner size={10} /> Searching YouTube…
+                </div>
+              )}
+              {mod.status === 'done' && mod.videoId && (
+                <div style={{ fontSize: 10.5, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                  <span>▶</span>
+                  <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                    {mod.videoTitle ? mod.videoTitle.slice(0, 35) + '…' : 'Video found'}
+                  </span>
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+        <ErrMsg msg={err} />
+      </div>
+    );
+  }
+
+  if (phase === 'course') {
+    const doneCount  = modules.filter(m => m.status === 'done').length;
+    const compCount  = modules.filter(m => isComplete(m.id)).length;
+    const pct        = doneCount > 0 ? Math.round((compCount / doneCount) * 100) : 0;
+
+    return (
+      <div style={{ padding: 24, fontFamily: "'Nunito', sans-serif", maxWidth: 900, margin: '0 auto' }}>
+        <GhostBtn small onClick={() => setPhase('select')} style={{ marginBottom: 20 }}>
+          ← Change Chapter
+        </GhostBtn>
+
+        {/* Course header */}
+        <div style={{ marginBottom: 22, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
+          <div>
+            <h2 style={{ fontFamily: "'Sora', sans-serif", fontWeight: 900, fontSize: 'clamp(1.1rem, 2.5vw, 1.4rem)', color: 'var(--text-h)', margin: '0 0 4px' }}>
+              📚 {chapter}
+            </h2>
+            <p style={{ color: 'var(--text)', margin: 0, fontSize: 13 }}>
+              {subj} · {cls} · CBSE · {doneCount} modules
+            </p>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 900, fontSize: 22, color: 'var(--accent)' }}>
+              {pct}%
+            </div>
+            <div style={{ fontSize: 11, color: 'var(--text)' }}>{compCount}/{doneCount} completed</div>
+          </div>
+        </div>
+
+        {/* Progress bar */}
+        <div style={{ background: 'var(--border)', borderRadius: 999, height: 6, marginBottom: 24 }}>
+          <div style={{ background: 'linear-gradient(90deg, #6366F1, #8B5CF6)', width: `${pct}%`, height: '100%', borderRadius: 999, transition: 'width .5s ease' }} />
+        </div>
+
+        {/* Module grid */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
+          {modules.map((mod, idx) => {
+            const done    = mod.status === 'done';
+            const comp    = isComplete(mod.id);
+            const active  = mod.status === 'building';
+            return (
+              <div key={mod.id}
+                onClick={() => done && openModule(mod)}
+                style={{
+                  background: comp ? 'rgba(99,102,241,.1)' : 'var(--bg2)',
+                  border: `1.5px solid ${comp ? 'var(--accent)' : done ? 'rgba(255,255,255,.1)' : 'var(--border)'}`,
+                  borderRadius: 14, padding: '14px 16px',
+                  cursor: done ? 'pointer' : 'default',
+                  opacity: !done && !active ? .55 : 1,
+                  transition: 'all .2s',
+                  position: 'relative',
+                }}
+                onMouseEnter={e => { if (done) e.currentTarget.style.borderColor = 'var(--accent)'; }}
+                onMouseLeave={e => { if (done) e.currentTarget.style.borderColor = comp ? 'var(--accent)' : 'rgba(255,255,255,.1)'; }}>
+
+                {/* Completion badge */}
+                {comp && (
+                  <div style={{ position: 'absolute', top: 10, right: 10, width: 20, height: 20, background: 'var(--accent)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#fff' }}>✓</div>
+                )}
+
+                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
+                  <span style={{ fontSize: 24, lineHeight: 1, flexShrink: 0 }}>{mod.emoji}</span>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 3 }}>
+                      Module {idx + 1}
+                    </div>
+                    <div style={{ fontFamily: "'Sora', sans-serif", fontSize: 13.5, fontWeight: 800, color: 'var(--text-h)', lineHeight: 1.3 }}>
+                      {mod.title}
+                    </div>
+                  </div>
+                </div>
+
+                <p style={{ fontSize: 12, color: 'var(--text)', margin: '0 0 10px', lineHeight: 1.5 }}>
+                  {mod.description}
+                </p>
+
+                {/* Video info */}
+                {done && mod.videoId && (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', background: 'rgba(255,255,255,.04)', borderRadius: 8, marginBottom: 8 }}>
+                    {mod.videoThumbnail && (
+                      <img src={mod.videoThumbnail} alt="" style={{ width: 44, height: 30, objectFit: 'cover', borderRadius: 4, flexShrink: 0 }} />
+                    )}
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 10.5, color: 'var(--text-h)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>
+                        {mod.videoTitle || 'Video found'}
+                      </div>
+                      <div style={{ fontSize: 10, color: 'var(--text)' }}>
+                        {mod.videoChannel}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                  <div style={{ display: 'flex', gap: 5 }}>
+                    {done && <span style={{ fontSize: 10, background: 'rgba(99,102,241,.1)', color: 'var(--accent)', borderRadius: 20, padding: '2px 8px', fontWeight: 700 }}>
+                      {mod.estimatedMinutes || 15} min
+                    </span>}
+                    {done && (
+                      <span style={{ fontSize: 10, background: mod.transcriptStatus === 'success' ? 'rgba(16,185,129,.1)' : 'rgba(100,116,139,.1)', color: mod.transcriptStatus === 'success' ? '#6ee7b7' : '#94a3b8', borderRadius: 20, padding: '2px 8px', fontWeight: 700 }}>
+                        {mod.transcriptStatus === 'success' ? '📄 Transcript' : '🧠 AI Notes'}
+                      </span>
+                    )}
+                    {active && <span style={{ fontSize: 10, color: '#F59E0B', display: 'flex', alignItems: 'center', gap: 3 }}><Spinner size={9} /> Building…</span>}
+                  </div>
+                  {done && <span style={{ fontSize: 14, color: 'var(--text)' }}>→</span>}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {modules.some(m => m.status === 'error') && (
+          <div style={{ marginTop: 16 }}>
+            <p style={{ fontSize: 13, color: '#fca5a5' }}>⚠️ Some modules had errors.</p>
+          </div>
+        )}
+        <ErrMsg msg={err} />
+      </div>
+    );
+  }
+
+  // ── PHASE: select chapter ─────────────────────────────────
+  return (
+    <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif" }}>
+      <PageHeader icon="📚" title="Chapter Courses" subtitle="AI selects the best YouTube videos per topic & generates notes + quiz from transcripts" color="#8B5CF6" />
+
+      <Card style={{ marginBottom: 18 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 14, marginBottom: 14 }}>
+          <Field label="Subject">
+            <BSSelect value={subj} onChange={v => { setSubj(v); setChapter(''); }} options={SUBJECTS} />
+          </Field>
+          <Field label="Class">
+            <BSSelect value={cls} onChange={v => { setCls(v); setChapter(''); }} options={CLASSES} />
+          </Field>
+        </div>
+
+        <Field label="Select Chapter">
+          <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6, marginTop: 4 }}>
+            {chs.map(ch => (
+              <button key={ch} onClick={() => setChapter(ch)}
+                style={{
+                  padding: '6px 14px', borderRadius: 20, fontSize: 12.5, cursor: 'pointer',
+                  fontWeight: 700, fontFamily: "'Nunito', sans-serif", transition: 'all .15s',
+                  background: chapter === ch ? 'var(--accent)' : 'var(--accent-bg)',
+                  color: chapter === ch ? '#fff' : 'var(--accent)',
+                  border: `1px solid ${chapter === ch ? 'var(--accent)' : 'var(--accent-border)'}`,
+                }}>
+                {ch}
+              </button>
+            ))}
+          </div>
+        </Field>
+
+        {chapter && (
+          <div style={{ marginTop: 14, padding: '14px 16px', background: 'var(--accent-bg)', border: '1px solid var(--accent-border)', borderRadius: 12 }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
+              <div>
+                <div style={{ fontWeight: 800, color: 'var(--text-h)', fontSize: 14 }}>{chapter}</div>
+                <div style={{ fontSize: 12, color: 'var(--text)', marginTop: 3 }}>
+                  AI will generate 8-12 focused modules · YouTube videos selected for each · Notes + Quiz from transcript
+                </div>
+              </div>
+              <PrimaryBtn onClick={generateCourse} color="#8B5CF6">
+                🚀 Build Course
+              </PrimaryBtn>
+            </div>
+          </div>
+        )}
+      </Card>
+
+      {/* Feature highlights */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 10, marginBottom: 20 }}>
+        {[
+          ['🎬', 'Best Video Selected', 'YouTube searched per sub-topic — best video with transcript chosen'],
+          ['📄', 'Transcript-Based', 'Notes & quiz generated from actual video content, not guesswork'],
+          ['🎯', 'Per-Module Quiz', '8 MCQs per module based on what the video teaches'],
+          ['💬', 'Deep Q&A', '6 practice questions per module from Hard to Easy'],
+        ].map(([e, t, d]) => (
+          <div key={t} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, padding: '14px 15px' }}>
+            <div style={{ fontSize: 22, marginBottom: 6 }}>{e}</div>
+            <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-h)', marginBottom: 4 }}>{t}</div>
+            <div style={{ fontSize: 11.5, color: 'var(--text)', lineHeight: 1.5 }}>{d}</div>
+          </div>
+        ))}
+      </div>
+      <ErrMsg msg={err} />
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  STATUS DOT (module status indicator)
+// ══════════════════════════════════════════════════════════════
+function StatusDot({ status }) {
+  const MAP = {
+    done:     { color: '#22c55e', label: '✓' },
+    building: { color: '#F59E0B', label: '…' },
+    error:    { color: '#EF4444', label: '!' },
+    pending:  { color: '#64748b', label: '' },
+  };
+  const { color, label } = MAP[status] || MAP.pending;
+  return (
+    <div style={{ width: 18, height: 18, borderRadius: '50%', background: color, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, color: '#fff', fontWeight: 900, flexShrink: 0 }}>
+      {status === 'building' ? <Spinner size={10} /> : label}
+    </div>
+  );
+}
+
+// ══════════════════════════════════════════════════════════════
+//  MODULE VIEW — Video player + Notes/Q&A/Quiz tabs
+// ══════════════════════════════════════════════════════════════
+function ModuleView({ mod, moduleData, subject, cls, chapter, courseKey, isComplete, onComplete, onBack, onPrev, onNext, hasPrev, hasNext }) {
+  const [tab,     setTab]     = useState('video');
+  const [qAns,    setQAns]    = useState({});
+  const [qDone,   setQDone]   = useState(false);
+  const [qScore,  setQScore]  = useState(0);
+  const [qaOpen,  setQaOpen]  = useState(null);
+  const [swapping, setSwapping] = useState(false);   // show video picker
+
+  const notes = moduleData?.notes;
+  const qa    = moduleData?.qa    || [];
+  const quiz  = moduleData?.quiz  || [];
+
+  function submitQuiz() {
+    let s = 0;
+    quiz.forEach((q, i) => { if (qAns[i] === q.ans) s++; });
+    setQScore(s);
+    setQDone(true);
+    if (!isComplete) onComplete?.();
+  }
+
+  async function swapVideo(newVideoId) {
+    try {
+      await api.patch('/api/chapter-courses/module/video', {
+        subject, cls, chapter,
+        moduleId:    mod.id,
+        newVideoId,
+        moduleTitle: mod.title,
+      });
+      // Reload the module data after a short delay (background regen takes ~10s)
+      setSwapping(false);
+      // Update the embedded video immediately
+      window._bsModVideoId = newVideoId;
+      // Show note about regeneration
+    } catch (e) {
+      alert('Swap failed: ' + e.message);
+    }
+  }
+
+  const currentVideoId = moduleData?.videoId || mod?.videoId;
+  const searchResults  = moduleData?.searchResults || [];
+  const pct = qDone ? Math.round((qScore / Math.max(quiz.length, 1)) * 100) : 0;
 
   return (
-    <div style={{ padding:24, width:'100%', boxSizing:'border-box', fontFamily:"'Nunito',sans-serif" }}>
-      <PageHeader icon="📚" title="Chapter Courses" subtitle="AI-generated CBSE courses — built once, cached for all students." color="#8B5CF6"/>
-      <Card style={{ marginBottom:18 }}>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:12, marginBottom:chs.length?14:0 }}>
-          <Field label="Subject"><BSSelect value={subj} onChange={v=>{setSubj(v);setChapter('');setCourse(null)}} options={SUBJECTS}/></Field>
-          <Field label="Class"><BSSelect value={cls} onChange={v=>{setCls(v);setChapter('');setCourse(null)}} options={CLASSES}/></Field>
+    <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif", maxWidth: 860, margin: '0 auto' }}>
+
+      {/* Top nav */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
+        <GhostBtn small onClick={onBack}>← All Modules</GhostBtn>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <span style={{ fontSize: 20 }}>{mod?.emoji}</span>
+            <span style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 15, color: 'var(--text-h)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {mod?.title}
+            </span>
+            {isComplete && (
+              <span style={{ background: 'rgba(99,102,241,.1)', color: 'var(--accent)', borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
+                ✓ Completed
+              </span>
+            )}
+          </div>
+          <div style={{ fontSize: 12, color: 'var(--text)', paddingLeft: 28 }}>{subject} · {cls} · {chapter}</div>
         </div>
-        {chs.length>0&&<><Label>Select Chapter</Label>
-          <div style={{ display:'flex', flexWrap:'wrap', gap:6, marginTop:6 }}>
-            {chs.map(ch=>(
-              <button key={ch} onClick={()=>loadChapter(ch)} disabled={loading} style={{ padding:'5px 12px', borderRadius:20, fontSize:12, cursor:'pointer', fontWeight:700, fontFamily:"'Nunito',sans-serif", transition:'all .15s', background:chapter===ch?'var(--accent)':'var(--accent-bg)', color:chapter===ch?'#fff':'var(--accent)', border:`1px solid ${chapter===ch?'var(--accent)':'var(--accent-border)'}`, opacity:loading&&chapter!==ch?.5:1 }}>{ch}</button>
-            ))}
-          </div>
-        </>}
-      </Card>
-      <ErrMsg msg={err}/>
-      {loading&&<div style={{ textAlign:'center', padding:44 }}><PageSpinner/><p style={{ marginTop:10, fontSize:13, color:'var(--text)' }}>Generating "{chapter}" — saved for all students after this ✨</p></div>}
-      {course&&!loading&&(
+        <div style={{ display: 'flex', gap: 7 }}>
+          <GhostBtn small onClick={onPrev} disabled={!hasPrev}>← Prev</GhostBtn>
+          <GhostBtn small onClick={onNext} disabled={!hasNext}>Next →</GhostBtn>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div style={{ display: 'flex', gap: 3, marginBottom: 16, background: 'var(--code-bg)', borderRadius: 10, padding: 3, overflowX: 'auto' }}>
+        {[
+          ['video', '▶ Video'],
+          ['notes', '📝 Notes'],
+          ['qa',    `💬 Q&A (${qa.length})`],
+          ['quiz',  `🎯 Quiz (${quiz.length})`],
+        ].map(([id, label]) => (
+          <button key={id} onClick={() => setTab(id)}
+            style={{ padding: '8px 16px', borderRadius: 7, border: 'none', fontWeight: 700, fontSize: 13, cursor: 'pointer', background: tab === id ? 'var(--accent)' : 'transparent', color: tab === id ? '#fff' : 'var(--text)', fontFamily: "'Nunito', sans-serif", whiteSpace: 'nowrap', flexShrink: 0 }}>
+            {label}
+          </button>
+        ))}
+      </div>
+
+      {/* ── VIDEO TAB ──────────────────────────────────────── */}
+      {tab === 'video' && (
         <div>
-          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14, flexWrap:'wrap' }}>
-            <span style={{ fontSize:22 }}>📚</span>
-            <div><div style={{ fontFamily:"'Sora',sans-serif", fontSize:17, fontWeight:800, color:'var(--text-h)' }}>{chapter}</div><div style={{ fontSize:12, color:'var(--text)' }}>{subj} · {cls} · CBSE</div></div>
-            <span style={{ background:'rgba(16,185,129,.1)', color:'#6ee7b7', border:'1px solid rgba(16,185,129,.2)', borderRadius:20, padding:'2px 11px', fontSize:11, fontWeight:700, marginLeft:'auto' }}>✓ Cached for all students</span>
-          </div>
-          <div style={{ display:'flex', gap:3, marginBottom:14, background:'var(--code-bg)', borderRadius:10, padding:3, overflowX:'auto' }}>
-            {[['notes','📝 Notes'],['qa',`💬 Q&A (${qa?.length||0})`],['quiz',`🎯 Quiz (${quiz?.length||0})`]].map(([id,l])=>(
-              <button key={id} onClick={()=>setTab(id)} style={{ padding:'7px 15px', borderRadius:7, border:'none', fontWeight:700, fontSize:12.5, cursor:'pointer', background:tab===id?'var(--accent)':'transparent', color:tab===id?'#fff':'var(--text)', fontFamily:"'Nunito',sans-serif", whiteSpace:'nowrap' }}>{l}</button>
-            ))}
-          </div>
-          {tab==='notes'&&<ContentBox content={course} label={`${chapter} — ${subj} ${cls}`} downloadName={`${chapter}-notes.txt`} onDownload={()=>downloadText(course,`${chapter}-notes.txt`)}/>}
-          {tab==='qa'&&<div style={{ display:'flex', flexDirection:'column', gap:7 }}>{(qa||[]).map((item,i)=>(
-            <Card key={i} style={{ cursor:'pointer' }}>
-              <div onClick={()=>setQaOpen(qaOpen===i?null:i)} style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:9 }}>
-                <div><div style={{ display:'flex', gap:6, marginBottom:5 }}><span style={{ background:'var(--accent-bg)', color:'var(--accent)', borderRadius:'50%', width:18, height:18, display:'inline-flex', alignItems:'center', justifyContent:'center', fontSize:8, fontWeight:800 }}>Q{i+1}</span><span style={{ fontSize:10.5, fontWeight:700, color:item.d==='Easy'?'#22c55e':item.d==='Hard'?'#f59e0b':'#06b6d4' }}>{item.d||'Medium'}</span></div><div style={{ fontSize:13.5, color:'var(--text-h)', lineHeight:1.5 }}>{item.q}</div></div>
-                <span style={{ color:'var(--text)', fontSize:12, flexShrink:0 }}>{qaOpen===i?'▲':'▼'}</span>
+          {currentVideoId ? (
+            <>
+              <div style={{ position: 'relative', paddingBottom: '56.25%', borderRadius: 14, overflow: 'hidden', background: '#000', marginBottom: 14 }}>
+                <iframe
+                  src={`https://www.youtube.com/embed/${currentVideoId}?rel=0&modestbranding=1`}
+                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+                  allowFullScreen
+                  title={mod?.title}
+                />
               </div>
-              {qaOpen===i&&<div style={{ marginTop:11, paddingTop:11, borderTop:'1px solid var(--border)', fontSize:13, color:'var(--text-h)', lineHeight:1.7 }}>💡 {item.a}</div>}
-            </Card>
-          ))}{(!qa||qa.length===0)&&<p style={{ color:'var(--text)', textAlign:'center', padding:20 }}>No Q&A available for this chapter.</p>}</div>}
-          {tab==='quiz'&&(!quiz||quiz.length===0?<div style={{ padding:24, textAlign:'center', color:'var(--text)' }}><p>No quiz generated yet. Try regenerating.</p></div>:
-            done?(
-              <div>
-                {(()=>{const pct=Math.round(score/quiz.length*100);return(<div style={{background:`linear-gradient(135deg,${pct===100?'#22c55e':pct>=70?'#F59E0B':'#EF4444'},${pct===100?'#16a34a':pct>=70?'#FBBF24':'#F87171'})`,borderRadius:14,padding:22,textAlign:'center',color:'#fff',marginBottom:14}}><div style={{fontFamily:"'Sora',sans-serif",fontSize:28,fontWeight:900,marginBottom:4}}>{score}/{quiz.length} · {pct}%</div><div style={{opacity:.85}}>{pct===100?'Perfect! 🏆':pct>=80?'Excellent! 🎉':'Keep practicing! 📚'}</div></div>)})()}
-                {quiz.map((q,i)=>(<Card key={i} style={{marginBottom:9}}><div style={{fontSize:13,color:'var(--text-h)',marginBottom:8}}>{i+1}. {q.q}</div>{q.opts.map((o,j)=><div key={j} style={{padding:'5px 9px',borderRadius:7,marginBottom:3,fontSize:12.5,background:j===q.ans?'rgba(16,185,129,.1)':ans[i]===j&&j!==q.ans?'rgba(239,68,68,.1)':'transparent',color:j===q.ans?'#6ee7b7':ans[i]===j?'#fca5a5':'var(--text-h)'}}>{j===q.ans?'✓ ':ans[i]===j?'✗ ':''}{o}</div>)}<div style={{marginTop:7,padding:'5px 9px',background:'var(--accent-bg)',borderRadius:7,fontSize:12,color:'var(--accent)'}}>{q.exp}</div></Card>))}
-                <OutlineBtn small onClick={()=>{setAns({});setDone(false)}}>Retake →</OutlineBtn>
+
+              {/* Video info + swap button */}
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-h)' }}>
+                    {moduleData?.videoTitle || 'YouTube Video'}
+                  </div>
+                  {moduleData?.videoChannel && (
+                    <div style={{ fontSize: 12, color: 'var(--text)' }}>📺 {moduleData.videoChannel}</div>
+                  )}
+                  <div style={{ fontSize: 11, marginTop: 4, color: moduleData?.transcriptStatus === 'success' ? '#6ee7b7' : '#94a3b8' }}>
+                    {moduleData?.transcriptStatus === 'success'
+                      ? '✓ Transcript used — notes are based on this video'
+                      : '🧠 AI knowledge used (no transcript available for this video)'}
+                  </div>
+                </div>
+                {searchResults.length > 1 && (
+                  <GhostBtn small onClick={() => setSwapping(!swapping)}>
+                    {swapping ? '✕ Close' : '🔄 Different Video'}
+                  </GhostBtn>
+                )}
               </div>
-            ):(
-              <div>
-                {quiz.map((q,i)=>(
-                  <Card key={i} style={{marginBottom:11}}>
-                    <p style={{margin:'0 0 11px',fontWeight:700,fontSize:14,color:'var(--text-h)'}}><span style={{color:'var(--accent)'}}>Q{i+1}.</span> {q.q}</p>
-                    <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:7}}>{q.opts.map((o,j)=><button key={j} onClick={()=>setAns(a=>({...a,[i]:j}))} style={{padding:'9px 12px',borderRadius:9,border:`1.5px solid ${ans[i]===j?'var(--accent)':'var(--border)'}`,background:ans[i]===j?'var(--accent-bg)':'var(--code-bg)',color:ans[i]===j?'var(--accent)':'var(--text-h)',cursor:'pointer',textAlign:'left',fontSize:13.5,fontFamily:"'Nunito',sans-serif",fontWeight:600}}><span style={{fontWeight:800,marginRight:4}}>{String.fromCharCode(65+j)}.</span>{o}</button>)}</div>
-                  </Card>
+
+              {/* Video picker */}
+              {swapping && searchResults.length > 0 && (
+                <Card style={{ marginBottom: 16 }}>
+                  <div style={{ fontWeight: 800, fontSize: 13.5, color: 'var(--text-h)', marginBottom: 12 }}>
+                    Pick a different video for this module:
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    {searchResults.map(v => (
+                      <div key={v.videoId}
+                        onClick={() => swapVideo(v.videoId)}
+                        style={{
+                          display: 'flex', gap: 10, padding: '10px 12px', borderRadius: 10,
+                          border: `1.5px solid ${v.videoId === currentVideoId ? 'var(--accent)' : 'var(--border)'}`,
+                          background: v.videoId === currentVideoId ? 'var(--accent-bg)' : 'transparent',
+                          cursor: 'pointer', alignItems: 'center', transition: 'all .15s',
+                        }}
+                        onMouseEnter={e => { if (v.videoId !== currentVideoId) e.currentTarget.style.borderColor = 'rgba(99,102,241,.4)'; }}
+                        onMouseLeave={e => { if (v.videoId !== currentVideoId) e.currentTarget.style.borderColor = 'var(--border)'; }}>
+                        {v.thumbnail && <img src={v.thumbnail} alt="" style={{ width: 80, height: 54, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-h)', marginBottom: 3 }}>{v.title}</div>
+                          <div style={{ fontSize: 11, color: 'var(--text)' }}>📺 {v.channel}</div>
+                          {v.videoId === currentVideoId && <div style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 700 }}>Currently playing</div>}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text)', fontStyle: 'italic' }}>
+                    ℹ️ Swapping video will regenerate notes & quiz from the new transcript (takes ~30s in background).
+                  </div>
+                </Card>
+              )}
+            </>
+          ) : (
+            <div style={{ ...T.card, textAlign: 'center', padding: 40 }}>
+              <div style={{ fontSize: 40, marginBottom: 10 }}>🎬</div>
+              <p style={{ color: 'var(--text)', fontSize: 14 }}>No video found for this module. Notes were generated from AI knowledge.</p>
+            </div>
+          )}
+
+          {/* Key topics */}
+          {mod?.keyTopics?.length > 0 && (
+            <Card>
+              <div style={{ fontWeight: 800, fontSize: 13.5, color: 'var(--text-h)', marginBottom: 10 }}>🎯 What you'll learn</div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                {mod.keyTopics.map((t, i) => (
+                  <span key={i} style={{ background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid var(--accent-border)', borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 700 }}>
+                    {t}
+                  </span>
                 ))}
-                {Object.keys(ans).length===quiz.length&&quiz.length>0&&<PrimaryBtn color="#8B5CF6" onClick={submitQuiz}>Submit Quiz ✓</PrimaryBtn>}
               </div>
-            )
+            </Card>
+          )}
+        </div>
+      )}
+
+      {/* ── NOTES TAB ──────────────────────────────────────── */}
+      {tab === 'notes' && !moduleData && <PageSpinner />}
+      {tab === 'notes' && notes && (
+        <div>
+          {/* Summary */}
+          <Card style={{ marginBottom: 12 }}>
+            <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 15, color: 'var(--text-h)', marginBottom: 12 }}>📋 Summary</div>
+            <p style={{ fontSize: 14, color: 'var(--text-h)', lineHeight: 1.8, margin: 0 }}>{notes.summary}</p>
+          </Card>
+
+          {/* Key Concepts */}
+          {notes.keyConcepts?.length > 0 && (
+            <Card style={{ marginBottom: 12 }}>
+              <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 15, color: 'var(--text-h)', marginBottom: 12 }}>🔑 Key Concepts</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {notes.keyConcepts.map((c, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 10 }}>
+                    <div style={{ background: 'var(--accent-bg)', color: 'var(--accent)', borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 800, flexShrink: 0, alignSelf: 'flex-start' }}>
+                      {c.term}
+                    </div>
+                    <div style={{ fontSize: 13.5, color: 'var(--text-h)', lineHeight: 1.6, alignSelf: 'center' }}>{c.definition}</div>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {/* Key Points */}
+          {notes.keyPoints?.length > 0 && (
+            <Card style={{ marginBottom: 12 }}>
+              <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 15, color: 'var(--text-h)', marginBottom: 12 }}>⚡ Key Points</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {notes.keyPoints.map((p, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 10, padding: '7px 10px', background: 'var(--code-bg)', borderRadius: 8, border: '1px solid var(--border)' }}>
+                    <span style={{ color: 'var(--accent)', fontWeight: 800, flexShrink: 0, fontSize: 13 }}>{i + 1}.</span>
+                    <span style={{ fontSize: 13.5, color: 'var(--text-h)', lineHeight: 1.6 }}>{p}</span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {/* Formulas */}
+          {notes.formulas?.length > 0 && (
+            <Card style={{ marginBottom: 12, borderColor: '#F59E0B' }}>
+              <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 15, color: '#FCD34D', marginBottom: 12 }}>📐 Formulas</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                {notes.formulas.map((f, i) => (
+                  <div key={i} style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, padding: '10px 14px', fontSize: 13.5, color: 'var(--text-h)', fontFamily: 'monospace', lineHeight: 1.6 }}>
+                    {f}
+                  </div>
+                ))}
+              </div>
+            </Card>
+          )}
+
+          {/* Solved Example */}
+          {notes.solvedExample && (
+            <Card style={{ marginBottom: 12, borderColor: '#10B981' }}>
+              <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 15, color: '#6ee7b7', marginBottom: 12 }}>✏️ Solved Example</div>
+              <p style={{ fontSize: 13.5, color: 'var(--text-h)', lineHeight: 1.8, margin: 0, whiteSpace: 'pre-wrap' }}>{notes.solvedExample}</p>
+            </Card>
+          )}
+
+          {/* Two-column: Mistakes + Exam Tips */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
+            {notes.commonMistakes?.length > 0 && (
+              <Card style={{ borderColor: '#EF4444' }}>
+                <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 14, color: '#fca5a5', marginBottom: 10 }}>⚠️ Common Mistakes</div>
+                {notes.commonMistakes.map((m, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 7, fontSize: 13, color: 'var(--text-h)', lineHeight: 1.5 }}>
+                    <span style={{ color: '#EF4444', flexShrink: 0 }}>✗</span> {m}
+                  </div>
+                ))}
+              </Card>
+            )}
+            {notes.examTips?.length > 0 && (
+              <Card style={{ borderColor: '#6366F1' }}>
+                <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 14, color: 'var(--accent)', marginBottom: 10 }}>🎯 Exam Tips</div>
+                {notes.examTips.map((t, i) => (
+                  <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 7, fontSize: 13, color: 'var(--text-h)', lineHeight: 1.5 }}>
+                    <span style={{ color: 'var(--accent)', flexShrink: 0 }}>★</span> {t}
+                  </div>
+                ))}
+              </Card>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── Q&A TAB ────────────────────────────────────────── */}
+      {tab === 'qa' && !moduleData && <PageSpinner />}
+      {tab === 'qa' && (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {qa.map((item, i) => (
+            <Card key={i} style={{ cursor: 'pointer' }}
+              onClick={() => setQaOpen(qaOpen === i ? null : i)}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
+                <div style={{ flex: 1 }}>
+                  <div style={{ display: 'flex', gap: 7, marginBottom: 5, alignItems: 'center' }}>
+                    <span style={{ background: 'var(--accent-bg)', color: 'var(--accent)', borderRadius: '50%', width: 20, height: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, flexShrink: 0 }}>Q{i + 1}</span>
+                    <span style={{ fontSize: 10.5, fontWeight: 700, color: item.difficulty === 'Easy' ? '#22c55e' : item.difficulty === 'Hard' ? '#EF4444' : '#06b6d4' }}>
+                      {item.difficulty || 'Medium'}
+                    </span>
+                  </div>
+                  <div style={{ fontSize: 13.5, color: 'var(--text-h)', lineHeight: 1.5 }}>{item.q}</div>
+                </div>
+                <span style={{ color: 'var(--text)', fontSize: 12, flexShrink: 0 }}>{qaOpen === i ? '▲' : '▼'}</span>
+              </div>
+              {qaOpen === i && (
+                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)', fontSize: 13.5, color: 'var(--text-h)', lineHeight: 1.8 }}>
+                  💡 {item.a}
+                </div>
+              )}
+            </Card>
+          ))}
+          {qa.length === 0 && <p style={{ color: 'var(--text)', textAlign: 'center', padding: 20 }}>Q&A not available for this module.</p>}
+        </div>
+      )}
+
+      {/* ── QUIZ TAB ───────────────────────────────────────── */}
+      {tab === 'quiz' && !moduleData && <PageSpinner />}
+      {tab === 'quiz' && (
+        <div>
+          {qDone ? (
+            <>
+              {/* Score card */}
+              <div style={{ background: `linear-gradient(135deg, ${pct >= 80 ? '#6366F1' : pct >= 50 ? '#F59E0B' : '#EF4444'}, ${pct >= 80 ? '#8B5CF6' : pct >= 50 ? '#FBBF24' : '#F87171'})`, borderRadius: 18, padding: 28, textAlign: 'center', color: '#fff', marginBottom: 18 }}>
+                <div style={{ fontSize: 44, marginBottom: 8 }}>{pct === 100 ? '🏆' : pct >= 80 ? '🎉' : pct >= 50 ? '👍' : '📚'}</div>
+                <div style={{ fontFamily: "'Sora', sans-serif", fontSize: 32, fontWeight: 900, marginBottom: 4 }}>{qScore}/{quiz.length}</div>
+                <div style={{ opacity: .85, marginBottom: 12 }}>
+                  {pct === 100 ? 'Perfect score! Outstanding!' : pct >= 80 ? 'Excellent work!' : pct >= 50 ? 'Good effort — review the explanations below' : 'Keep practicing — review the notes and try again'}
+                </div>
+                <GhostBtn small onClick={() => { setQAns({}); setQDone(false); }} style={{ background: 'rgba(255,255,255,.2)', border: 'none', color: '#fff' }}>
+                  Retake
+                </GhostBtn>
+              </div>
+
+              {/* Review answers */}
+              {quiz.map((q, i) => (
+                <Card key={i} style={{ marginBottom: 10, borderLeft: `4px solid ${qAns[i] === q.ans ? '#22c55e' : '#EF4444'}` }}>
+                  <p style={{ margin: '0 0 10px', fontWeight: 700, fontSize: 14, color: 'var(--text-h)' }}>
+                    <span style={{ color: 'var(--accent)' }}>Q{i + 1}.</span> {q.q}
+                  </p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
+                    {q.opts.map((opt, j) => {
+                      const isAns  = j === q.ans;
+                      const isSel  = qAns[i] === j;
+                      let bg = 'transparent', border = 'var(--border)', color = 'var(--text-h)';
+                      if (isAns)            { bg = 'rgba(34,197,94,.1)';  border = '#6ee7b7'; color = '#6ee7b7'; }
+                      else if (isSel && !isAns) { bg = 'rgba(239,68,68,.1)'; border = '#fca5a5'; color = '#fca5a5'; }
+                      return (
+                        <div key={j} style={{ padding: '8px 12px', borderRadius: 8, border: `1.5px solid ${border}`, background: bg, color, fontSize: 13, fontWeight: 600 }}>
+                          {String.fromCharCode(65 + j)}. {opt}{isAns ? ' ✓' : ''}
+                        </div>
+                      );
+                    })}
+                  </div>
+                  <div style={{ padding: '8px 12px', background: 'var(--accent-bg)', borderRadius: 8, fontSize: 13, color: 'var(--accent)' }}>
+                    💡 {q.exp}
+                  </div>
+                </Card>
+              ))}
+            </>
+          ) : (
+            <>
+              <p style={{ fontSize: 13, color: 'var(--text)', marginBottom: 16 }}>
+                {quiz.length} questions based on the video content for this module.
+              </p>
+              {quiz.map((q, i) => (
+                <Card key={i} style={{ marginBottom: 12 }}>
+                  <p style={{ margin: '0 0 12px', fontWeight: 700, fontSize: 14, color: 'var(--text-h)' }}>
+                    <span style={{ color: 'var(--accent)' }}>Q{i + 1}.</span> {q.q}
+                  </p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    {q.opts.map((opt, j) => (
+                      <button key={j} onClick={() => setQAns(a => ({ ...a, [i]: j }))}
+                        style={{
+                          padding: '9px 12px', borderRadius: 9, textAlign: 'left', cursor: 'pointer',
+                          fontFamily: "'Nunito', sans-serif", fontWeight: 600, fontSize: 13.5, transition: 'all .15s',
+                          border: `1.5px solid ${qAns[i] === j ? 'var(--accent)' : 'var(--border)'}`,
+                          background: qAns[i] === j ? 'var(--accent-bg)' : 'var(--code-bg)',
+                          color: qAns[i] === j ? 'var(--accent)' : 'var(--text-h)',
+                        }}>
+                        <span style={{ fontWeight: 800, marginRight: 4 }}>{String.fromCharCode(65 + j)}.</span>{opt}
+                      </button>
+                    ))}
+                  </div>
+                </Card>
+              ))}
+              {quiz.length > 0 && (
+                <PrimaryBtn onClick={submitQuiz} disabled={Object.keys(qAns).length < quiz.length} color="#8B5CF6" style={{ marginTop: 8 }}>
+                  Submit Quiz ({Object.keys(qAns).length}/{quiz.length} answered) →
+                </PrimaryBtn>
+              )}
+              {quiz.length === 0 && <p style={{ color: 'var(--text)', textAlign: 'center', padding: 20 }}>Quiz not available for this module.</p>}
+            </>
           )}
         </div>
       )}
     </div>
-  )
+  );
 }
 
 // ══════════════════════════════════════════════════════════════
