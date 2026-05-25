@@ -1890,14 +1890,43 @@ function SchoolDashboard({ user }) {
   )
 }
 
+
+// Loads the most recent saved item for a tool matching subject + chapter/chapters
+async function loadSavedContent(tool, subject, chapter, chapters) {
+  const endpoints = {
+    notes:      { list: '/api/user/notes',      detail: id => `/api/user/notes/${id}`,      matchFn: (n) => n.subject === subject && n.chapter === chapter },
+    paper:      { list: '/api/user/papers',     detail: id => `/api/user/papers`,           matchFn: (n) => n.subject === subject && (n.chapters||[]).some(c => (chapters||[]).includes(c) || c === chapter) },
+    cheatsheet: { list: '/api/user/cheatsheets',detail: id => `/api/user/cheatsheets`,      matchFn: (n) => n.subject === subject && (n.chapters||[]).some(c => (chapters||[]).includes(c) || c === chapter) },
+    lessonplan: { list: '/api/user/lessonplans', detail: id => `/api/user/lessonplans`,     matchFn: (n) => n.subject === subject && (n.topic === chapter) },
+  }
+  const cfg = endpoints[tool]
+  if (!cfg) return null
+  try {
+    const list  = await api.get(cfg.list)
+    const match = list.find(cfg.matchFn)
+    if (!match) return null
+    // notes have a real detail endpoint; others store content in list already
+    if (tool === 'notes') {
+      const full = await api.get(`/api/user/notes/${match.id}`)
+      return full.content
+    }
+    return match.content || null
+  } catch { return null }
+}
+
 // ══════════════════════════════════════════════════════════════
 //  DOUBT SOLVER
 // ══════════════════════════════════════════════════════════════
-function DoubtSolver({ user }) {
+function DoubtSolver({ user, prefill, onClearPrefill }) {
   const [messages,setMessages]=useState([{role:'assistant',content:"👋 Hi! Ask me any doubt — I'll give you a **clear, step-by-step explanation** tailored to your CBSE syllabus. 🎯"}])
   const [input,setInput]=useState(''); const [subject,setSubject]=useState('Mathematics'); const [loading,setLoading]=useState(false); const [err,setErr]=useState('')
   const bottomRef=useRef(null)
   useEffect(()=>{bottomRef.current?.scrollIntoView({behavior:'smooth'})},[messages])
+  useEffect(() => {
+  if (!prefill) return
+  if (prefill.subject) setSubject(prefill.subject)
+  onClearPrefill?.()
+}, [])
   const SYSTEM=`You are an expert CBSE teacher specializing in ${subject}. Help students understand concepts clearly with step-by-step explanations. Use simple language and relatable examples. Use **bold** for key terms. Be encouraging and thorough.`
   const send=async()=>{
     if (!input.trim()) return
@@ -1935,7 +1964,7 @@ function DoubtSolver({ user }) {
 // ══════════════════════════════════════════════════════════════
 //  NOTES MAKER
 // ══════════════════════════════════════════════════════════════
-function NotesMaker({ user }) {
+function NotesMaker({ user, prefill, onClearPrefill }) {
   const [subject,setSubject]=useState('Mathematics'); const [cls,setCls]=useState('Class 10')
   const [chapter,setChapter]=useState(''); const [customCh,setCustomCh]=useState(''); const [style_,setStyle_]=useState('Detailed')
   const [result,setResult]=useState(''); const [loading,setLoading]=useState(false); const [saved,setSaved]=useState(false); const [err,setErr]=useState('')
@@ -1955,6 +1984,18 @@ function NotesMaker({ user }) {
 ## 8. Previous Year CBSE Question Patterns
 
 MANDATORY: Cover EVERY subtopic. Minimum 900 words. Use **bold** for key terms only.`
+
+
+  useEffect(() => {
+    if (!prefill) return
+    if (prefill.subject) setSubject(prefill.subject)
+    if (prefill.chapter) { setChapter(prefill.chapter); setCustomCh('') }
+    onClearPrefill?.()
+    // Try to load previously saved note
+    loadSavedContent('notes', prefill.subject, prefill.chapter, []).then(content => {
+      if (content) { setResult(content); setSaved(true) }
+    })
+  }, [])
 
   async function generate() {
     if(!finalChapter) return; setErr(''); setLoading(true); setSaved(false)
@@ -1994,7 +2035,7 @@ MANDATORY: Cover EVERY subtopic. Minimum 900 words. Use **bold** for key terms o
 // ══════════════════════════════════════════════════════════════
 //  CHEAT SHEET MAKER
 // ══════════════════════════════════════════════════════════════
-function CheatSheetMaker({ user }) {
+function CheatSheetMaker({ user, prefill, onClearPrefill }) {
   const [subject,setSubject]=useState('Mathematics'); const [cls,setCls]=useState('Class 10')
   const [chapters,setChapters]=useState([]); const [examDate,setExamDate]=useState('')
   const [result,setResult]=useState(''); const [loading,setLoading]=useState(false); const [saved,setSaved]=useState(false); const [err,setErr]=useState('')
@@ -2012,6 +2053,17 @@ ${chapters.map(ch=>`
 ### 🎯 Top 15 Exam Questions + Model Answers
 ### ⚠️ Common Mistakes`).join('\n')}
 ## 📊 FINAL EXAM STRATEGY & SCORING TIPS`
+
+  useEffect(() => {
+    if (!prefill) return
+    if (prefill.subject) setSubject(prefill.subject)
+    if (prefill.chapters?.length) setChapters(prefill.chapters)
+    else if (prefill.chapter) setChapters([prefill.chapter])
+    onClearPrefill?.()
+    loadSavedContent('cheatsheet', prefill.subject, prefill.chapter, prefill.chapters).then(content => {
+      if (content) { setResult(content); setSaved(true) }
+    })
+  }, [])
 
   async function generate() {
     if(chapters.length===0) return alert('Please select at least one chapter')
@@ -2050,10 +2102,20 @@ ${chapters.map(ch=>`
 // ══════════════════════════════════════════════════════════════
 //  QUESTION PAPER MAKER
 // ══════════════════════════════════════════════════════════════
-function QPMaker({ user }) {
+function QPMaker({ user, prefill, onClearPrefill }) {
   const [subject,setSubject]=useState('Mathematics'); const [cls,setCls]=useState('Class 10')
   const [chapters,setChapters]=useState([]); const [marks,setMarks]=useState('80'); const [duration,setDuration]=useState('3 Hours'); const [desc,setDesc]=useState('')
   const [result,setResult]=useState(''); const [loading,setLoading]=useState(false); const [saved,setSaved]=useState(false); const [err,setErr]=useState('')
+  useEffect(() => {
+  if (!prefill) return
+  if (prefill.subject) setSubject(prefill.subject)
+  if (prefill.chapters?.length) setChapters(prefill.chapters)
+  else if (prefill.chapter) setChapters([prefill.chapter])
+  onClearPrefill?.()
+  loadSavedContent('paper', prefill.subject, prefill.chapter, prefill.chapters).then(content => {
+    if (content) { setResult(content); setSaved(true) }
+  })
+}, [])
 
   async function generate() {
     if(chapters.length===0) return alert('Please select at least one chapter')
@@ -2098,9 +2160,10 @@ Include general instructions at the top. No markdown formatting — plain text o
 // ══════════════════════════════════════════════════════════════
 //  LESSON PLANNER
 // ══════════════════════════════════════════════════════════════
-function LessonPlanner({ user }) {
+function LessonPlanner({ user, prefill, onClearPrefill }) {
   const [subject,setSubject]=useState('Mathematics'); const [topic,setTopic]=useState(''); const [cls,setCls]=useState('Class 9'); const [duration,setDuration]=useState(45); const [notes,setNotes]=useState('')
   const [result,setResult]=useState(''); const [loading,setLoading]=useState(false); const [saved,setSaved]=useState(false); const [err,setErr]=useState(''); const [rating,setRating]=useState(0)
+
 
   const buildPrompt=()=>`You are a world-class master teacher and pedagogy expert. Create an exceptional, fully detailed lesson plan for "${topic}" — ${subject} ${cls} — ${duration} minutes.
 Teacher's context: ${notes||'Standard classroom with mixed ability students'}
@@ -2131,6 +2194,17 @@ MINIMUM 1500 words. This must be genuinely useful and specific.
 ## 🏆 DIFFERENTIATION STRATEGIES
 ## 📊 ASSESSMENT CRITERIA
 ## 🔗 CONNECTIONS TO CBSE EXAM`
+
+  
+  useEffect(() => {
+  if (!prefill) return
+  if (prefill.subject) setSubject(prefill.subject)
+  if (prefill.chapter) setTopic(prefill.chapter)   // topic = chapter for lesson plans
+  onClearPrefill?.()
+  loadSavedContent('lessonplan', prefill.subject, prefill.chapter, []).then(content => {
+    if (content) { setResult(content); setSaved(true) }
+  })
+}, [])
 
   async function generate() {
     if(!topic.trim()) return alert('Please enter a topic')
@@ -2178,9 +2252,15 @@ MINIMUM 1500 words. This must be genuinely useful and specific.
 // ══════════════════════════════════════════════════════════════
 //  QUIZ GENERATOR
 // ══════════════════════════════════════════════════════════════
-function QuizGenerator({ user }) {
+function QuizGenerator({ user, prefill, onClearPrefill }) {
   const [subject,setSubject]=useState('Mathematics'); const [topic,setTopic]=useState(''); const [diff,setDiff]=useState('Medium'); const [num,setNum]=useState('5')
   const [quiz,setQuiz]=useState(null); const [answers,setAnswers]=useState({}); const [submitted,setSubmitted]=useState(false); const [loading,setLoading]=useState(false); const [err,setErr]=useState('')
+  useEffect(() => {
+  if (!prefill) return
+  if (prefill.subject) setSubject(prefill.subject)
+  if (prefill.chapter) setTopic(prefill.chapter)
+  onClearPrefill?.()
+}, [])
 
   async function generate() {
     if(!topic.trim()) return alert('Enter a topic')
@@ -2264,9 +2344,15 @@ Return ONLY valid JSON (no markdown, no explanation):
 // ══════════════════════════════════════════════════════════════
 //  FLASHCARDS
 // ══════════════════════════════════════════════════════════════
-function FlashCards({ user }) {
+function FlashCards({ user, prefill, onClearPrefill }) {
   const [subject,setSubject]=useState('Mathematics'); const [cls,setCls]=useState('Class 10'); const [topic,setTopic]=useState('')
   const [cards,setCards]=useState([]); const [current,setCurrent]=useState(0); const [flipped,setFlipped]=useState({}); const [mode,setMode]=useState('grid'); const [loading,setLoading]=useState(false); const [err,setErr]=useState('')
+  useEffect(() => {
+  if (!prefill) return
+  if (prefill.subject) setSubject(prefill.subject)
+  if (prefill.chapter) setTopic(prefill.chapter)
+  onClearPrefill?.()
+}, [])
 
   async function generate() {
     if(!topic.trim()) return alert('Enter a topic')
@@ -2383,7 +2469,7 @@ function AchievementsPage() {
 // ══════════════════════════════════════════════════════════════
 //  CHAPTER COURSES
 // ══════════════════════════════════════════════════════════════
-function ChapterCourses({ user }) {
+function ChapterCourses({ user, prefill, onClearPrefill }) {
   const [subj,     setSubj]    = useState('Mathematics');
   const [cls,      setCls]     = useState(user?.class_level || 'Class 10');
   const [chapter,  setChapter] = useState('');
@@ -2402,6 +2488,22 @@ function ChapterCourses({ user }) {
 
   const chs    = getChapters(subj, cls);
   const sseRef = useRef(null);
+  const autoGenRef = useRef(false)
+
+  useEffect(() => {
+  if (!prefill?.chapter) return
+  if (prefill.subject) setSubj(prefill.subject)
+  setChapter(prefill.chapter)
+  autoGenRef.current = true
+  onClearPrefill?.()
+}, [])
+
+
+  useEffect(() => {
+  if (!autoGenRef.current || !chapter) return
+  autoGenRef.current = false
+  generateCourse()
+}, [chapter, subj])
 
   // ── Close SSE on unmount ──────────────────────────────────
   useEffect(() => () => sseRef.current?.close(), []);
@@ -3310,7 +3412,7 @@ Generate 6 quiz questions.`}],subject:'General'})
 }
 
 
-function HistoryPage() {
+function HistoryPage({ onNavigate }) {
   const [history, setHistory] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page,    setPage]    = useState(1);
@@ -3407,66 +3509,80 @@ function HistoryPage() {
                 : item.chapter || null;
 
               return (
-                <div key={i} style={{
-                  display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
-                  background: 'var(--bg2)', borderRadius: 12,
-                  border: '1px solid var(--border)', transition: 'border-color .15s',
-                }}
-                  onMouseEnter={e => e.currentTarget.style.borderColor = meta.color + '55'}
-                  onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
+                      <div key={i}
+          onClick={() => onNavigate?.(item)}
+          style={{
+            display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
+            background: 'var(--bg2)', borderRadius: 12, cursor: 'pointer',
+            border: '1px solid var(--border)', transition: 'all .18s',
+          }}
+          onMouseEnter={e => {
+            e.currentTarget.style.borderColor = meta.color + '66';
+            e.currentTarget.style.background  = `${meta.color}08`;
+            e.currentTarget.style.transform   = 'translateX(3px)';
+          }}
+          onMouseLeave={e => {
+            e.currentTarget.style.borderColor = 'var(--border)';
+            e.currentTarget.style.background  = 'var(--bg2)';
+            e.currentTarget.style.transform   = 'none';
+          }}>
 
-                  {/* Icon */}
-                  <div style={{
-                    width: 40, height: 40, borderRadius: 11, flexShrink: 0,
-                    background: `${meta.color}18`, border: `1px solid ${meta.color}28`,
-                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19,
-                  }}>
-                    {meta.icon}
-                  </div>
+          {/* Icon — NO CHANGE */}
+          <div style={{
+            width: 40, height: 40, borderRadius: 11, flexShrink: 0,
+            background: `${meta.color}18`, border: `1px solid ${meta.color}28`,
+            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19,
+          }}>
+            {meta.icon}
+          </div>
 
-                  {/* Details */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap', marginBottom: 2 }}>
-                      <span style={{ fontWeight: 800, fontSize: 13.5, color: 'var(--text-h)' }}>
-                        {meta.label}
-                      </span>
-                      {item.subject && (
-                        <span style={{
-                          fontSize: 11.5, fontWeight: 700, color: meta.color,
-                          background: `${meta.color}15`, borderRadius: 20,
-                          padding: '1px 8px', border: `1px solid ${meta.color}25`,
-                        }}>
-                          {item.subject}
-                        </span>
-                      )}
-                    </div>
-                    {chapters && (
-                      <div style={{
-                        fontSize: 12, color: 'var(--text)', overflow: 'hidden',
-                        textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-                      }}>
-                        📌 {chapters}
-                      </div>
-                    )}
-                  </div>
+          {/* Details — NO CHANGE */}
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap', marginBottom: 2 }}>
+              <span style={{ fontWeight: 800, fontSize: 13.5, color: 'var(--text-h)' }}>
+                {meta.label}
+              </span>
+              {item.subject && (
+                <span style={{
+                  fontSize: 11.5, fontWeight: 700, color: meta.color,
+                  background: `${meta.color}15`, borderRadius: 20,
+                  padding: '1px 8px', border: `1px solid ${meta.color}25`,
+                }}>
+                  {item.subject}
+                </span>
+              )}
+            </div>
+            {chapters && (
+              <div style={{
+                fontSize: 12, color: 'var(--text)', overflow: 'hidden',
+                textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+              }}>
+                📌 {chapters}
+              </div>
+            )}
+          </div>
 
-                  {/* Right side: XP + time */}
-                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
-                    {item.xp_earned > 0 && (
-                      <div style={{ fontSize: 12.5, fontWeight: 800, color: '#FCD34D', marginBottom: 2 }}>
-                        +{item.xp_earned} XP
-                      </div>
-                    )}
-                    <div style={{ fontSize: 11, color: 'var(--text)' }}>
-                      {new Date(item.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-                    </div>
-                    {item.ai_provider && (
-                      <div style={{ fontSize: 10, color: 'var(--text)', marginTop: 1, opacity: .6 }}>
-                        via {item.ai_provider}
-                      </div>
-                    )}
-                  </div>
-                </div>
+          {/* Right side: XP + time — NO CHANGE */}
+          <div style={{ textAlign: 'right', flexShrink: 0 }}>
+            {item.xp_earned > 0 && (
+              <div style={{ fontSize: 12.5, fontWeight: 800, color: '#FCD34D', marginBottom: 2 }}>
+                +{item.xp_earned} XP
+              </div>
+            )}
+            <div style={{ fontSize: 11, color: 'var(--text)' }}>
+              {new Date(item.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+            </div>
+            {item.ai_provider && (
+              <div style={{ fontSize: 10, color: 'var(--text)', marginTop: 1, opacity: .6 }}>
+                via {item.ai_provider}
+              </div>
+            )}
+          </div>
+
+          {/* ✅ CHANGE 2: arrow added here, after the time block, before closing div */}
+          <span style={{ fontSize: 13, color: 'var(--text)', opacity: .5, flexShrink: 0 }}>→</span>
+
+        </div>  
               );
             })}
           </div>
@@ -3496,12 +3612,13 @@ export default function App() {
   const [user, setUser] = useState(() => {
     try { return JSON.parse(localStorage.getItem('bs_user')) } catch { return null }
   })
-  const [page, setPage] = useState(() => localStorage.getItem('bs_user') ? 'app' : 'landing')
-  const [tab, setTab]   = useState('dashboard')
+  const [page, setPage]               = useState(() => localStorage.getItem('bs_user') ? 'app' : 'landing')
+  const [tab, setTab]                 = useState('dashboard')
   const [initAuthMode, setInitAuthMode] = useState('login')
   const [viewProfileId, setViewProfileId] = useState(null)
-  const [msgUserId, setMsgUserId]         = useState(null)
-  const [trialExpired, setTrialExpired]   = useState(false)
+  const [msgUserId, setMsgUserId]     = useState(null)
+  const [trialExpired, setTrialExpired] = useState(false)
+  const [prefill, setPrefill]         = useState(null)
 
   // Refresh user on mount
   useEffect(() => {
@@ -3530,9 +3647,21 @@ export default function App() {
     setUser(u); localStorage.setItem('bs_user', JSON.stringify(u))
   }
 
+  function handleHistoryNav(item) {
+    setPrefill({
+      tool:     item.tool,
+      subject:  item.subject  || '',
+      chapter:  item.chapter  || '',
+      chapters: item.chapters || [],
+    })
+    setTab(item.tool)
+  }
+
+  function clearPrefill() { setPrefill(null) }
+
   // ── Landing ──────────────────────────────────────────────────
   if (page === 'landing') return (
-    <LandingPage onStart={mode => { setInitAuthMode(mode==='signup'?'register':'login'); setPage('auth') }} />
+    <LandingPage onStart={mode => { setInitAuthMode(mode === 'signup' ? 'register' : 'login'); setPage('auth') }} />
   )
   if (!user || page === 'auth') return (
     <AuthPage onAuth={handleAuth} initMode={initAuthMode} />
@@ -3547,107 +3676,130 @@ export default function App() {
   const isSchool  = user.type === 'school'
 
   const tabs = [
-    { id: 'dashboard',    icon: '🏠', label: 'Dashboard',      color: '#6366F1' },
-    { id: 'feed',         icon: '📣', label: 'Study Feed',      color: '#6366F1' },
-    { id: 'search',       icon: '🔍', label: 'Search',          color: '#06b6d4' },
-    { id: 'messages',     icon: '💬', label: 'Messages',        color: '#10B981' },
-    { id: 'history', icon: '🕘', label: 'History', color: '#6366F1' },
-    { id: 'doubt',        icon: '🤔', label: 'Doubt Solver',    color: '#818CF8' },
-    { id: 'notes',        icon: '📖', label: 'Notes',           color: '#10B981' },
-    { id: 'courses',      icon: '📚', label: 'Chapter Courses', color: '#8B5CF6' },
-    { id: 'video',        icon: '🎬', label: 'Video Learning',  color: '#06b6d4' },
-    ...(isStudent ? [{ id: 'cheatsheet', icon: '📋', label: 'Cheat Sheet', color: '#F97316' }] : []),
-    { id: 'paper',        icon: '📄', label: 'Question Paper',  color: '#A855F7' },
+    { id: 'dashboard',   icon: '🏠', label: 'Dashboard',      color: '#6366F1' },
+    { id: 'feed',        icon: '📣', label: 'Study Feed',      color: '#6366F1' },
+    { id: 'search',      icon: '🔍', label: 'Search',          color: '#06b6d4' },
+    { id: 'messages',    icon: '💬', label: 'Messages',        color: '#10B981' },
+    { id: 'history',     icon: '🕘', label: 'History',         color: '#6366F1' },
+    { id: 'doubt',       icon: '🤔', label: 'Doubt Solver',    color: '#818CF8' },
+    { id: 'notes',       icon: '📖', label: 'Notes',           color: '#10B981' },
+    { id: 'courses',     icon: '📚', label: 'Chapter Courses', color: '#8B5CF6' },
+    { id: 'video',       icon: '🎬', label: 'Video Learning',  color: '#06b6d4' },
+    ...(isStudent ? [{ id: 'cheatsheet', icon: '📋', label: 'Cheat Sheet',   color: '#F97316' }] : []),
+    { id: 'paper',       icon: '📄', label: 'Question Paper',  color: '#A855F7' },
     ...(isTeacher ? [{ id: 'lessonplan', icon: '🎓', label: 'Lesson Planner', color: '#7C3AED' }] : []),
-    { id: 'quiz',         icon: '🎯', label: 'Quiz',            color: '#F59E0B' },
-    { id: 'flashcards',   icon: '🃏', label: 'Flashcards',      color: '#EF4444' },
+    { id: 'quiz',        icon: '🎯', label: 'Quiz',            color: '#F59E0B' },
+    { id: 'flashcards',  icon: '🃏', label: 'Flashcards',      color: '#EF4444' },
     ...(isSchool ? [
-      { id: 'assignments', icon: '📝', label: 'Assignments',   color: '#F59E0B' },
-      { id: 'notices',     icon: '📢', label: 'Notices',        color: '#F97316' },
-      { id: 'timetable',   icon: '📅', label: 'Timetable',      color: '#06b6d4' },
+      { id: 'assignments', icon: '📝', label: 'Assignments', color: '#F59E0B' },
+      { id: 'notices',     icon: '📢', label: 'Notices',     color: '#F97316' },
+      { id: 'timetable',   icon: '📅', label: 'Timetable',   color: '#06b6d4' },
     ] : []),
-    ...(isTeacher&&isSchool ? [{ id: 'school', icon: '🏫', label: 'Analytics', color: '#A855F7' }] : []),
+    ...(isTeacher && isSchool ? [{ id: 'school', icon: '🏫', label: 'Analytics', color: '#A855F7' }] : []),
   ]
 
   const renderPage = () => {
-    if (tab === 'subscription') return <SubscriptionPage user={user} onSuccess={() => { api.get('/api/auth/me').then(updateUser); setTab('dashboard') }} onBack={() => setTab('dashboard')} />
-    if (tab === 'achievements')  return <AchievementsPage />
-    if (tab === 'profile')       return <ProfilePage userId={viewProfileId||undefined} currentUser={user} onBack={() => { setTab(viewProfileId ? 'search' : 'dashboard'); setViewProfileId(null) }} onMessage={id => { setMsgUserId(id); setTab('messages') }} />
-    if (tab === 'dashboard')     return <Dashboard user={user} onNavigate={setTab} />
-    if (tab === 'feed')          return <SocialFeed user={user} />
-    if (tab === 'search')        return <SearchPage currentUser={user} onViewProfile={id => { setViewProfileId(id); setTab('profile') }} />
-    if (tab === 'messages')      return <MessagingPage currentUser={user} startWithUserId={msgUserId} />
-    if (tab === 'history') return <HistoryPage />;
-    if (tab === 'doubt')         return <DoubtSolver user={user} />
-    if (tab === 'notes')         return <NotesMaker user={user} />
-    if (tab === 'courses')       return <ChapterCourses user={user} />
-    if (tab === 'video')         return <VideoLearn user={user} />
-    if (tab === 'cheatsheet')    return <CheatSheetMaker user={user} />
-    if (tab === 'paper')         return <QPMaker user={user} />
-    if (tab === 'lessonplan')    return <LessonPlanner user={user} />
-    if (tab === 'quiz')          return <QuizGenerator user={user} />
-    if (tab === 'flashcards')    return <FlashCards user={user} />
-    if (tab === 'assignments')   return <AssignmentsPage user={user} />
-    if (tab === 'notices')       return <NoticesPage user={user} />
-    if (tab === 'timetable')     return <TimetablePage user={user} />
-    if (tab === 'school')        return <SchoolDashboard user={user} />
+    if (tab === 'subscription') return (
+      <SubscriptionPage
+        user={user}
+        onSuccess={() => { api.get('/api/auth/me').then(updateUser); setTab('dashboard') }}
+        onBack={() => setTab('dashboard')}
+      />
+    )
+    if (tab === 'achievements') return <AchievementsPage />
+    if (tab === 'profile')      return (
+      <ProfilePage
+        userId={viewProfileId || undefined}
+        currentUser={user}
+        onBack={() => { setTab(viewProfileId ? 'search' : 'dashboard'); setViewProfileId(null) }}
+        onMessage={id => { setMsgUserId(id); setTab('messages') }}
+      />
+    )
+    if (tab === 'dashboard')  return <Dashboard user={user} onNavigate={setTab} />
+    if (tab === 'feed')       return <SocialFeed user={user} />
+    if (tab === 'search')     return <SearchPage currentUser={user} onViewProfile={id => { setViewProfileId(id); setTab('profile') }} />
+    if (tab === 'messages')   return <MessagingPage currentUser={user} startWithUserId={msgUserId} />
+    if (tab === 'history')    return <HistoryPage onNavigate={handleHistoryNav} />
+    if (tab === 'doubt')      return <DoubtSolver    user={user} prefill={prefill} onClearPrefill={clearPrefill} />
+    if (tab === 'notes')      return <NotesMaker      user={user} prefill={prefill} onClearPrefill={clearPrefill} />
+    if (tab === 'courses')    return <ChapterCourses  user={user} prefill={prefill} onClearPrefill={clearPrefill} />
+    if (tab === 'video')      return <VideoLearn user={user} />
+    if (tab === 'cheatsheet') return <CheatSheetMaker user={user} prefill={prefill} onClearPrefill={clearPrefill} />
+    if (tab === 'paper')      return <QPMaker         user={user} prefill={prefill} onClearPrefill={clearPrefill} />
+    if (tab === 'lessonplan') return <LessonPlanner   user={user} prefill={prefill} onClearPrefill={clearPrefill} />
+    if (tab === 'quiz')       return <QuizGenerator   user={user} prefill={prefill} onClearPrefill={clearPrefill} />
+    if (tab === 'flashcards') return <FlashCards      user={user} prefill={prefill} onClearPrefill={clearPrefill} />
+    if (tab === 'assignments') return <AssignmentsPage user={user} />
+    if (tab === 'notices')    return <NoticesPage user={user} />
+    if (tab === 'timetable')  return <TimetablePage user={user} />
+    if (tab === 'school')     return <SchoolDashboard user={user} />
     return <Dashboard user={user} onNavigate={setTab} />
   }
 
   return (
-    <div style={{ minHeight:'100vh', background:'var(--bg)', display:'flex', flexDirection:'column', fontFamily:"'Nunito',sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column', fontFamily: "'Nunito', sans-serif" }}>
 
-      {/* Top header */}
-      <header style={{ borderBottom:'1px solid var(--border)', padding:'0 20px', display:'flex', alignItems:'center', justifyContent:'space-between', height:58, position:'sticky', top:0, zIndex:100, background:'rgba(5,5,14,.95)', backdropFilter:'blur(20px)', boxShadow:'0 2px 20px rgba(0,0,0,.3)' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:10, cursor:'pointer' }} onClick={()=>setTab('dashboard')}>
-          <div style={{ width:34, height:34, borderRadius:10, background:'linear-gradient(135deg,#6366F1,#8B5CF6)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>🧠</div>
-          <span style={{ fontFamily:"'Sora',sans-serif", fontWeight:900, fontSize:17, color:'var(--text-h)' }}>BrainSpark<span style={{ color:'#818CF8' }}> AI</span></span>
-          {isSchool&&user.schools&&<span style={{ fontSize:11.5, color:'var(--accent)', fontWeight:700, background:'var(--accent-bg)', padding:'2px 10px', borderRadius:20, border:'1px solid var(--accent-border)' }}>🏫 {user.schools.name}</span>}
-        </div>
-        <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-          {!isSchool && user.subscription_status!=='active' && (
-            <button onClick={()=>setTab('subscription')} style={{ padding:'6px 14px', borderRadius:9, border:'none', background:'linear-gradient(135deg,#6366F1,#8B5CF6)', color:'#fff', fontWeight:800, fontSize:12.5, cursor:'pointer', fontFamily:"'Nunito',sans-serif" }}>⚡ Upgrade</button>
+      {/* ── Top header ───────────────────────────────────────── */}
+      <header style={{ borderBottom: '1px solid var(--border)', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 58, position: 'sticky', top: 0, zIndex: 100, background: 'rgba(5,5,14,.95)', backdropFilter: 'blur(20px)', boxShadow: '0 2px 20px rgba(0,0,0,.3)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={() => setTab('dashboard')}>
+          <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🧠</div>
+          <span style={{ fontFamily: "'Sora', sans-serif", fontWeight: 900, fontSize: 17, color: 'var(--text-h)' }}>
+            BrainSpark<span style={{ color: '#818CF8' }}> AI</span>
+          </span>
+          {isSchool && user.schools && (
+            <span style={{ fontSize: 11.5, color: 'var(--accent)', fontWeight: 700, background: 'var(--accent-bg)', padding: '2px 10px', borderRadius: 20, border: '1px solid var(--accent-border)' }}>
+              🏫 {user.schools.name}
+            </span>
           )}
-          <button onClick={()=>setTab('achievements')} title="Achievements" style={{ width:36, height:36, borderRadius:9, border:'1px solid var(--border)', background:'var(--social-bg)', cursor:'pointer', fontSize:16, display:'flex', alignItems:'center', justifyContent:'center' }}>🏆</button>
-          <button onClick={()=>{ setViewProfileId(null); setTab('profile') }} title="My Profile" style={{ width:36, height:36, borderRadius:9, background:'linear-gradient(135deg,#6366F1,#8B5CF6)', cursor:'pointer', fontSize:14, fontWeight:900, color:'#fff', border:'none', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:"'Sora',sans-serif" }}>
-            {user.name?.[0]?.toUpperCase()||'?'}
+        </div>
+
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {!isSchool && user.subscription_status !== 'active' && (
+            <button onClick={() => setTab('subscription')} style={{ padding: '6px 14px', borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', color: '#fff', fontWeight: 800, fontSize: 12.5, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>
+              ⚡ Upgrade
+            </button>
+          )}
+          <button onClick={() => setTab('achievements')} title="Achievements" style={{ width: 36, height: 36, borderRadius: 9, border: '1px solid var(--border)', background: 'var(--social-bg)', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🏆</button>
+          <button onClick={() => { setViewProfileId(null); setTab('profile') }} title="My Profile" style={{ width: 36, height: 36, borderRadius: 9, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', cursor: 'pointer', fontSize: 14, fontWeight: 900, color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Sora', sans-serif" }}>
+            {user.name?.[0]?.toUpperCase() || '?'}
           </button>
-          <button onClick={logout} style={{ padding:'6px 13px', borderRadius:9, border:'1px solid var(--border)', background:'none', color:'var(--text)', cursor:'pointer', fontSize:13, fontWeight:700, fontFamily:"'Nunito',sans-serif" }}>Sign Out</button>
+          <button onClick={logout} style={{ padding: '6px 13px', borderRadius: 9, border: '1px solid var(--border)', background: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 13, fontWeight: 700, fontFamily: "'Nunito', sans-serif" }}>Sign Out</button>
         </div>
       </header>
 
-      {/* Mobile top nav */}
+      {/* ── Mobile top nav ───────────────────────────────────── */}
       <MobileTopNav tabs={tabs} activeTab={tab} onTabChange={setTab} />
 
-      <div style={{ display:'flex', flex:1 }}>
+      <div style={{ display: 'flex', flex: 1 }}>
 
-        {/* Desktop sidebar */}
-        <nav className="desktop-sidebar" style={{ width:210, borderRight:'1px solid var(--border)', padding:'12px 8px', background:'rgba(5,5,14,.8)', flexShrink:0, position:'sticky', top:58, height:'calc(100vh - 58px)', overflowY:'auto', display:'flex', flexDirection:'column', gap:2 }}>
+        {/* ── Desktop sidebar ──────────────────────────────────── */}
+        <nav className="desktop-sidebar" style={{ width: 210, borderRight: '1px solid var(--border)', padding: '12px 8px', background: 'rgba(5,5,14,.8)', flexShrink: 0, position: 'sticky', top: 58, height: 'calc(100vh - 58px)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
           {tabs.map(t => {
             const active = tab === t.id
             return (
-              <button key={t.id} onClick={()=>setTab(t.id)}
-                style={{ width:'100%', display:'flex', alignItems:'center', gap:9, padding:'9px 12px', borderRadius:10, border:'none', cursor:'pointer', fontFamily:"'Nunito',sans-serif", background:active?`linear-gradient(135deg,${t.color},${t.color}bb)`:'transparent', color:active?'#fff':'var(--text-h)', fontWeight:active?800:600, fontSize:13.5, textAlign:'left', transition:'all .15s' }}
-                onMouseEnter={e=>{ if(!active) e.currentTarget.style.background='rgba(255,255,255,.05)' }}
-                onMouseLeave={e=>{ if(!active) e.currentTarget.style.background='transparent' }}>
-                <span style={{ fontSize:16 }}>{t.icon}</span>
+              <button key={t.id} onClick={() => setTab(t.id)}
+                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: "'Nunito', sans-serif", background: active ? `linear-gradient(135deg,${t.color},${t.color}bb)` : 'transparent', color: active ? '#fff' : 'var(--text-h)', fontWeight: active ? 800 : 600, fontSize: 13.5, textAlign: 'left', transition: 'all .15s' }}
+                onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,.05)' }}
+                onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}>
+                <span style={{ fontSize: 16 }}>{t.icon}</span>
                 {t.label}
               </button>
             )
           })}
-          <div style={{ height:1, background:'var(--border)', margin:'6px 0' }}/>
-          <button onClick={()=>setTab('achievements')} style={{ width:'100%', display:'flex', alignItems:'center', gap:9, padding:'9px 12px', borderRadius:10, border:'none', cursor:'pointer', fontFamily:"'Nunito',sans-serif", background:tab==='achievements'?'linear-gradient(135deg,#F59E0B,#FBBF24)':'transparent', color:tab==='achievements'?'#fff':'var(--text-h)', fontWeight:600, fontSize:13.5, textAlign:'left', transition:'all .15s' }}>
-            <span style={{ fontSize:16 }}>🏆</span> Achievements
+          <div style={{ height: 1, background: 'var(--border)', margin: '6px 0' }} />
+          <button onClick={() => setTab('achievements')}
+            style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: "'Nunito', sans-serif", background: tab === 'achievements' ? 'linear-gradient(135deg,#F59E0B,#FBBF24)' : 'transparent', color: tab === 'achievements' ? '#fff' : 'var(--text-h)', fontWeight: 600, fontSize: 13.5, textAlign: 'left', transition: 'all .15s' }}>
+            <span style={{ fontSize: 16 }}>🏆</span> Achievements
           </button>
         </nav>
 
-        {/* Main content */}
-        <main style={{ flex:1, overflowY:'auto', minWidth:0 }}>
-          <div style={{ padding:'16px 24px 0', paddingBottom:0 }}>
+        {/* ── Main content ─────────────────────────────────────── */}
+        <main style={{ flex: 1, overflowY: 'auto', minWidth: 0 }}>
+          <div style={{ padding: '16px 24px 0', paddingBottom: 0 }}>
             <FreeTierCountdown
               user={user}
-              onSubscribe={()=>setTab('subscription')}
-              onExpired={()=>{ setTrialExpired(true); setTab('subscription') }}
+              onSubscribe={() => setTab('subscription')}
+              onExpired={() => { setTrialExpired(true); setTab('subscription') }}
             />
           </div>
           {renderPage()}
@@ -3655,7 +3807,7 @@ export default function App() {
 
       </div>
 
-      {/* AI Buddy (school users only) */}
+      {/* ── AI Buddy (school users only) ─────────────────────── */}
       {isSchool && <AIBuddy user={user} />}
 
     </div>
