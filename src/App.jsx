@@ -784,6 +784,7 @@ function Dashboard({ user, onNavigate }) {
   const streak=stats?.stats?.current_streak||0; const unlocked=achs.filter(a=>a.unlocked).slice(0,3)
   const hour=new Date().getHours(); const greeting=hour<12?'Good morning':hour<17?'Good afternoon':'Good evening'
   const quickStart = [
+    { icon: '🕘', label: 'My History', tab: 'history', color: '#6366F1' },
     {icon:'📣',label:'Study Feed',tab:'feed',color:'#6366F1'},
     {icon:'📚',label:'Chapter Courses',tab:'courses',color:'#8B5CF6'},
     {icon:'🤔',label:'Ask a Doubt',tab:'doubt',color:'#818CF8'},
@@ -792,6 +793,7 @@ function Dashboard({ user, onNavigate }) {
     ...(user.role==='student'?[{icon:'📋',label:'Exam Cheat Sheet',tab:'cheatsheet',color:'#F97316'}]:[{icon:'🎓',label:'Lesson Planner',tab:'lessonplan',color:'#7C3AED'}]),
     {icon:'🎯',label:'Take a Quiz',tab:'quiz',color:'#F59E0B'},
     {icon:'🔍',label:'Find People',tab:'search',color:'#06b6d4'},
+    
   ]
   return (
     <div style={{ padding:24, width:'100%', boxSizing:'border-box', fontFamily:"'Nunito',sans-serif", animation:'slideUp .25s ease-out' }}>
@@ -3307,6 +3309,183 @@ Generate 6 quiz questions.`}],subject:'General'})
   )
 }
 
+
+function HistoryPage() {
+  const [history, setHistory] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [page,    setPage]    = useState(1);
+  const [hasMore, setHasMore] = useState(true);
+  const [filter,  setFilter]  = useState('all');
+
+  useEffect(() => {
+    setLoading(true);
+    api.get(`/api/user/history?page=${page}`)
+      .then(data => {
+        setHistory(prev => page === 1 ? data : [...prev, ...data]);
+        setHasMore(data.length === 50);
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false));
+  }, [page]);
+
+  const TOOL_META = {
+    doubt:      { icon: '🤔', label: 'Doubt Solved',    color: '#818CF8' },
+    notes:      { icon: '📖', label: 'Notes Generated', color: '#10B981' },
+    quiz:       { icon: '🎯', label: 'Quiz Generated',  color: '#F59E0B' },
+    paper:      { icon: '📄', label: 'Question Paper',  color: '#A855F7' },
+    flashcards: { icon: '🃏', label: 'Flashcards',      color: '#EF4444' },
+    cheatsheet: { icon: '📋', label: 'Cheat Sheet',     color: '#F97316' },
+    lessonplan: { icon: '🎓', label: 'Lesson Plan',     color: '#7C3AED' },
+  };
+
+  const tools = ['all', ...Object.keys(TOOL_META)];
+
+  const shown = filter === 'all'
+    ? history
+    : history.filter(h => h.tool === filter);
+
+  // Group by date
+  const grouped = shown.reduce((acc, item) => {
+    const date = new Date(item.created_at).toLocaleDateString('en-IN', {
+      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
+    });
+    if (!acc[date]) acc[date] = [];
+    acc[date].push(item);
+    return acc;
+  }, {});
+
+  return (
+    <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif" }}>
+      <PageHeader icon="🕘" title="Activity History" subtitle="Everything you've generated — notes, quizzes, papers and more" color="#6366F1" />
+
+      {/* Filter pills */}
+      <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 22 }}>
+        {tools.map(t => {
+          const meta = TOOL_META[t];
+          return (
+            <button key={t} onClick={() => setFilter(t)}
+              style={{
+                padding: '5px 15px', borderRadius: 20, border: 'none', fontWeight: 700,
+                fontSize: 12.5, cursor: 'pointer', fontFamily: "'Nunito', sans-serif",
+                background: filter === t ? (meta?.color || 'var(--accent)') : 'var(--social-bg)',
+                color: filter === t ? '#fff' : 'var(--text-h)', transition: 'all .15s',
+                display: 'flex', alignItems: 'center', gap: 5,
+              }}>
+              {meta ? `${meta.icon} ${meta.label}` : '⚡ All'}
+            </button>
+          );
+        })}
+      </div>
+
+      {loading && page === 1 && <PageSpinner />}
+
+      {!loading && shown.length === 0 && (
+        <div style={{ textAlign: 'center', padding: 52, color: 'var(--text)' }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>🕘</div>
+          <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 16, color: 'var(--text-h)', marginBottom: 6 }}>No history yet</div>
+          <p style={{ fontSize: 13 }}>Start using AI tools and your activity will appear here.</p>
+        </div>
+      )}
+
+      {Object.entries(grouped).map(([date, items]) => (
+        <div key={date} style={{ marginBottom: 24 }}>
+          <div style={{
+            fontSize: 11.5, fontWeight: 800, color: 'var(--text)', textTransform: 'uppercase',
+            letterSpacing: '0.6px', marginBottom: 10, paddingLeft: 4,
+            display: 'flex', alignItems: 'center', gap: 8,
+          }}>
+            <div style={{ height: 1, width: 20, background: 'var(--border)' }} />
+            {date}
+            <div style={{ height: 1, flex: 1, background: 'var(--border)' }} />
+          </div>
+
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
+            {items.map((item, i) => {
+              const meta = TOOL_META[item.tool] || { icon: '⚡', label: item.tool, color: '#6366F1' };
+              const chapters = item.chapters?.length > 0
+                ? item.chapters.join(', ')
+                : item.chapter || null;
+
+              return (
+                <div key={i} style={{
+                  display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
+                  background: 'var(--bg2)', borderRadius: 12,
+                  border: '1px solid var(--border)', transition: 'border-color .15s',
+                }}
+                  onMouseEnter={e => e.currentTarget.style.borderColor = meta.color + '55'}
+                  onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
+
+                  {/* Icon */}
+                  <div style={{
+                    width: 40, height: 40, borderRadius: 11, flexShrink: 0,
+                    background: `${meta.color}18`, border: `1px solid ${meta.color}28`,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19,
+                  }}>
+                    {meta.icon}
+                  </div>
+
+                  {/* Details */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap', marginBottom: 2 }}>
+                      <span style={{ fontWeight: 800, fontSize: 13.5, color: 'var(--text-h)' }}>
+                        {meta.label}
+                      </span>
+                      {item.subject && (
+                        <span style={{
+                          fontSize: 11.5, fontWeight: 700, color: meta.color,
+                          background: `${meta.color}15`, borderRadius: 20,
+                          padding: '1px 8px', border: `1px solid ${meta.color}25`,
+                        }}>
+                          {item.subject}
+                        </span>
+                      )}
+                    </div>
+                    {chapters && (
+                      <div style={{
+                        fontSize: 12, color: 'var(--text)', overflow: 'hidden',
+                        textOverflow: 'ellipsis', whiteSpace: 'nowrap',
+                      }}>
+                        📌 {chapters}
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Right side: XP + time */}
+                  <div style={{ textAlign: 'right', flexShrink: 0 }}>
+                    {item.xp_earned > 0 && (
+                      <div style={{ fontSize: 12.5, fontWeight: 800, color: '#FCD34D', marginBottom: 2 }}>
+                        +{item.xp_earned} XP
+                      </div>
+                    )}
+                    <div style={{ fontSize: 11, color: 'var(--text)' }}>
+                      {new Date(item.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                    </div>
+                    {item.ai_provider && (
+                      <div style={{ fontSize: 10, color: 'var(--text)', marginTop: 1, opacity: .6 }}>
+                        via {item.ai_provider}
+                      </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ))}
+
+      {/* Load more */}
+      {hasMore && !loading && shown.length > 0 && (
+        <div style={{ textAlign: 'center', marginTop: 16 }}>
+          <GhostBtn onClick={() => setPage(p => p + 1)}>Load More</GhostBtn>
+        </div>
+      )}
+      {loading && page > 1 && (
+        <div style={{ display: 'flex', justifyContent: 'center', padding: 16 }}><Spinner size={20} /></div>
+      )}
+    </div>
+  );
+}
+
 // ══════════════════════════════════════════════════════════════
 //  MAIN APP
 // ══════════════════════════════════════════════════════════════
@@ -3372,6 +3551,7 @@ export default function App() {
     { id: 'feed',         icon: '📣', label: 'Study Feed',      color: '#6366F1' },
     { id: 'search',       icon: '🔍', label: 'Search',          color: '#06b6d4' },
     { id: 'messages',     icon: '💬', label: 'Messages',        color: '#10B981' },
+    { id: 'history', icon: '🕘', label: 'History', color: '#6366F1' },
     { id: 'doubt',        icon: '🤔', label: 'Doubt Solver',    color: '#818CF8' },
     { id: 'notes',        icon: '📖', label: 'Notes',           color: '#10B981' },
     { id: 'courses',      icon: '📚', label: 'Chapter Courses', color: '#8B5CF6' },
@@ -3397,6 +3577,7 @@ export default function App() {
     if (tab === 'feed')          return <SocialFeed user={user} />
     if (tab === 'search')        return <SearchPage currentUser={user} onViewProfile={id => { setViewProfileId(id); setTab('profile') }} />
     if (tab === 'messages')      return <MessagingPage currentUser={user} startWithUserId={msgUserId} />
+    if (tab === 'history') return <HistoryPage />;
     if (tab === 'doubt')         return <DoubtSolver user={user} />
     if (tab === 'notes')         return <NotesMaker user={user} />
     if (tab === 'courses')       return <ChapterCourses user={user} />
