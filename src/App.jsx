@@ -3548,28 +3548,40 @@ export default function App() {
   const isTeacher = user.role === 'teacher'
   const isSchool  = user.type === 'school'
 
+  // const tabs = [
+  //   { id: 'dashboard',   icon: '🏠', label: 'Dashboard',      color: '#6366F1' },
+  //   { id: 'feed',        icon: '📣', label: 'Study Feed',      color: '#6366F1' },
+  //   { id: 'search',      icon: '🔍', label: 'Search',          color: '#06b6d4' },
+  //   { id: 'messages',    icon: '💬', label: 'Messages',        color: '#10B981' },
+  //   { id: 'history',     icon: '🕘', label: 'History',         color: '#6366F1' },
+  //   { id: 'doubt',       icon: '🤔', label: 'Doubt Solver',    color: '#818CF8' },
+  //   { id: 'notes',       icon: '📖', label: 'Notes',           color: '#10B981' },
+  //   { id: 'courses',     icon: '📚', label: 'Chapter Courses', color: '#8B5CF6' },
+  //   { id: 'video',       icon: '🎬', label: 'Video Learning',  color: '#06b6d4' },
+  //   ...(isStudent ? [{ id: 'cheatsheet', icon: '📋', label: 'Cheat Sheet',   color: '#F97316' }] : []),
+  //   { id: 'paper',       icon: '📄', label: 'Question Paper',  color: '#A855F7' },
+  //   ...(isTeacher ? [{ id: 'lessonplan', icon: '🎓', label: 'Lesson Planner', color: '#7C3AED' }] : []),
+  //   { id: 'quiz',        icon: '🎯', label: 'Quiz',            color: '#F59E0B' },
+  //   { id: 'flashcards',  icon: '🃏', label: 'Flashcards',      color: '#EF4444' },
+  //   ...(isSchool ? [
+  //     { id: 'assignments', icon: '📝', label: 'Assignments', color: '#F59E0B' },
+  //     { id: 'notices',     icon: '📢', label: 'Notices',     color: '#F97316' },
+  //     { id: 'timetable',   icon: '📅', label: 'Timetable',   color: '#06b6d4' },
+  //   ] : []),
+  //   ...(isTeacher && isSchool ? [{ id: 'school', icon: '🏫', label: 'Analytics', color: '#A855F7' }] : []),
+  // ]
+
   const tabs = [
-    { id: 'dashboard',   icon: '🏠', label: 'Dashboard',      color: '#6366F1' },
-    { id: 'feed',        icon: '📣', label: 'Study Feed',      color: '#6366F1' },
-    { id: 'search',      icon: '🔍', label: 'Search',          color: '#06b6d4' },
-    { id: 'messages',    icon: '💬', label: 'Messages',        color: '#10B981' },
-    { id: 'history',     icon: '🕘', label: 'History',         color: '#6366F1' },
-    { id: 'doubt',       icon: '🤔', label: 'Doubt Solver',    color: '#818CF8' },
-    { id: 'notes',       icon: '📖', label: 'Notes',           color: '#10B981' },
-    { id: 'courses',     icon: '📚', label: 'Chapter Courses', color: '#8B5CF6' },
-    { id: 'video',       icon: '🎬', label: 'Video Learning',  color: '#06b6d4' },
-    ...(isStudent ? [{ id: 'cheatsheet', icon: '📋', label: 'Cheat Sheet',   color: '#F97316' }] : []),
-    { id: 'paper',       icon: '📄', label: 'Question Paper',  color: '#A855F7' },
-    ...(isTeacher ? [{ id: 'lessonplan', icon: '🎓', label: 'Lesson Planner', color: '#7C3AED' }] : []),
-    { id: 'quiz',        icon: '🎯', label: 'Quiz',            color: '#F59E0B' },
-    { id: 'flashcards',  icon: '🃏', label: 'Flashcards',      color: '#EF4444' },
-    ...(isSchool ? [
-      { id: 'assignments', icon: '📝', label: 'Assignments', color: '#F59E0B' },
-      { id: 'notices',     icon: '📢', label: 'Notices',     color: '#F97316' },
-      { id: 'timetable',   icon: '📅', label: 'Timetable',   color: '#06b6d4' },
-    ] : []),
-    ...(isTeacher && isSchool ? [{ id: 'school', icon: '🏫', label: 'Analytics', color: '#A855F7' }] : []),
-  ]
+  { id: 'dashboard',  icon: '🏠', label: 'Dashboard',       color: '#6366F1' },
+  { id: 'courses',    icon: '📚', label: 'Chapter Courses',  color: '#8B5CF6' },
+  { id: 'notes',      icon: '📖', label: 'Notes',            color: '#10B981' },
+  { id: 'paper',      icon: '📄', label: 'Question Paper',   color: '#A855F7' },
+  { id: 'quiz',       icon: '🎯', label: 'Quiz',             color: '#F59E0B' },
+  { id: 'flashcards', icon: '🃏', label: 'Flashcards',       color: '#EF4444' },
+  { id: 'doubt',      icon: '🤔', label: 'Doubt Solver',     color: '#818CF8' },
+  { id: 'history',    icon: '🕘', label: 'History',          color: '#6366F1' },
+  { id: 'feed',       icon: '📣', label: 'Study Feed',       color: '#6366F1' },
+]
 
   const renderPage = () => {
     if (tab === 'subscription') return (
