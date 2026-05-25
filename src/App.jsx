@@ -2736,127 +2736,89 @@ function ChapterCourses({ user, prefill, onClearPrefill }) {
     );
   }
 
-  if (phase === 'course') {
+    if (phase === 'course') {
     const doneCount  = modules.filter(m => m.status === 'done').length;
     const compCount  = modules.filter(m => isComplete(m.id)).length;
     const pct        = doneCount > 0 ? Math.round((compCount / doneCount) * 100) : 0;
 
     return (
-      <div style={{ padding: 24, fontFamily: "'Nunito', sans-serif", maxWidth: 900, margin: '0 auto' }}>
-        <GhostBtn small onClick={() => setPhase('select')} style={{ marginBottom: 20 }}>
-          ← Change Chapter
-        </GhostBtn>
+      <div style={{ display: 'flex', height: 'calc(100vh - 120px)', fontFamily: "'Nunito', sans-serif", overflow: 'hidden' }}>
 
-        {/* Course header */}
-        <div style={{ marginBottom: 22, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', flexWrap: 'wrap', gap: 12 }}>
-          <div>
-            <h2 style={{ fontFamily: "'Sora', sans-serif", fontWeight: 900, fontSize: 'clamp(1.1rem, 2.5vw, 1.4rem)', color: 'var(--text-h)', margin: '0 0 4px' }}>
-              📚 {chapter}
-            </h2>
-            <p style={{ color: 'var(--text)', margin: 0, fontSize: 13 }}>
-              {subj} · {cls} · CBSE · {doneCount} modules
-            </p>
-          </div>
-          <div style={{ textAlign: 'right' }}>
-            <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 900, fontSize: 22, color: 'var(--accent)' }}>
-              {pct}%
+        {/* ── Left sidebar — module list ── */}
+        <div style={{ width: 272, flexShrink: 0, borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: 'rgba(5,5,14,.85)', overflow: 'hidden' }}>
+
+          {/* Sidebar header */}
+          <div style={{ padding: '14px 14px 12px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+            <GhostBtn small onClick={() => setPhase('select')} style={{ marginBottom: 12 }}>← Change Chapter</GhostBtn>
+            <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: 5 }}>Course Content</div>
+            <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 13.5, color: 'var(--text-h)', marginBottom: 2, lineHeight: 1.3 }}>{chapter}</div>
+            <div style={{ fontSize: 11, color: 'var(--text)', marginBottom: 8 }}>{subj} · {cls} · {doneCount} modules</div>
+            <div style={{ background: 'var(--border)', borderRadius: 999, height: 3 }}>
+              <div style={{ background: 'linear-gradient(90deg, var(--accent), #8B5CF6)', width: `${pct}%`, height: '100%', borderRadius: 999, transition: 'width .5s ease' }} />
             </div>
-            <div style={{ fontSize: 11, color: 'var(--text)' }}>{compCount}/{doneCount} completed</div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
+              <span style={{ fontSize: 10, color: 'var(--text)' }}>{pct}% complete</span>
+              <span style={{ fontSize: 10, color: 'var(--text)' }}>{compCount}/{doneCount} done</span>
+            </div>
           </div>
-        </div>
 
-        {/* Progress bar */}
-        <div style={{ background: 'var(--border)', borderRadius: 999, height: 6, marginBottom: 24 }}>
-          <div style={{ background: 'linear-gradient(90deg, #6366F1, #8B5CF6)', width: `${pct}%`, height: '100%', borderRadius: 999, transition: 'width .5s ease' }} />
-        </div>
+          {/* Module list — top to bottom */}
+          <div style={{ flex: 1, overflowY: 'auto', padding: '8px 8px' }}>
+            {modules.map((mod, idx) => {
+              const done     = mod.status === 'done'
+              const comp     = isComplete(mod.id)
+              const building = mod.status === 'building'
+              const error    = mod.status === 'error'
+              return (
+                <div key={mod.id}
+                  onClick={() => done && openModule(mod)}
+                  style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 10px', borderRadius: 10, cursor: done ? 'pointer' : 'default', border: '1px solid transparent', opacity: !done && !building ? .5 : 1, marginBottom: 2, transition: 'all .15s' }}
+                  onMouseEnter={e => { if (done) { e.currentTarget.style.background = 'rgba(255,255,255,.04)'; e.currentTarget.style.borderColor = 'var(--border)' } }}
+                  onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = 'transparent' }}>
 
-        {/* Module grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))', gap: 12 }}>
-          {modules.map((mod, idx) => {
-            const done    = mod.status === 'done';
-            const comp    = isComplete(mod.id);
-            const active  = mod.status === 'building';
-            return (
-              <div key={mod.id}
-                onClick={() => done && openModule(mod)}
-                style={{
-                  background: comp ? 'rgba(99,102,241,.1)' : 'var(--bg2)',
-                  border: `1.5px solid ${comp ? 'var(--accent)' : done ? 'rgba(255,255,255,.1)' : 'var(--border)'}`,
-                  borderRadius: 14, padding: '14px 16px',
-                  cursor: done ? 'pointer' : 'default',
-                  opacity: !done && !active ? .55 : 1,
-                  transition: 'all .2s',
-                  position: 'relative',
-                }}
-                onMouseEnter={e => { if (done) e.currentTarget.style.borderColor = 'var(--accent)'; }}
-                onMouseLeave={e => { if (done) e.currentTarget.style.borderColor = comp ? 'var(--accent)' : 'rgba(255,255,255,.1)'; }}>
+                  {/* Number badge */}
+                  <div style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, marginTop: 1,
+                    background: comp ? 'rgba(34,197,94,.2)' : building ? 'rgba(245,158,11,.15)' : error ? 'rgba(239,68,68,.15)' : 'rgba(255,255,255,.06)',
+                    color: comp ? '#34d399' : building ? '#fbbf24' : error ? '#fca5a5' : '#374151' }}>
+                    {comp ? '✓' : building ? <Spinner size={9} /> : error ? '!' : idx + 1}
+                  </div>
 
-                {/* Completion badge */}
-                {comp && (
-                  <div style={{ position: 'absolute', top: 10, right: 10, width: 20, height: 20, background: 'var(--accent)', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 11, color: '#fff' }}>✓</div>
-                )}
-
-                <div style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 8 }}>
-                  <span style={{ fontSize: 24, lineHeight: 1, flexShrink: 0 }}>{mod.emoji}</span>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 11, fontWeight: 800, color: 'var(--text)', textTransform: 'uppercase', letterSpacing: '0.5px', marginBottom: 3 }}>
-                      Module {idx + 1}
+                    <div style={{ fontSize: 12.5, color: '#94a3b8', fontWeight: 400, lineHeight: 1.35, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                      {mod.emoji && <span style={{ marginRight: 4 }}>{mod.emoji}</span>}
+                      {mod.title || '…'}
                     </div>
-                    <div style={{ fontFamily: "'Sora', sans-serif", fontSize: 13.5, fontWeight: 800, color: 'var(--text-h)', lineHeight: 1.3 }}>
-                      {mod.title}
+                    <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
+                      {done && mod.videoId && <span style={{ fontSize: 9.5, background: 'rgba(34,197,94,.1)', color: '#34d399', borderRadius: 10, padding: '1px 6px', fontWeight: 700 }}>▶ Video</span>}
+                      {done && mod.transcriptStatus === 'success' && <span style={{ fontSize: 9.5, background: 'rgba(6,182,212,.1)', color: '#22d3ee', borderRadius: 10, padding: '1px 6px', fontWeight: 700 }}>✓ Transcript</span>}
+                      {comp && <span style={{ fontSize: 9.5, background: 'rgba(245,158,11,.1)', color: '#fbbf24', borderRadius: 10, padding: '1px 6px', fontWeight: 700 }}>🏆 Done</span>}
+                      {building && <span style={{ fontSize: 9.5, color: '#fbbf24' }}>Building…</span>}
+                      {error && <span style={{ fontSize: 9.5, color: '#fca5a5' }}>⚠ Failed</span>}
                     </div>
                   </div>
                 </div>
-
-                <p style={{ fontSize: 12, color: 'var(--text)', margin: '0 0 10px', lineHeight: 1.5 }}>
-                  {mod.description}
-                </p>
-
-                {/* Video info */}
-                {done && mod.videoId && (
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 8px', background: 'rgba(255,255,255,.04)', borderRadius: 8, marginBottom: 8 }}>
-                    {mod.videoThumbnail && (
-                      <img src={mod.videoThumbnail} alt="" style={{ width: 44, height: 30, objectFit: 'cover', borderRadius: 4, flexShrink: 0 }} />
-                    )}
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ fontSize: 10.5, color: 'var(--text-h)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', fontWeight: 600 }}>
-                        {mod.videoTitle || 'Video found'}
-                      </div>
-                      <div style={{ fontSize: 10, color: 'var(--text)' }}>
-                        {mod.videoChannel}
-                      </div>
-                    </div>
-                  </div>
-                )}
-
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                  <div style={{ display: 'flex', gap: 5 }}>
-                    {done && <span style={{ fontSize: 10, background: 'rgba(99,102,241,.1)', color: 'var(--accent)', borderRadius: 20, padding: '2px 8px', fontWeight: 700 }}>
-                      {mod.estimatedMinutes || 15} min
-                    </span>}
-                    {done && (
-                      <span style={{ fontSize: 10, background: mod.transcriptStatus === 'success' ? 'rgba(16,185,129,.1)' : 'rgba(100,116,139,.1)', color: mod.transcriptStatus === 'success' ? '#6ee7b7' : '#94a3b8', borderRadius: 20, padding: '2px 8px', fontWeight: 700 }}>
-                        {mod.transcriptStatus === 'success' ? '📄 Transcript' : '🧠 AI Notes'}
-                      </span>
-                    )}
-                    {active && <span style={{ fontSize: 10, color: '#F59E0B', display: 'flex', alignItems: 'center', gap: 3 }}><Spinner size={9} /> Building…</span>}
-                  </div>
-                  {done && <span style={{ fontSize: 14, color: 'var(--text)' }}>→</span>}
-                </div>
-              </div>
-            );
-          })}
+              )
+            })}
+          </div>
         </div>
 
-        {modules.some(m => m.status === 'error') && (
-          <div style={{ marginTop: 16 }}>
-            <p style={{ fontSize: 13, color: '#fca5a5' }}>⚠️ Some modules had errors.</p>
-          </div>
-        )}
-        <ErrMsg msg={err} />
+        {/* ── Right — select prompt ── */}
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: 12, color: 'var(--text)', padding: 40, textAlign: 'center' }}>
+          <div style={{ fontSize: 52 }}>📚</div>
+          <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 18, color: 'var(--text-h)' }}>Select a module to start</div>
+          <p style={{ fontSize: 13, color: 'var(--text)', maxWidth: 300, lineHeight: 1.7, margin: 0 }}>
+            Click any module from the list on the left to watch the video and study the notes, Q&amp;A and quiz.
+          </p>
+          {modules.some(m => m.status === 'error') && (
+            <p style={{ fontSize: 12.5, color: '#fca5a5', marginTop: 8 }}>⚠️ Some modules had errors. Check the sidebar.</p>
+          )}
+          <ErrMsg msg={err} />
+        </div>
+
       </div>
-    );
+    )
   }
+
 
   // ── PHASE: select chapter ─────────────────────────────────
   return (
@@ -2949,66 +2911,47 @@ function StatusDot({ status }) {
 //  MODULE VIEW — Video player + Notes/Q&A/Quiz tabs
 // ══════════════════════════════════════════════════════════════
 function ModuleView({ mod, moduleData, subject, cls, chapter, courseKey, isComplete, onComplete, onBack, onPrev, onNext, hasPrev, hasNext }) {
-  const [tab,     setTab]     = useState('video');
-  const [qAns,    setQAns]    = useState({});
-  const [qDone,   setQDone]   = useState(false);
-  const [qScore,  setQScore]  = useState(0);
-  const [qaOpen,  setQaOpen]  = useState(null);
-  const [swapping, setSwapping] = useState(false);   // show video picker
+  const [qAns,   setQAns]   = useState({})
+  const [qDone,  setQDone]  = useState(false)
+  const [qScore, setQScore] = useState(0)
+  const [qaOpen, setQaOpen] = useState(null)
+  const [swapping, setSwapping] = useState(false)
 
-  const notes = moduleData?.notes;
-  const qa    = moduleData?.qa    || [];
-  const quiz  = moduleData?.quiz  || [];
+  const notes = moduleData?.notes
+  const qa    = moduleData?.qa   || []
+  const quiz  = moduleData?.quiz || []
 
   function submitQuiz() {
-    let s = 0;
-    quiz.forEach((q, i) => { if (qAns[i] === q.ans) s++; });
-    setQScore(s);
-    setQDone(true);
-    if (!isComplete) onComplete?.();
+    let s = 0
+    quiz.forEach((q, i) => { if (qAns[i] === q.ans) s++ })
+    setQScore(s); setQDone(true)
+    if (!isComplete) onComplete?.()
   }
 
   async function swapVideo(newVideoId) {
     try {
-      await api.patch('/api/chapter-courses/module/video', {
-        subject, cls, chapter,
-        moduleId:    mod.id,
-        newVideoId,
-        moduleTitle: mod.title,
-      });
-      // Reload the module data after a short delay (background regen takes ~10s)
-      setSwapping(false);
-      // Update the embedded video immediately
-      window._bsModVideoId = newVideoId;
-      // Show note about regeneration
-    } catch (e) {
-      alert('Swap failed: ' + e.message);
-    }
+      await api.patch('/api/chapter-courses/module/video', { subject, cls, chapter, moduleId: mod.id, newVideoId, moduleTitle: mod.title })
+      setSwapping(false)
+    } catch (e) { alert('Swap failed: ' + e.message) }
   }
 
-  const currentVideoId = moduleData?.videoId || mod?.videoId;
-  const searchResults  = moduleData?.searchResults || [];
-  const pct = qDone ? Math.round((qScore / Math.max(quiz.length, 1)) * 100) : 0;
+  const currentVideoId = moduleData?.videoId || mod?.videoId
+  const searchResults  = moduleData?.searchResults || []
+  const pct = qDone ? Math.round((qScore / Math.max(quiz.length, 1)) * 100) : 0
 
   return (
-    <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif", maxWidth: 860, margin: '0 auto' }}>
+    <div style={{ width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif" }}>
 
-      {/* Top nav */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 18, flexWrap: 'wrap' }}>
+      {/* ── Top nav ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '16px 24px 14px', flexWrap: 'wrap', borderBottom: '1px solid var(--border)' }}>
         <GhostBtn small onClick={onBack}>← All Modules</GhostBtn>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap' }}>
             <span style={{ fontSize: 20 }}>{mod?.emoji}</span>
-            <span style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 15, color: 'var(--text-h)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-              {mod?.title}
-            </span>
-            {isComplete && (
-              <span style={{ background: 'rgba(99,102,241,.1)', color: 'var(--accent)', borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
-                ✓ Completed
-              </span>
-            )}
+            <span style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 15, color: 'var(--text-h)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mod?.title}</span>
+            {isComplete && <span style={{ background: 'var(--accent-bg)', color: 'var(--accent)', borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>✓ Completed</span>}
           </div>
-          <div style={{ fontSize: 12, color: 'var(--text)', paddingLeft: 28 }}>{subject} · {cls} · {chapter}</div>
+          <div style={{ fontSize: 12, color: 'var(--text)', paddingLeft: 28, marginTop: 2 }}>{subject} · {cls} · {chapter}</div>
         </div>
         <div style={{ display: 'flex', gap: 7 }}>
           <GhostBtn small onClick={onPrev} disabled={!hasPrev}>← Prev</GhostBtn>
@@ -3016,315 +2959,240 @@ function ModuleView({ mod, moduleData, subject, cls, chapter, courseKey, isCompl
         </div>
       </div>
 
-      {/* Tabs */}
-      <div style={{ display: 'flex', gap: 3, marginBottom: 16, background: 'var(--code-bg)', borderRadius: 10, padding: 3, overflowX: 'auto' }}>
-        {[
-          ['video', '▶ Video'],
-          ['notes', '📝 Notes'],
-          ['qa',    `💬 Q&A (${qa.length})`],
-          ['quiz',  `🎯 Quiz (${quiz.length})`],
-        ].map(([id, label]) => (
-          <button key={id} onClick={() => setTab(id)}
-            style={{ padding: '8px 16px', borderRadius: 7, border: 'none', fontWeight: 700, fontSize: 13, cursor: 'pointer', background: tab === id ? 'var(--accent)' : 'transparent', color: tab === id ? '#fff' : 'var(--text)', fontFamily: "'Nunito', sans-serif", whiteSpace: 'nowrap', flexShrink: 0 }}>
-            {label}
-          </button>
-        ))}
+      {/* ── Video (full width) ── */}
+      <div style={{ padding: '20px 24px 0' }}>
+        {currentVideoId ? (
+          <>
+            <div style={{ position: 'relative', paddingBottom: '56.25%', borderRadius: 14, overflow: 'hidden', background: '#000', boxShadow: '0 8px 32px rgba(0,0,0,.4)' }}>
+              <iframe
+                src={`https://www.youtube.com/embed/${currentVideoId}?rel=0&modestbranding=1`}
+                style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
+                allowFullScreen title={mod?.title}
+              />
+            </div>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 10, flexWrap: 'wrap', gap: 8 }}>
+              <div>
+                <div style={{ fontWeight: 700, fontSize: 13.5, color: 'var(--text-h)' }}>{moduleData?.videoTitle || 'YouTube Video'}</div>
+                {moduleData?.videoChannel && <div style={{ fontSize: 12, color: 'var(--text)', marginTop: 2 }}>📺 {moduleData.videoChannel}</div>}
+                <div style={{ fontSize: 11, marginTop: 3, color: moduleData?.transcriptStatus === 'success' ? '#6ee7b7' : '#94a3b8' }}>
+                  {moduleData?.transcriptStatus === 'success' ? '✓ Transcript-based notes' : '🧠 AI knowledge used'}
+                </div>
+              </div>
+              {searchResults.length > 1 && (
+                <GhostBtn small onClick={() => setSwapping(!swapping)}>{swapping ? '✕ Close' : '🔄 Different Video'}</GhostBtn>
+              )}
+            </div>
+            {swapping && searchResults.length > 0 && (
+              <Card style={{ marginTop: 12, marginBottom: 4 }}>
+                <div style={{ fontWeight: 700, fontSize: 13, color: 'var(--text-h)', marginBottom: 10 }}>Pick a different video:</div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {searchResults.map(v => (
+                    <div key={v.videoId} onClick={() => swapVideo(v.videoId)}
+                      style={{ display: 'flex', gap: 10, padding: '9px 12px', borderRadius: 10, border: `1.5px solid ${v.videoId === currentVideoId ? 'var(--accent)' : 'var(--border)'}`, background: v.videoId === currentVideoId ? 'var(--accent-bg)' : 'transparent', cursor: 'pointer', alignItems: 'center', transition: 'all .15s' }}>
+                      {v.thumbnail && <img src={v.thumbnail} alt="" style={{ width: 80, height: 54, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />}
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-h)', marginBottom: 2 }}>{v.title}</div>
+                        <div style={{ fontSize: 11, color: 'var(--text)' }}>{v.channel}</div>
+                        {v.videoId === currentVideoId && <div style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 700 }}>Currently playing</div>}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </Card>
+            )}
+          </>
+        ) : (
+          <div style={{ ...T.card, textAlign: 'center', padding: 36 }}>
+            <div style={{ fontSize: 36, marginBottom: 8 }}>🎬</div>
+            <p style={{ color: 'var(--text)', fontSize: 13 }}>No video found. Notes were generated from AI knowledge.</p>
+          </div>
+        )}
       </div>
 
-      {/* ── VIDEO TAB ──────────────────────────────────────── */}
-      {tab === 'video' && (
-        <div>
-          {currentVideoId ? (
-            <>
-              <div style={{ position: 'relative', paddingBottom: '56.25%', borderRadius: 14, overflow: 'hidden', background: '#000', marginBottom: 14 }}>
-                <iframe
-                  src={`https://www.youtube.com/embed/${currentVideoId}?rel=0&modestbranding=1`}
-                  style={{ position: 'absolute', top: 0, left: 0, width: '100%', height: '100%', border: 'none' }}
-                  allowFullScreen
-                  title={mod?.title}
-                />
-              </div>
+      {/* ── 3-column: Notes | Q&A | Quiz ── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16, padding: '20px 24px 32px' }}>
 
-              {/* Video info + swap button */}
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 14, flexWrap: 'wrap', gap: 10 }}>
-                <div>
-                  <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text-h)' }}>
-                    {moduleData?.videoTitle || 'YouTube Video'}
+        {/* Notes */}
+        <div style={{ ...T.card, display: 'flex', flexDirection: 'column', maxHeight: '68vh', padding: 0, overflow: 'hidden' }}>
+          <div style={{ padding: '13px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0 }} />
+            <span style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 13, color: 'var(--text-h)' }}>Notes</span>
+          </div>
+          <div style={{ overflowY: 'auto', flex: 1, padding: '14px 16px' }}>
+            {!moduleData ? <PageSpinner /> : !notes ? (
+              <div style={{ textAlign: 'center', padding: 24, color: 'var(--text)', fontSize: 13 }}>Notes not available.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+                {notes.summary && (
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: 6 }}>Summary</div>
+                    <p style={{ fontSize: 13, color: 'var(--text-h)', lineHeight: 1.75, margin: 0 }}>{notes.summary}</p>
                   </div>
-                  {moduleData?.videoChannel && (
-                    <div style={{ fontSize: 12, color: 'var(--text)' }}>📺 {moduleData.videoChannel}</div>
-                  )}
-                  <div style={{ fontSize: 11, marginTop: 4, color: moduleData?.transcriptStatus === 'success' ? '#6ee7b7' : '#94a3b8' }}>
-                    {moduleData?.transcriptStatus === 'success'
-                      ? '✓ Transcript used — notes are based on this video'
-                      : '🧠 AI knowledge used (no transcript available for this video)'}
-                  </div>
-                </div>
-                {searchResults.length > 1 && (
-                  <GhostBtn small onClick={() => setSwapping(!swapping)}>
-                    {swapping ? '✕ Close' : '🔄 Different Video'}
-                  </GhostBtn>
                 )}
-              </div>
-
-              {/* Video picker */}
-              {swapping && searchResults.length > 0 && (
-                <Card style={{ marginBottom: 16 }}>
-                  <div style={{ fontWeight: 800, fontSize: 13.5, color: 'var(--text-h)', marginBottom: 12 }}>
-                    Pick a different video for this module:
-                  </div>
-                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                    {searchResults.map(v => (
-                      <div key={v.videoId}
-                        onClick={() => swapVideo(v.videoId)}
-                        style={{
-                          display: 'flex', gap: 10, padding: '10px 12px', borderRadius: 10,
-                          border: `1.5px solid ${v.videoId === currentVideoId ? 'var(--accent)' : 'var(--border)'}`,
-                          background: v.videoId === currentVideoId ? 'var(--accent-bg)' : 'transparent',
-                          cursor: 'pointer', alignItems: 'center', transition: 'all .15s',
-                        }}
-                        onMouseEnter={e => { if (v.videoId !== currentVideoId) e.currentTarget.style.borderColor = 'rgba(99,102,241,.4)'; }}
-                        onMouseLeave={e => { if (v.videoId !== currentVideoId) e.currentTarget.style.borderColor = 'var(--border)'; }}>
-                        {v.thumbnail && <img src={v.thumbnail} alt="" style={{ width: 80, height: 54, objectFit: 'cover', borderRadius: 6, flexShrink: 0 }} />}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                          <div style={{ fontSize: 13, fontWeight: 700, color: 'var(--text-h)', marginBottom: 3 }}>{v.title}</div>
-                          <div style={{ fontSize: 11, color: 'var(--text)' }}>📺 {v.channel}</div>
-                          {v.videoId === currentVideoId && <div style={{ fontSize: 11, color: 'var(--accent)', fontWeight: 700 }}>Currently playing</div>}
-                        </div>
+                {notes.keyConcepts?.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: '#06b6d4', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: 7 }}>Key Concepts</div>
+                    {notes.keyConcepts.map((c, i) => (
+                      <div key={i} style={{ padding: '7px 10px', background: 'rgba(6,182,212,.05)', borderRadius: 8, border: '1px solid rgba(6,182,212,.1)', marginBottom: 5 }}>
+                        <span style={{ fontSize: 11.5, color: '#38bdf8', fontWeight: 700 }}>{c.term}: </span>
+                        <span style={{ fontSize: 12.5, color: 'var(--text)' }}>{c.definition}</span>
                       </div>
                     ))}
                   </div>
-                  <div style={{ marginTop: 10, fontSize: 12, color: 'var(--text)', fontStyle: 'italic' }}>
-                    ℹ️ Swapping video will regenerate notes & quiz from the new transcript (takes ~30s in background).
+                )}
+                {notes.keyPoints?.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: 7 }}>Key Points</div>
+                    {notes.keyPoints.map((p, i) => (
+                      <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 6 }}>
+                        <div style={{ width: 4, height: 4, borderRadius: '50%', background: 'var(--accent)', flexShrink: 0, marginTop: 7 }} />
+                        <span style={{ fontSize: 12.5, color: 'var(--text-h)', lineHeight: 1.6 }}>{p}</span>
+                      </div>
+                    ))}
                   </div>
-                </Card>
-              )}
-            </>
-          ) : (
-            <div style={{ ...T.card, textAlign: 'center', padding: 40 }}>
-              <div style={{ fontSize: 40, marginBottom: 10 }}>🎬</div>
-              <p style={{ color: 'var(--text)', fontSize: 14 }}>No video found for this module. Notes were generated from AI knowledge.</p>
-            </div>
-          )}
-
-          {/* Key topics */}
-          {mod?.keyTopics?.length > 0 && (
-            <Card>
-              <div style={{ fontWeight: 800, fontSize: 13.5, color: 'var(--text-h)', marginBottom: 10 }}>🎯 What you'll learn</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                {mod.keyTopics.map((t, i) => (
-                  <span key={i} style={{ background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid var(--accent-border)', borderRadius: 20, padding: '4px 12px', fontSize: 12, fontWeight: 700 }}>
-                    {t}
-                  </span>
-                ))}
+                )}
+                {notes.formulas?.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: '#f59e0b', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: 7 }}>Formulas</div>
+                    {notes.formulas.map((f, i) => (
+                      <div key={i} style={{ padding: '8px 10px', background: 'rgba(245,158,11,.06)', borderRadius: 7, border: '1px solid rgba(245,158,11,.12)', fontFamily: 'monospace', fontSize: 12, color: '#fcd34d', marginBottom: 5 }}>{f}</div>
+                    ))}
+                  </div>
+                )}
+                {notes.solvedExample && (
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: '#6ee7b7', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: 7 }}>Solved Example</div>
+                    <p style={{ fontSize: 12.5, color: 'var(--text-h)', lineHeight: 1.8, margin: 0, whiteSpace: 'pre-wrap' }}>{notes.solvedExample}</p>
+                  </div>
+                )}
+                {notes.commonMistakes?.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: '#ef4444', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: 7 }}>Common Mistakes</div>
+                    {notes.commonMistakes.map((m, i) => (
+                      <div key={i} style={{ display: 'flex', gap: 7, marginBottom: 5, fontSize: 12.5, color: 'var(--text-h)', lineHeight: 1.5 }}>
+                        <span style={{ color: '#ef4444', flexShrink: 0 }}>✗</span>{m}
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {notes.examTips?.length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: 7 }}>Exam Tips</div>
+                    {notes.examTips.map((t, i) => (
+                      <div key={i} style={{ display: 'flex', gap: 7, marginBottom: 5, fontSize: 12.5, color: 'var(--text-h)', lineHeight: 1.5 }}>
+                        <span style={{ color: 'var(--accent)', flexShrink: 0 }}>★</span>{t}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </div>
-            </Card>
-          )}
-        </div>
-      )}
-
-      {/* ── NOTES TAB ──────────────────────────────────────── */}
-      {tab === 'notes' && !moduleData && <PageSpinner />}
-      {tab === 'notes' && notes && (
-        <div>
-          {/* Summary */}
-          <Card style={{ marginBottom: 12 }}>
-            <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 15, color: 'var(--text-h)', marginBottom: 12 }}>📋 Summary</div>
-            <p style={{ fontSize: 14, color: 'var(--text-h)', lineHeight: 1.8, margin: 0 }}>{notes.summary}</p>
-          </Card>
-
-          {/* Key Concepts */}
-          {notes.keyConcepts?.length > 0 && (
-            <Card style={{ marginBottom: 12 }}>
-              <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 15, color: 'var(--text-h)', marginBottom: 12 }}>🔑 Key Concepts</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
-                {notes.keyConcepts.map((c, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 10 }}>
-                    <div style={{ background: 'var(--accent-bg)', color: 'var(--accent)', borderRadius: 8, padding: '6px 10px', fontSize: 12, fontWeight: 800, flexShrink: 0, alignSelf: 'flex-start' }}>
-                      {c.term}
-                    </div>
-                    <div style={{ fontSize: 13.5, color: 'var(--text-h)', lineHeight: 1.6, alignSelf: 'center' }}>{c.definition}</div>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-
-          {/* Key Points */}
-          {notes.keyPoints?.length > 0 && (
-            <Card style={{ marginBottom: 12 }}>
-              <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 15, color: 'var(--text-h)', marginBottom: 12 }}>⚡ Key Points</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                {notes.keyPoints.map((p, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 10, padding: '7px 10px', background: 'var(--code-bg)', borderRadius: 8, border: '1px solid var(--border)' }}>
-                    <span style={{ color: 'var(--accent)', fontWeight: 800, flexShrink: 0, fontSize: 13 }}>{i + 1}.</span>
-                    <span style={{ fontSize: 13.5, color: 'var(--text-h)', lineHeight: 1.6 }}>{p}</span>
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-
-          {/* Formulas */}
-          {notes.formulas?.length > 0 && (
-            <Card style={{ marginBottom: 12, borderColor: '#F59E0B' }}>
-              <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 15, color: '#FCD34D', marginBottom: 12 }}>📐 Formulas</div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-                {notes.formulas.map((f, i) => (
-                  <div key={i} style={{ background: 'rgba(245,158,11,.08)', border: '1px solid rgba(245,158,11,.2)', borderRadius: 8, padding: '10px 14px', fontSize: 13.5, color: 'var(--text-h)', fontFamily: 'monospace', lineHeight: 1.6 }}>
-                    {f}
-                  </div>
-                ))}
-              </div>
-            </Card>
-          )}
-
-          {/* Solved Example */}
-          {notes.solvedExample && (
-            <Card style={{ marginBottom: 12, borderColor: '#10B981' }}>
-              <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 15, color: '#6ee7b7', marginBottom: 12 }}>✏️ Solved Example</div>
-              <p style={{ fontSize: 13.5, color: 'var(--text-h)', lineHeight: 1.8, margin: 0, whiteSpace: 'pre-wrap' }}>{notes.solvedExample}</p>
-            </Card>
-          )}
-
-          {/* Two-column: Mistakes + Exam Tips */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 12 }}>
-            {notes.commonMistakes?.length > 0 && (
-              <Card style={{ borderColor: '#EF4444' }}>
-                <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 14, color: '#fca5a5', marginBottom: 10 }}>⚠️ Common Mistakes</div>
-                {notes.commonMistakes.map((m, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 7, fontSize: 13, color: 'var(--text-h)', lineHeight: 1.5 }}>
-                    <span style={{ color: '#EF4444', flexShrink: 0 }}>✗</span> {m}
-                  </div>
-                ))}
-              </Card>
-            )}
-            {notes.examTips?.length > 0 && (
-              <Card style={{ borderColor: '#6366F1' }}>
-                <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 14, color: 'var(--accent)', marginBottom: 10 }}>🎯 Exam Tips</div>
-                {notes.examTips.map((t, i) => (
-                  <div key={i} style={{ display: 'flex', gap: 8, marginBottom: 7, fontSize: 13, color: 'var(--text-h)', lineHeight: 1.5 }}>
-                    <span style={{ color: 'var(--accent)', flexShrink: 0 }}>★</span> {t}
-                  </div>
-                ))}
-              </Card>
             )}
           </div>
         </div>
-      )}
 
-      {/* ── Q&A TAB ────────────────────────────────────────── */}
-      {tab === 'qa' && !moduleData && <PageSpinner />}
-      {tab === 'qa' && (
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
-          {qa.map((item, i) => (
-            <Card key={i} style={{ cursor: 'pointer' }}
-              onClick={() => setQaOpen(qaOpen === i ? null : i)}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
-                <div style={{ flex: 1 }}>
-                  <div style={{ display: 'flex', gap: 7, marginBottom: 5, alignItems: 'center' }}>
-                    <span style={{ background: 'var(--accent-bg)', color: 'var(--accent)', borderRadius: '50%', width: 20, height: 20, display: 'inline-flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 800, flexShrink: 0 }}>Q{i + 1}</span>
-                    <span style={{ fontSize: 10.5, fontWeight: 700, color: item.difficulty === 'Easy' ? '#22c55e' : item.difficulty === 'Hard' ? '#EF4444' : '#06b6d4' }}>
-                      {item.difficulty || 'Medium'}
-                    </span>
+        {/* Q&A */}
+        <div style={{ ...T.card, display: 'flex', flexDirection: 'column', maxHeight: '68vh', padding: 0, overflow: 'hidden' }}>
+          <div style={{ padding: '13px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 7, flexShrink: 0 }}>
+            <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#06b6d4', flexShrink: 0 }} />
+            <span style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 13, color: 'var(--text-h)' }}>Q&amp;A</span>
+            {qa.length > 0 && <span style={{ fontSize: 10.5, color: 'var(--text)', marginLeft: 2 }}>{qa.length} questions</span>}
+          </div>
+          <div style={{ overflowY: 'auto', flex: 1, padding: '10px 12px' }}>
+            {!moduleData ? <PageSpinner /> : qa.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 24, color: 'var(--text)', fontSize: 13 }}>Q&A not available.</div>
+            ) : (
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                {qa.map((item, i) => (
+                  <div key={i} style={{ borderRadius: 9, border: `1px solid ${qaOpen === i ? 'var(--accent-border)' : 'var(--border)'}`, background: qaOpen === i ? 'var(--accent-bg)' : 'transparent', overflow: 'hidden', transition: 'all .15s' }}>
+                    <div onClick={() => setQaOpen(qaOpen === i ? null : i)}
+                      style={{ padding: '9px 12px', cursor: 'pointer', display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                      <div style={{ width: 18, height: 18, borderRadius: '50%', background: 'var(--accent-bg)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, color: 'var(--accent)', fontWeight: 700, flexShrink: 0, marginTop: 1 }}>Q{i + 1}</div>
+                      <div style={{ flex: 1 }}>
+                        {item.difficulty && (
+                          <div style={{ fontSize: 9.5, fontWeight: 700, color: item.difficulty === 'Easy' ? '#22c55e' : item.difficulty === 'Hard' ? '#ef4444' : '#06b6d4', marginBottom: 3 }}>{item.difficulty}</div>
+                        )}
+                        <div style={{ fontSize: 12.5, color: 'var(--text-h)', lineHeight: 1.45 }}>{item.q}</div>
+                      </div>
+                      <span style={{ color: 'var(--text)', fontSize: 10, flexShrink: 0 }}>{qaOpen === i ? '▲' : '▼'}</span>
+                    </div>
+                    {qaOpen === i && (
+                      <div style={{ padding: '0 12px 11px 38px', fontSize: 12.5, color: 'var(--text-h)', lineHeight: 1.75, borderTop: '1px solid var(--border)', paddingTop: 9 }}>
+                        💡 {item.a}
+                      </div>
+                    )}
                   </div>
-                  <div style={{ fontSize: 13.5, color: 'var(--text-h)', lineHeight: 1.5 }}>{item.q}</div>
-                </div>
-                <span style={{ color: 'var(--text)', fontSize: 12, flexShrink: 0 }}>{qaOpen === i ? '▲' : '▼'}</span>
+                ))}
               </div>
-              {qaOpen === i && (
-                <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid var(--border)', fontSize: 13.5, color: 'var(--text-h)', lineHeight: 1.8 }}>
-                  💡 {item.a}
-                </div>
-              )}
-            </Card>
-          ))}
-          {qa.length === 0 && <p style={{ color: 'var(--text)', textAlign: 'center', padding: 20 }}>Q&A not available for this module.</p>}
+            )}
+          </div>
         </div>
-      )}
 
-      {/* ── QUIZ TAB ───────────────────────────────────────── */}
-      {tab === 'quiz' && !moduleData && <PageSpinner />}
-      {tab === 'quiz' && (
-        <div>
-          {qDone ? (
-            <>
-              {/* Score card */}
-              <div style={{ background: `linear-gradient(135deg, ${pct >= 80 ? '#6366F1' : pct >= 50 ? '#F59E0B' : '#EF4444'}, ${pct >= 80 ? '#8B5CF6' : pct >= 50 ? '#FBBF24' : '#F87171'})`, borderRadius: 18, padding: 28, textAlign: 'center', color: '#fff', marginBottom: 18 }}>
-                <div style={{ fontSize: 44, marginBottom: 8 }}>{pct === 100 ? '🏆' : pct >= 80 ? '🎉' : pct >= 50 ? '👍' : '📚'}</div>
-                <div style={{ fontFamily: "'Sora', sans-serif", fontSize: 32, fontWeight: 900, marginBottom: 4 }}>{qScore}/{quiz.length}</div>
-                <div style={{ opacity: .85, marginBottom: 12 }}>
-                  {pct === 100 ? 'Perfect score! Outstanding!' : pct >= 80 ? 'Excellent work!' : pct >= 50 ? 'Good effort — review the explanations below' : 'Keep practicing — review the notes and try again'}
+        {/* Quiz */}
+        <div style={{ ...T.card, display: 'flex', flexDirection: 'column', maxHeight: '68vh', padding: 0, overflow: 'hidden' }}>
+          <div style={{ padding: '13px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 7 }}>
+              <div style={{ width: 8, height: 8, borderRadius: '50%', background: '#f59e0b', flexShrink: 0 }} />
+              <span style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 13, color: 'var(--text-h)' }}>Quiz</span>
+            </div>
+            {qDone && <span style={{ fontSize: 11, fontWeight: 800, color: pct >= 70 ? '#6ee7b7' : '#fca5a5' }}>{pct}%</span>}
+          </div>
+          <div style={{ overflowY: 'auto', flex: 1, padding: '14px 16px' }}>
+            {!moduleData ? <PageSpinner /> : quiz.length === 0 ? (
+              <div style={{ textAlign: 'center', padding: 24, color: 'var(--text)', fontSize: 13 }}>Quiz not available.</div>
+            ) : qDone ? (
+              <div>
+                <div style={{ padding: '20px', borderRadius: 12, background: `linear-gradient(135deg,${pct >= 80 ? '#6366F1' : pct >= 50 ? '#F59E0B' : '#EF4444'},${pct >= 80 ? '#8B5CF6' : pct >= 50 ? '#FBBF24' : '#F87171'})`, textAlign: 'center', color: '#fff', marginBottom: 14 }}>
+                  <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 900, fontSize: 30 }}>{qScore}/{quiz.length}</div>
+                  <div style={{ fontSize: 13, opacity: .85, marginTop: 4 }}>{pct >= 80 ? 'Excellent! 🎉' : pct >= 50 ? 'Good effort! 👍' : 'Keep practicing! 📚'}</div>
+                  <button onClick={() => { setQAns({}); setQDone(false) }} style={{ marginTop: 12, padding: '5px 16px', borderRadius: 8, background: 'rgba(255,255,255,.2)', border: 'none', color: '#fff', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>↺ Retake</button>
                 </div>
-                <GhostBtn small onClick={() => { setQAns({}); setQDone(false); }} style={{ background: 'rgba(255,255,255,.2)', border: 'none', color: '#fff' }}>
-                  Retake
-                </GhostBtn>
-              </div>
-
-              {/* Review answers */}
-              {quiz.map((q, i) => (
-                <Card key={i} style={{ marginBottom: 10, borderLeft: `4px solid ${qAns[i] === q.ans ? '#22c55e' : '#EF4444'}` }}>
-                  <p style={{ margin: '0 0 10px', fontWeight: 700, fontSize: 14, color: 'var(--text-h)' }}>
-                    <span style={{ color: 'var(--accent)' }}>Q{i + 1}.</span> {q.q}
-                  </p>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 6, marginBottom: 10 }}>
-                    {q.opts.map((opt, j) => {
-                      const isAns  = j === q.ans;
-                      const isSel  = qAns[i] === j;
-                      let bg = 'transparent', border = 'var(--border)', color = 'var(--text-h)';
-                      if (isAns)            { bg = 'rgba(34,197,94,.1)';  border = '#6ee7b7'; color = '#6ee7b7'; }
-                      else if (isSel && !isAns) { bg = 'rgba(239,68,68,.1)'; border = '#fca5a5'; color = '#fca5a5'; }
-                      return (
-                        <div key={j} style={{ padding: '8px 12px', borderRadius: 8, border: `1.5px solid ${border}`, background: bg, color, fontSize: 13, fontWeight: 600 }}>
-                          {String.fromCharCode(65 + j)}. {opt}{isAns ? ' ✓' : ''}
-                        </div>
-                      );
-                    })}
-                  </div>
-                  <div style={{ padding: '8px 12px', background: 'var(--accent-bg)', borderRadius: 8, fontSize: 13, color: 'var(--accent)' }}>
-                    💡 {q.exp}
-                  </div>
-                </Card>
-              ))}
-            </>
-          ) : (
-            <>
-              <p style={{ fontSize: 13, color: 'var(--text)', marginBottom: 16 }}>
-                {quiz.length} questions based on the video content for this module.
-              </p>
-              {quiz.map((q, i) => (
-                <Card key={i} style={{ marginBottom: 12 }}>
-                  <p style={{ margin: '0 0 12px', fontWeight: 700, fontSize: 14, color: 'var(--text-h)' }}>
-                    <span style={{ color: 'var(--accent)' }}>Q{i + 1}.</span> {q.q}
-                  </p>
-                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                {quiz.map((q, i) => (
+                  <div key={i} style={{ marginBottom: 9, padding: '10px 12px', borderRadius: 9, border: `1px solid ${qAns[i] === q.ans ? 'rgba(34,197,94,.3)' : 'rgba(239,68,68,.2)'}`, background: qAns[i] === q.ans ? 'rgba(34,197,94,.05)' : 'rgba(239,68,68,.04)' }}>
+                    <div style={{ fontSize: 12, color: 'var(--text-h)', fontWeight: 500, marginBottom: 6, lineHeight: 1.4 }}>{i + 1}. {q.q}</div>
                     {q.opts.map((opt, j) => (
-                      <button key={j} onClick={() => setQAns(a => ({ ...a, [i]: j }))}
-                        style={{
-                          padding: '9px 12px', borderRadius: 9, textAlign: 'left', cursor: 'pointer',
-                          fontFamily: "'Nunito', sans-serif", fontWeight: 600, fontSize: 13.5, transition: 'all .15s',
-                          border: `1.5px solid ${qAns[i] === j ? 'var(--accent)' : 'var(--border)'}`,
-                          background: qAns[i] === j ? 'var(--accent-bg)' : 'var(--code-bg)',
-                          color: qAns[i] === j ? 'var(--accent)' : 'var(--text-h)',
-                        }}>
-                        <span style={{ fontWeight: 800, marginRight: 4 }}>{String.fromCharCode(65 + j)}.</span>{opt}
-                      </button>
+                      <div key={j} style={{ fontSize: 11.5, padding: '2px 0', color: j === q.ans ? '#6ee7b7' : qAns[i] === j ? '#fca5a5' : 'var(--text)' }}>
+                        {j === q.ans ? '✓ ' : qAns[i] === j ? '✗ ' : '   '}{opt}
+                      </div>
                     ))}
+                    {q.exp && <div style={{ marginTop: 7, fontSize: 11, color: 'var(--accent)', padding: '5px 9px', background: 'var(--accent-bg)', borderRadius: 7 }}>{q.exp}</div>}
                   </div>
-                </Card>
-              ))}
-              {quiz.length > 0 && (
-                <PrimaryBtn onClick={submitQuiz} disabled={Object.keys(qAns).length < quiz.length} color="#8B5CF6" style={{ marginTop: 8 }}>
-                  Submit Quiz ({Object.keys(qAns).length}/{quiz.length} answered) →
-                </PrimaryBtn>
-              )}
-              {quiz.length === 0 && <p style={{ color: 'var(--text)', textAlign: 'center', padding: 20 }}>Quiz not available for this module.</p>}
-            </>
-          )}
+                ))}
+              </div>
+            ) : (
+              <div>
+                <div style={{ display: 'flex', gap: 3, marginBottom: 14, flexWrap: 'wrap' }}>
+                  {quiz.map((_, i) => (
+                    <div key={i} style={{ flex: '1 0 auto', maxWidth: 28, height: 4, borderRadius: 100, background: qAns[i] !== undefined ? 'var(--accent)' : 'rgba(255,255,255,.09)', cursor: 'pointer' }} onClick={() => {}} />
+                  ))}
+                </div>
+                {quiz.map((q, i) => (
+                  <div key={i} style={{ marginBottom: 16 }}>
+                    <div style={{ fontSize: 12.5, color: 'var(--text-h)', fontWeight: 600, marginBottom: 8, lineHeight: 1.45 }}>
+                      <span style={{ color: 'var(--accent)' }}>Q{i + 1}.</span> {q.q}
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {q.opts.map((opt, j) => (
+                        <button key={j} onClick={() => setQAns(a => ({ ...a, [i]: j }))}
+                          style={{ padding: '8px 12px', borderRadius: 9, border: `1.5px solid ${qAns[i] === j ? 'var(--accent)' : 'var(--border)'}`, background: qAns[i] === j ? 'var(--accent-bg)' : 'var(--code-bg)', color: qAns[i] === j ? 'var(--accent)' : 'var(--text-h)', cursor: 'pointer', textAlign: 'left', fontSize: 12.5, fontFamily: "'Nunito', sans-serif", fontWeight: 600, transition: 'all .15s' }}>
+                          <span style={{ fontWeight: 800, marginRight: 4 }}>{String.fromCharCode(65 + j)}.</span>{opt}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                ))}
+                {Object.keys(qAns).length === quiz.length && (
+                  <PrimaryBtn onClick={submitQuiz} color="#8B5CF6" style={{ width: '100%', justifyContent: 'center', marginTop: 4 }}>
+                    Submit Quiz ({Object.keys(qAns).length}/{quiz.length}) →
+                  </PrimaryBtn>
+                )}
+              </div>
+            )}
+          </div>
         </div>
-      )}
+
+      </div>
     </div>
-  );
+  )
 }
 
 // ══════════════════════════════════════════════════════════════
