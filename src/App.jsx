@@ -177,6 +177,71 @@ const api = {
 // ══════════════════════════════════════════════════════════════
 //  UTILITIES
 // ══════════════════════════════════════════════════════════════
+
+async function downloadNotesAsPDF(content, title) {
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js')
+
+  const lines = (content || '').split('\n')
+  let body = ''
+  for (const line of lines) {
+    if (line.startsWith('# '))        body += `<h1>${line.slice(2)}</h1>`
+    else if (line.startsWith('## '))  body += `<h2>${line.slice(3)}</h2>`
+    else if (line.startsWith('### ')) body += `<h3>${line.slice(4)}</h3>`
+    else if (line.startsWith('- ') || line.startsWith('• ')) body += `<li>${line.slice(2)}</li>`
+    else if (/^\d+\./.test(line))     body += `<li>${line}</li>`
+    else if (line.startsWith('---'))  body += `<hr/>`
+    else if (line.startsWith('📝'))   body += `<div class="tip">${line}</div>`
+    else if (line.trim() === '')      body += `<div style="height:8px"></div>`
+    else body += `<p>${line.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')}</p>`
+  }
+
+  const el = document.createElement('div')
+  el.style.cssText = 'position:absolute;left:-9999px;top:0;width:794px;background:white'
+  el.innerHTML = `
+    <style>
+      * { box-sizing:border-box; margin:0; padding:0; }
+      body { font-family:'Source Sans 3',Georgia,sans-serif; }
+      .wrap { background:#fff; padding:56px 64px; font-size:14px; line-height:1.8; color:#374151; }
+      .hdr  { border-bottom:3px solid #3730a3; padding-bottom:20px; margin-bottom:32px; }
+      .hdr-title { font-family:Georgia,serif; font-size:28px; font-weight:700; color:#1a1a2e; margin-bottom:8px; }
+      .hdr-meta  { font-size:12px; color:#64748b; font-weight:600; }
+      .hdr-meta span { color:#3730a3; }
+      h1 { font-family:Georgia,serif; font-size:22px; font-weight:700; color:#1a1a2e;
+           margin:32px 0 10px; padding-bottom:8px; border-bottom:2px solid #e8e6ff; }
+      h2 { font-family:Georgia,serif; font-size:18px; font-weight:700; color:#3730a3; margin:24px 0 8px; }
+      h3 { font-size:15px; font-weight:700; color:#1e293b; margin:18px 0 6px;
+           padding-left:12px; border-left:3px solid #818cf8; }
+      p  { margin:0 0 10px; }
+      li { margin:4px 0 4px 22px; list-style:disc; }
+      strong { color:#1a1a2e; font-weight:700; }
+      hr { border:none; border-top:1px solid #e2e8f0; margin:18px 0; }
+      .tip { background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px;
+             padding:8px 14px; margin:10px 0; font-size:13px; color:#1d4ed8; font-weight:600; }
+    </style>
+    <div class="wrap">
+      <div class="hdr">
+        <div class="hdr-title">${title.split('—')[0]?.trim() || title}</div>
+        <div class="hdr-meta"><span>${title.split('—')[1]?.trim() || ''}</span> · CBSE 2024-25</div>
+      </div>
+      ${body}
+    </div>`
+  document.body.appendChild(el)
+
+  try {
+    await window.html2pdf().set({
+      margin:      [10, 10],
+      filename:    `${title.replace(/ — | /g, '-')}.pdf`,
+      html2canvas: { scale: 2, useCORS: true, logging: false },
+      jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak:   { mode: ['avoid-all', 'css'] },
+    }).from(el).save()
+  } finally {
+    document.body.removeChild(el)
+  }
+}
+
+
+
 function downloadText(content, filename = 'brainspark.txt') {
   const blob = new Blob([content], { type: 'text/plain' })
   const url  = URL.createObjectURL(blob)
@@ -187,125 +252,79 @@ function downloadText(content, filename = 'brainspark.txt') {
 
 // REPLACE the old printContent function with this
 function printContent(content, title = 'BrainSpark AI Notes') {
+  // Build HTML string (no DOM touching yet — pure string ops, non-blocking)
   const lines = (content || '').split('\n')
-  let html = ''
+  let body = ''
   for (const line of lines) {
-    if (line.startsWith('# '))       html += `<h1>${line.slice(2)}</h1>`
-    else if (line.startsWith('## ')) html += `<h2>${line.slice(3)}</h2>`
-    else if (line.startsWith('### '))html += `<h3>${line.slice(4)}</h3>`
-    else if (line.startsWith('- ') || line.startsWith('• ')) html += `<li>${line.slice(2)}</li>`
-    else if (/^\d+\./.test(line))    html += `<li>${line}</li>`
-    else if (line.startsWith('---') || line.startsWith('═══')) html += `<hr/>`
-    else if (line.trim() === '')     html += `<div style="margin:6px 0"></div>`
-    else {
-      const formatted = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      html += `<p>${formatted}</p>`
-    }
+    if (line.startsWith('# '))        body += `<h1>${line.slice(2)}</h1>`
+    else if (line.startsWith('## '))  body += `<h2>${line.slice(3)}</h2>`
+    else if (line.startsWith('### ')) body += `<h3>${line.slice(4)}</h3>`
+    else if (line.startsWith('- ') || line.startsWith('• ')) body += `<li>${line.slice(2)}</li>`
+    else if (/^\d+\./.test(line))     body += `<li>${line}</li>`
+    else if (line.startsWith('---'))  body += `<hr/>`
+    else if (line.startsWith('📝'))   body += `<div class="tip">${line}</div>`
+    else if (line.trim() === '')      body += `<div style="height:8px"></div>`
+    else body += `<p>${line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')}</p>`
   }
-  const win = window.open('', '_blank')
-  win.document.write(`<!DOCTYPE html>
+
+  const html = `<!DOCTYPE html>
 <html>
 <head>
+  <meta charset="UTF-8"/>
   <title>${title}</title>
-  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;600;700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body {
-      font-family: 'Source Sans 3', Georgia, serif;
-      background: #f5f4f0;
-      color: #1a1a2e;
-      padding: 40px 20px;
-      font-size: 15px;
-      line-height: 1.8;
-    }
-    .page {
-      background: #ffffff;
-      max-width: 780px;
-      margin: 0 auto;
-      padding: 64px 72px;
-      border-radius: 4px;
-      box-shadow: 0 2px 40px rgba(0,0,0,0.10);
-      min-height: 100vh;
-    }
-    .doc-header {
-      border-bottom: 3px solid #3730a3;
-      padding-bottom: 22px;
-      margin-bottom: 36px;
-    }
-    .doc-title {
-      font-family: 'Lora', Georgia, serif;
-      font-size: 34px;
-      font-weight: 700;
-      color: #1a1a2e;
-      line-height: 1.2;
-      margin-bottom: 10px;
-    }
-    .doc-meta {
-      font-size: 13px;
-      color: #64748b;
-      font-weight: 600;
-      letter-spacing: 0.3px;
-    }
-    .doc-meta span { color: #3730a3; }
-    h1 {
-      font-family: 'Lora', Georgia, serif;
-      font-size: 26px;
-      font-weight: 700;
-      color: #1a1a2e;
-      margin: 36px 0 14px;
-      padding-bottom: 8px;
-      border-bottom: 2px solid #e8e6ff;
-    }
-    h2 {
-      font-family: 'Lora', Georgia, serif;
-      font-size: 20px;
-      font-weight: 700;
-      color: #3730a3;
-      margin: 28px 0 10px;
-    }
-    h3 {
-      font-size: 16px;
-      font-weight: 700;
-      color: #1e293b;
-      margin: 20px 0 8px;
-      padding-left: 12px;
-      border-left: 3px solid #818cf8;
-    }
-    p { margin: 0 0 12px; color: #374151; }
-    li {
-      margin: 5px 0 5px 24px;
-      color: #374151;
-      list-style: disc;
-    }
-    strong { color: #1a1a2e; font-weight: 700; }
-    hr {
-      border: none;
-      border-top: 1px solid #e2e8f0;
-      margin: 24px 0;
-    }
+    @import url('https://fonts.googleapis.com/css2?family=Lora:wght@400;700&family=Source+Sans+3:wght@400;600;700&display=swap');
+    * { box-sizing:border-box; margin:0; padding:0; }
+    body { font-family:'Source Sans 3',Georgia,sans-serif; background:#f0efe9; padding:32px 20px; color:#374151; font-size:14.5px; line-height:1.8; }
+    .page { background:#fff; max-width:780px; margin:0 auto; padding:56px 68px; border-radius:6px; box-shadow:0 4px 32px rgba(0,0,0,.10); }
+    .hdr  { border-bottom:3px solid #3730a3; padding-bottom:20px; margin-bottom:32px; }
+    .hdr-title { font-family:'Lora',Georgia,serif; font-size:30px; font-weight:700; color:#1a1a2e; margin-bottom:8px; }
+    .hdr-meta  { font-size:12.5px; color:#64748b; font-weight:600; }
+    .hdr-meta span { color:#3730a3; }
+    h1 { font-family:'Lora',Georgia,serif; font-size:22px; font-weight:700; color:#1a1a2e; margin:32px 0 10px; padding-bottom:8px; border-bottom:2px solid #e8e6ff; }
+    h2 { font-family:'Lora',Georgia,serif; font-size:18px; font-weight:700; color:#3730a3; margin:24px 0 8px; }
+    h3 { font-size:15px; font-weight:700; color:#1e293b; margin:18px 0 6px; padding-left:12px; border-left:3px solid #818cf8; }
+    p  { margin:0 0 10px; }
+    li { margin:4px 0 4px 22px; list-style:disc; }
+    strong { color:#1a1a2e; font-weight:700; }
+    hr { border:none; border-top:1px solid #e2e8f0; margin:18px 0; }
+    .tip { background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px; padding:8px 14px; margin:10px 0; font-size:13px; color:#1d4ed8; font-weight:600; }
     @media print {
-      body { background: white; padding: 0; }
-      .page {
-        box-shadow: none;
-        border-radius: 0;
-        padding: 48px 60px;
-        max-width: 100%;
-      }
-      @page { margin: 0.6in; }
+      body { background:#fff; padding:0; }
+      .page { box-shadow:none; border-radius:0; max-width:100%; padding:0; }
+      @page { margin:0.65in; }
     }
   </style>
 </head>
 <body>
   <div class="page">
-    <div class="doc-header">
-      <div class="doc-title">${title.replace(' Notes — ', '<br/><span style="font-size:22px;color:#3730a3">')}</div>
+    <div class="hdr">
+      <div class="hdr-title">${title.split('—')[0]?.trim() || title}</div>
+      <div class="hdr-meta"><span>${title.split('—')[1]?.trim() || ''}</span> · CBSE 2024-25</div>
     </div>
-    ${html}
+    ${body}
   </div>
-  <script>setTimeout(()=>{ window.print() }, 500)<\/script>
+  <script>
+    // Only print after fonts + content are loaded — never blocks parent
+    window.addEventListener('load', function() {
+      setTimeout(function() { window.print(); }, 400);
+    });
+  <\/script>
 </body>
-</html>`)
-  win.document.close()
+</html>`
+
+  // ✅ Blob URL approach — zero DOM blocking on the parent window
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+  const url  = URL.createObjectURL(blob)
+  const win  = window.open(url, '_blank')
+
+  // Clean up the blob URL after the new window has loaded it
+  if (win) {
+    win.addEventListener('load', () => URL.revokeObjectURL(url), { once: true })
+  } else {
+    // Popup blocked fallback — revoke after a delay
+    setTimeout(() => URL.revokeObjectURL(url), 30000)
+  }
 }
 
 async function loadScript(src) {
@@ -2113,7 +2132,7 @@ function NotesDocument({ content, title, onDownload }) {
             <span style={{ fontSize:12, color:'#94a3b8', marginLeft:6, fontFamily:"'Source Sans 3',sans-serif" }}>{title}</span>
           </div>
           <div style={{ display:'flex', gap:8 }}>
-            <button onClick={onDownload}
+            <button onClick={()=>downloadNotesAsPDF(content, title)}
               style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 16px', borderRadius:8, border:'1px solid #d1d5db', background:'#ffffff', color:'#374151', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:"'Source Sans 3',sans-serif", boxShadow:'0 1px 3px rgba(0,0,0,.08)' }}>
               ⬇ Download PDF
             </button>
