@@ -184,57 +184,73 @@ async function downloadNotesAsPDF(content, title) {
   const lines = (content || '').split('\n')
   let body = ''
   for (const line of lines) {
-    if (line.startsWith('# '))        body += `<h1>${line.slice(2)}</h1>`
-    else if (line.startsWith('## '))  body += `<h2>${line.slice(3)}</h2>`
-    else if (line.startsWith('### ')) body += `<h3>${line.slice(4)}</h3>`
-    else if (line.startsWith('- ') || line.startsWith('• ')) body += `<li>${line.slice(2)}</li>`
-    else if (/^\d+\./.test(line))     body += `<li>${line}</li>`
-    else if (line.startsWith('---'))  body += `<hr/>`
-    else if (line.startsWith('📝'))   body += `<div class="tip">${line}</div>`
-    else if (line.trim() === '')      body += `<div style="height:8px"></div>`
-    else body += `<p>${line.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')}</p>`
+    if (line.startsWith('# '))
+      body += `<h1 style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:#1a1a2e;margin:28px 0 10px;padding-bottom:8px;border-bottom:2px solid #e8e6ff;line-height:1.3">${line.slice(2)}</h1>`
+    else if (line.startsWith('## '))
+      body += `<h2 style="font-family:Georgia,serif;font-size:18px;font-weight:700;color:#3730a3;margin:22px 0 8px">${line.slice(3)}</h2>`
+    else if (line.startsWith('### '))
+      body += `<h3 style="font-size:15px;font-weight:700;color:#1e293b;margin:16px 0 6px;padding-left:12px;border-left:3px solid #818cf8">${line.slice(4)}</h3>`
+    else if (line.startsWith('- ') || line.startsWith('• '))
+      body += `<div style="display:flex;gap:8px;margin-bottom:6px;padding-left:8px"><span style="color:#818cf8;font-weight:800;flex-shrink:0">•</span><span style="color:#374151;font-size:14px;line-height:1.75">${line.slice(2)}</span></div>`
+    else if (/^\d+\./.test(line))
+      body += `<div style="margin-bottom:6px;padding-left:20px;color:#374151;font-size:14px;line-height:1.75">${line}</div>`
+    else if (line.startsWith('---') || line.startsWith('═══'))
+      body += `<hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0"/>`
+    else if (line.startsWith('📝'))
+      body += `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:8px 14px;margin:10px 0;font-size:13px;color:#1d4ed8;font-weight:600">${line}</div>`
+    else if (line.trim() === '')
+      body += `<div style="height:8px"></div>`
+    else {
+      const formatted = line.replace(/\*\*(.*?)\*\*/g, '<strong style="color:#1a1a2e;font-weight:700">$1</strong>')
+      body += `<p style="margin:0 0 10px;color:#374151;font-size:14px;line-height:1.8">${formatted}</p>`
+    }
   }
 
+  // ✅ KEY FIX: position:fixed + opacity:0.01 (not 0, not off-screen)
+  // html2canvas needs the element to be in the viewport with non-zero opacity
   const el = document.createElement('div')
-  el.style.cssText = 'position:absolute;left:-9999px;top:0;width:794px;background:white'
+  el.style.cssText = [
+    'position:fixed', 'top:0', 'left:0', 'width:794px', 'max-height:100vh',
+    'overflow:hidden', 'background:white', 'z-index:-9999',
+    'opacity:0.01', 'pointer-events:none',
+    'font-family:Georgia,sans-serif', 'padding:0',
+  ].join(';')
+
   el.innerHTML = `
-    <style>
-      * { box-sizing:border-box; margin:0; padding:0; }
-      body { font-family:'Source Sans 3',Georgia,sans-serif; }
-      .wrap { background:#fff; padding:56px 64px; font-size:14px; line-height:1.8; color:#374151; }
-      .hdr  { border-bottom:3px solid #3730a3; padding-bottom:20px; margin-bottom:32px; }
-      .hdr-title { font-family:Georgia,serif; font-size:28px; font-weight:700; color:#1a1a2e; margin-bottom:8px; }
-      .hdr-meta  { font-size:12px; color:#64748b; font-weight:600; }
-      .hdr-meta span { color:#3730a3; }
-      h1 { font-family:Georgia,serif; font-size:22px; font-weight:700; color:#1a1a2e;
-           margin:32px 0 10px; padding-bottom:8px; border-bottom:2px solid #e8e6ff; }
-      h2 { font-family:Georgia,serif; font-size:18px; font-weight:700; color:#3730a3; margin:24px 0 8px; }
-      h3 { font-size:15px; font-weight:700; color:#1e293b; margin:18px 0 6px;
-           padding-left:12px; border-left:3px solid #818cf8; }
-      p  { margin:0 0 10px; }
-      li { margin:4px 0 4px 22px; list-style:disc; }
-      strong { color:#1a1a2e; font-weight:700; }
-      hr { border:none; border-top:1px solid #e2e8f0; margin:18px 0; }
-      .tip { background:#eff6ff; border:1px solid #bfdbfe; border-radius:6px;
-             padding:8px 14px; margin:10px 0; font-size:13px; color:#1d4ed8; font-weight:600; }
-    </style>
-    <div class="wrap">
-      <div class="hdr">
-        <div class="hdr-title">${title.split('—')[0]?.trim() || title}</div>
-        <div class="hdr-meta"><span>${title.split('—')[1]?.trim() || ''}</span> · CBSE 2024-25</div>
+    <div style="padding:56px 64px;background:white;min-height:100px">
+      <div style="border-bottom:3px solid #3730a3;padding-bottom:20px;margin-bottom:32px">
+        <div style="font-family:Georgia,serif;font-size:28px;font-weight:700;color:#1a1a2e;margin-bottom:8px;line-height:1.25">
+          ${title.split('—')[0]?.trim() || title}
+        </div>
+        <div style="font-size:12.5px;color:#64748b;font-weight:600">
+          ${title.split('—')[1]?.trim() || ''} · CBSE 2024-25
+        </div>
       </div>
       ${body}
     </div>`
+
   document.body.appendChild(el)
 
   try {
-    await window.html2pdf().set({
-      margin:      [10, 10],
-      filename:    `${title.replace(/ — | /g, '-')}.pdf`,
-      html2canvas: { scale: 2, useCORS: true, logging: false },
-      jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak:   { mode: ['avoid-all', 'css'] },
-    }).from(el).save()
+    await window.html2pdf()
+      .set({
+        margin:      [8, 8],
+        filename:    `${title.replace(/ — |—/g, '-').replace(/\s+/g, '-')}.pdf`,
+        html2canvas: {
+          scale:       2,
+          useCORS:     true,
+          logging:     false,
+          width:       794,
+          windowWidth: 794,
+          backgroundColor: '#ffffff',
+        },
+        jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
+        pagebreak:   { mode: 'avoid-all' },
+      })
+      .from(el)
+      .save()
+  } catch (e) {
+    alert('PDF generation failed: ' + e.message)
   } finally {
     document.body.removeChild(el)
   }
