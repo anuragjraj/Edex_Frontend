@@ -179,81 +179,197 @@ const api = {
 // ══════════════════════════════════════════════════════════════
 
 async function downloadNotesAsPDF(content, title) {
-  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js')
+  // jsPDF writes text directly to PDF — no canvas, never blank
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
 
-  const lines = (content || '').split('\n')
-  let body = ''
-  for (const line of lines) {
-    if (line.startsWith('# '))
-      body += `<h1 style="font-family:Georgia,serif;font-size:22px;font-weight:700;color:#1a1a2e;margin:28px 0 10px;padding-bottom:8px;border-bottom:2px solid #e8e6ff;line-height:1.3">${line.slice(2)}</h1>`
-    else if (line.startsWith('## '))
-      body += `<h2 style="font-family:Georgia,serif;font-size:18px;font-weight:700;color:#3730a3;margin:22px 0 8px">${line.slice(3)}</h2>`
-    else if (line.startsWith('### '))
-      body += `<h3 style="font-size:15px;font-weight:700;color:#1e293b;margin:16px 0 6px;padding-left:12px;border-left:3px solid #818cf8">${line.slice(4)}</h3>`
-    else if (line.startsWith('- ') || line.startsWith('• '))
-      body += `<div style="display:flex;gap:8px;margin-bottom:6px;padding-left:8px"><span style="color:#818cf8;font-weight:800;flex-shrink:0">•</span><span style="color:#374151;font-size:14px;line-height:1.75">${line.slice(2)}</span></div>`
-    else if (/^\d+\./.test(line))
-      body += `<div style="margin-bottom:6px;padding-left:20px;color:#374151;font-size:14px;line-height:1.75">${line}</div>`
-    else if (line.startsWith('---') || line.startsWith('═══'))
-      body += `<hr style="border:none;border-top:1px solid #e2e8f0;margin:16px 0"/>`
-    else if (line.startsWith('📝'))
-      body += `<div style="background:#eff6ff;border:1px solid #bfdbfe;border-radius:6px;padding:8px 14px;margin:10px 0;font-size:13px;color:#1d4ed8;font-weight:600">${line}</div>`
-    else if (line.trim() === '')
-      body += `<div style="height:8px"></div>`
-    else {
-      const formatted = line.replace(/\*\*(.*?)\*\*/g, '<strong style="color:#1a1a2e;font-weight:700">$1</strong>')
-      body += `<p style="margin:0 0 10px;color:#374151;font-size:14px;line-height:1.8">${formatted}</p>`
+  const { jsPDF } = window.jspdf
+  const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' })
+
+  const PAGE_W    = 210
+  const MARGIN    = 18
+  const MAX_W     = PAGE_W - MARGIN * 2   // 174mm usable width
+  const PAGE_H    = 297
+  const BOT_LIMIT = PAGE_H - 20           // bottom margin
+
+  let y = MARGIN
+
+  // ── helpers ─────────────────────────────────────────────────
+  function newPageIfNeeded(needed = 8) {
+    if (y + needed > BOT_LIMIT) { doc.addPage(); y = MARGIN }
+  }
+
+  function writeLine(text, opts = {}) {
+    const {
+      size = 11, bold = false, italic = false,
+      color = [55, 65, 81],   // #374151
+      indent = 0, gap = 4,
+    } = opts
+
+    doc.setFontSize(size)
+    doc.setFont('helvetica', bold && italic ? 'bolditalic' : bold ? 'bold' : italic ? 'italic' : 'normal')
+    doc.setTextColor(...color)
+
+    const lines = doc.splitTextToSize(text, MAX_W - indent)
+    for (const line of lines) {
+      newPageIfNeeded(size * 0.4 + 2)
+      doc.text(line, MARGIN + indent, y)
+      y += size * 0.38 + 1.5
     }
+    y += gap
   }
 
-  // ✅ KEY FIX: position:fixed + opacity:0.01 (not 0, not off-screen)
-  // html2canvas needs the element to be in the viewport with non-zero opacity
-  const el = document.createElement('div')
-  el.style.cssText = [
-    'position:fixed', 'top:0', 'left:0', 'width:794px', 'max-height:100vh',
-    'overflow:hidden', 'background:white', 'z-index:-9999',
-    'opacity:0.01', 'pointer-events:none',
-    'font-family:Georgia,sans-serif', 'padding:0',
-  ].join(';')
-
-  el.innerHTML = `
-    <div style="padding:56px 64px;background:white;min-height:100px">
-      <div style="border-bottom:3px solid #3730a3;padding-bottom:20px;margin-bottom:32px">
-        <div style="font-family:Georgia,serif;font-size:28px;font-weight:700;color:#1a1a2e;margin-bottom:8px;line-height:1.25">
-          ${title.split('—')[0]?.trim() || title}
-        </div>
-        <div style="font-size:12.5px;color:#64748b;font-weight:600">
-          ${title.split('—')[1]?.trim() || ''} · CBSE 2024-25
-        </div>
-      </div>
-      ${body}
-    </div>`
-
-  document.body.appendChild(el)
-
-  try {
-    await window.html2pdf()
-      .set({
-        margin:      [8, 8],
-        filename:    `${title.replace(/ — |—/g, '-').replace(/\s+/g, '-')}.pdf`,
-        html2canvas: {
-          scale:       2,
-          useCORS:     true,
-          logging:     false,
-          width:       794,
-          windowWidth: 794,
-          backgroundColor: '#ffffff',
-        },
-        jsPDF:       { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak:   { mode: 'avoid-all' },
-      })
-      .from(el)
-      .save()
-  } catch (e) {
-    alert('PDF generation failed: ' + e.message)
-  } finally {
-    document.body.removeChild(el)
+  function drawHRule(color = [226, 232, 240], thickness = 0.3) {
+    doc.setDrawColor(...color)
+    doc.setLineWidth(thickness)
+    doc.line(MARGIN, y, PAGE_W - MARGIN, y)
+    y += 4
   }
+
+  function writeBoldLine(text, baseOpts = {}) {
+    // Handles **bold** inline markers
+    const parts = []
+    const regex  = /\*\*(.*?)\*\*/g
+    let last = 0, m
+    while ((m = regex.exec(text)) !== null) {
+      if (m.index > last) parts.push({ t: text.slice(last, m.index), bold: false })
+      parts.push({ t: m[1], bold: true })
+      last = m.index + m[0].length
+    }
+    if (last < text.length) parts.push({ t: text.slice(last), bold: false })
+
+    if (parts.length <= 1 || parts.every(p => !p.bold)) {
+      // No bold — just write normally
+      writeLine(text.replace(/\*\*(.*?)\*\*/g, '$1'), baseOpts)
+      return
+    }
+
+    // Mixed bold — measure and write segment by segment on same line
+    const { size = 11, color = [55, 65, 81], indent = 0, gap = 4 } = baseOpts
+    doc.setFontSize(size)
+    newPageIfNeeded(size * 0.4 + 2)
+    let cx = MARGIN + indent
+    for (const part of parts) {
+      doc.setFont('helvetica', part.bold ? 'bold' : 'normal')
+      doc.setTextColor(...(part.bold ? [26, 26, 46] : color))
+      doc.text(part.t, cx, y)
+      cx += doc.getTextWidth(part.t)
+    }
+    y += size * 0.38 + 1.5 + gap
+  }
+
+  // ── Document header ─────────────────────────────────────────
+  const mainTitle  = title.split('—')[0]?.trim() || title
+  const subTitle   = title.split('—')[1]?.trim() || ''
+
+  doc.setFillColor(55, 48, 163)  // #3730a3
+  doc.rect(MARGIN, y, MAX_W, 0.8, 'F')
+  y += 5
+
+  writeLine(mainTitle, { size: 22, bold: true, color: [26, 26, 46], gap: 3 })
+  if (subTitle) writeLine(`${subTitle} · CBSE 2024-25`, { size: 10, color: [100, 116, 139], gap: 8 })
+
+  drawHRule([55, 48, 163], 0.8)
+  y += 2
+
+  // ── Parse and write content ─────────────────────────────────
+  const lines = (content || '').split('\n')
+
+  for (const raw of lines) {
+    const line = raw.trimEnd()
+
+    if (line === '' || line === '---' || line.startsWith('═══')) {
+      if (line.startsWith('---') || line.startsWith('═══')) {
+        drawHRule(); continue
+      }
+      y += 2; continue
+    }
+
+    // H1
+    if (line.startsWith('# ')) {
+      y += 3
+      newPageIfNeeded(14)
+      writeLine(line.slice(2), { size: 16, bold: true, color: [26, 26, 46], gap: 2 })
+      drawHRule([232, 230, 255], 0.4)
+      continue
+    }
+
+    // H2
+    if (line.startsWith('## ')) {
+      y += 2
+      newPageIfNeeded(12)
+      writeLine(line.slice(3), { size: 13, bold: true, color: [55, 48, 163], gap: 3 })
+      continue
+    }
+
+    // H3
+    if (line.startsWith('### ') || line.startsWith('#### ')) {
+      const depth = line.startsWith('#### ') ? 4 : 3
+      y += 1
+      writeLine(line.slice(depth + 1), { size: 11.5, bold: true, color: [30, 41, 59], gap: 2 })
+      continue
+    }
+
+    // Bullet
+    if (line.startsWith('- ') || line.startsWith('• ')) {
+      doc.setFontSize(11)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(129, 140, 248)  // #818cf8
+      newPageIfNeeded(7)
+      doc.text('•', MARGIN + 2, y)
+      doc.setFont('helvetica', 'normal')
+      doc.setTextColor(55, 65, 81)
+      const txt   = line.slice(2)
+      const wrapped = doc.splitTextToSize(txt, MAX_W - 8)
+      for (let i = 0; i < wrapped.length; i++) {
+        newPageIfNeeded(6)
+        doc.text(wrapped[i], MARGIN + 7, y)
+        y += 5.5
+      }
+      y += 1
+      continue
+    }
+
+    // Numbered list
+    if (/^\d+\./.test(line)) {
+      writeLine(line, { indent: 5, gap: 3 })
+      continue
+    }
+
+    // Exam tip callout
+    if (line.startsWith('📝')) {
+      newPageIfNeeded(10)
+      doc.setFillColor(239, 246, 255)  // #eff6ff
+      const tipLines = doc.splitTextToSize(line, MAX_W - 6)
+      const boxH = tipLines.length * 5 + 4
+      doc.rect(MARGIN, y - 3, MAX_W, boxH, 'F')
+      doc.setFontSize(10)
+      doc.setFont('helvetica', 'bold')
+      doc.setTextColor(29, 78, 216)  // #1d4ed8
+      for (const tl of tipLines) {
+        doc.text(tl, MARGIN + 3, y)
+        y += 5
+      }
+      y += 3
+      continue
+    }
+
+    // Regular paragraph (with inline bold support)
+    writeBoldLine(line, { size: 11, color: [55, 65, 81], gap: 4 })
+  }
+
+  // ── Footer on each page ─────────────────────────────────────
+  const totalPages = doc.internal.getNumberOfPages()
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i)
+    doc.setFontSize(8.5)
+    doc.setFont('helvetica', 'normal')
+    doc.setTextColor(148, 163, 184)  // #94a3b8
+    doc.text('BrainSpark AI · CBSE Notes', MARGIN, PAGE_H - 8)
+    doc.text(`Page ${i} of ${totalPages}`, PAGE_W - MARGIN - 18, PAGE_H - 8)
+  }
+
+  const filename = `${title.replace(/ — |—/g, '-').replace(/[\s/\\:*?"<>|]+/g, '-')}.pdf`
+  doc.save(filename)
 }
 
 
