@@ -185,16 +185,126 @@ function downloadText(content, filename = 'brainspark.txt') {
   URL.revokeObjectURL(url)
 }
 
-function printContent(content, title = 'BrainSpark AI') {
-  const html = content
-    .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
-    .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-    .replace(/### (.*?)(\n|$)/g, '<h3>$1</h3>')
-    .replace(/## (.*?)(\n|$)/g, '<h2>$1</h2>')
-    .replace(/# (.*?)(\n|$)/g, '<h1>$1</h1>')
-    .replace(/\n/g, '<br>')
+// REPLACE the old printContent function with this
+function printContent(content, title = 'BrainSpark AI Notes') {
+  const lines = (content || '').split('\n')
+  let html = ''
+  for (const line of lines) {
+    if (line.startsWith('# '))       html += `<h1>${line.slice(2)}</h1>`
+    else if (line.startsWith('## ')) html += `<h2>${line.slice(3)}</h2>`
+    else if (line.startsWith('### '))html += `<h3>${line.slice(4)}</h3>`
+    else if (line.startsWith('- ') || line.startsWith('• ')) html += `<li>${line.slice(2)}</li>`
+    else if (/^\d+\./.test(line))    html += `<li>${line}</li>`
+    else if (line.startsWith('---') || line.startsWith('═══')) html += `<hr/>`
+    else if (line.trim() === '')     html += `<div style="margin:6px 0"></div>`
+    else {
+      const formatted = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+      html += `<p>${formatted}</p>`
+    }
+  }
   const win = window.open('', '_blank')
-  win.document.write(`<!DOCTYPE html><html><head><title>${title}</title><style>body{font-family:'Georgia',serif;max-width:800px;margin:40px auto;padding:0 20px;color:#111;line-height:1.7}h1{color:#6366F1}h2{color:#374151;border-bottom:2px solid #E5E7EB;padding-bottom:6px}strong{color:#111}@media print{@page{margin:.8in}}</style></head><body>${html}<script>setTimeout(()=>{window.print()},400)<\/script></body></html>`)
+  win.document.write(`<!DOCTYPE html>
+<html>
+<head>
+  <title>${title}</title>
+  <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;600;700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: 'Source Sans 3', Georgia, serif;
+      background: #f5f4f0;
+      color: #1a1a2e;
+      padding: 40px 20px;
+      font-size: 15px;
+      line-height: 1.8;
+    }
+    .page {
+      background: #ffffff;
+      max-width: 780px;
+      margin: 0 auto;
+      padding: 64px 72px;
+      border-radius: 4px;
+      box-shadow: 0 2px 40px rgba(0,0,0,0.10);
+      min-height: 100vh;
+    }
+    .doc-header {
+      border-bottom: 3px solid #3730a3;
+      padding-bottom: 22px;
+      margin-bottom: 36px;
+    }
+    .doc-title {
+      font-family: 'Lora', Georgia, serif;
+      font-size: 34px;
+      font-weight: 700;
+      color: #1a1a2e;
+      line-height: 1.2;
+      margin-bottom: 10px;
+    }
+    .doc-meta {
+      font-size: 13px;
+      color: #64748b;
+      font-weight: 600;
+      letter-spacing: 0.3px;
+    }
+    .doc-meta span { color: #3730a3; }
+    h1 {
+      font-family: 'Lora', Georgia, serif;
+      font-size: 26px;
+      font-weight: 700;
+      color: #1a1a2e;
+      margin: 36px 0 14px;
+      padding-bottom: 8px;
+      border-bottom: 2px solid #e8e6ff;
+    }
+    h2 {
+      font-family: 'Lora', Georgia, serif;
+      font-size: 20px;
+      font-weight: 700;
+      color: #3730a3;
+      margin: 28px 0 10px;
+    }
+    h3 {
+      font-size: 16px;
+      font-weight: 700;
+      color: #1e293b;
+      margin: 20px 0 8px;
+      padding-left: 12px;
+      border-left: 3px solid #818cf8;
+    }
+    p { margin: 0 0 12px; color: #374151; }
+    li {
+      margin: 5px 0 5px 24px;
+      color: #374151;
+      list-style: disc;
+    }
+    strong { color: #1a1a2e; font-weight: 700; }
+    hr {
+      border: none;
+      border-top: 1px solid #e2e8f0;
+      margin: 24px 0;
+    }
+    @media print {
+      body { background: white; padding: 0; }
+      .page {
+        box-shadow: none;
+        border-radius: 0;
+        padding: 48px 60px;
+        max-width: 100%;
+      }
+      @page { margin: 0.6in; }
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <div class="doc-header">
+      <div class="doc-title">${title.replace(' Notes — ', '<br/><span style="font-size:22px;color:#3730a3">')}</div>
+    </div>
+    ${html}
+  </div>
+  <script>setTimeout(()=>{ window.print() }, 500)<\/script>
+</body>
+</html>`)
   win.document.close()
 }
 
@@ -1961,6 +2071,84 @@ function DoubtSolver({ user, prefill, onClearPrefill }) {
   )
 }
 
+
+function NotesDocument({ content, title, onDownload }) {
+  const lines = (content || '').split('\n')
+
+  const rendered = lines.map((line, i) => {
+    if (line.startsWith('# '))
+      return <h2 key={i} style={{ fontFamily:"'Lora',Georgia,serif", fontSize:'clamp(20px,3vw,26px)', fontWeight:700, color:'#1a1a2e', margin:'32px 0 12px', paddingBottom:10, borderBottom:'2px solid #e8e6ff' }}>{line.slice(2)}</h2>
+    if (line.startsWith('## '))
+      return <h3 key={i} style={{ fontFamily:"'Lora',Georgia,serif", fontSize:'clamp(16px,2vw,20px)', fontWeight:700, color:'#3730a3', margin:'24px 0 8px' }}>{line.slice(3)}</h3>
+    if (line.startsWith('### '))
+      return <h4 key={i} style={{ fontSize:15, fontWeight:700, color:'#1e293b', margin:'18px 0 6px', paddingLeft:12, borderLeft:'3px solid #818cf8' }}>{line.slice(4)}</h4>
+    if (line.startsWith('- ') || line.startsWith('• '))
+      return <div key={i} style={{ display:'flex', gap:10, marginBottom:5, paddingLeft:8 }}><span style={{ color:'#818cf8', flexShrink:0, fontWeight:800, marginTop:1 }}>•</span><span style={{ color:'#374151', fontSize:14.5, lineHeight:1.75 }}>{line.slice(2)}</span></div>
+    if (/^\d+\./.test(line))
+      return <div key={i} style={{ display:'flex', gap:10, marginBottom:5, paddingLeft:8 }}><span style={{ color:'#818cf8', flexShrink:0, fontWeight:800, minWidth:22, fontSize:13 }}>{line.match(/^\d+/)[0]}.</span><span style={{ color:'#374151', fontSize:14.5, lineHeight:1.75 }}>{line.replace(/^\d+\.\s*/,'')}</span></div>
+    if (line.startsWith('---') || line.startsWith('═══'))
+      return <hr key={i} style={{ border:'none', borderTop:'1px solid #e2e8f0', margin:'20px 0' }}/>
+    if (line.startsWith('📝'))
+      return <div key={i} style={{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:8, padding:'8px 14px', margin:'10px 0', fontSize:13.5, color:'#1d4ed8', fontWeight:600 }}>{line}</div>
+    if (line.trim() === '')
+      return <div key={i} style={{ height:8 }}/>
+    const bold = line.replace(/\*\*(.*?)\*\*/g, '<strong style="color:#1a1a2e;font-weight:700">$1</strong>')
+    return <p key={i} style={{ color:'#374151', fontSize:14.5, lineHeight:1.8, marginBottom:6 }} dangerouslySetInnerHTML={{ __html: bold }}/>
+  })
+
+  return (
+    <>
+      {/* Load Lora font for the document */}
+      <link href="https://fonts.googleapis.com/css2?family=Lora:wght@400;600;700&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet"/>
+
+      {/* Outer wrapper — parchment/grey background like image 2 */}
+      <div style={{ background:'#f0efe9', borderRadius:14, padding:'20px 16px', marginTop:20 }}>
+
+        {/* Toolbar */}
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16, flexWrap:'wrap', gap:8 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+            <div style={{ width:10, height:10, borderRadius:'50%', background:'#ef4444' }}/>
+            <div style={{ width:10, height:10, borderRadius:'50%', background:'#f59e0b' }}/>
+            <div style={{ width:10, height:10, borderRadius:'50%', background:'#22c55e' }}/>
+            <span style={{ fontSize:12, color:'#94a3b8', marginLeft:6, fontFamily:"'Source Sans 3',sans-serif" }}>{title}</span>
+          </div>
+          <div style={{ display:'flex', gap:8 }}>
+            <button onClick={onDownload}
+              style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 16px', borderRadius:8, border:'1px solid #d1d5db', background:'#ffffff', color:'#374151', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:"'Source Sans 3',sans-serif", boxShadow:'0 1px 3px rgba(0,0,0,.08)' }}>
+              ⬇ Download PDF
+            </button>
+            <button onClick={()=>printContent(content, title)}
+              style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 16px', borderRadius:8, border:'none', background:'#3730a3', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:"'Source Sans 3',sans-serif" }}>
+              🖨 Print / Save PDF
+            </button>
+          </div>
+        </div>
+
+        {/* The white document paper */}
+        <div style={{ background:'#ffffff', borderRadius:10, padding:'clamp(28px,5vw,64px) clamp(20px,6vw,72px)', boxShadow:'0 4px 24px rgba(0,0,0,0.10)', maxHeight:'72vh', overflowY:'auto' }}>
+
+          {/* Document header */}
+          <div style={{ borderBottom:'3px solid #3730a3', paddingBottom:20, marginBottom:32 }}>
+            <h1 style={{ fontFamily:"'Lora',Georgia,serif", fontSize:'clamp(22px,4vw,32px)', fontWeight:700, color:'#1a1a2e', lineHeight:1.25, margin:'0 0 10px' }}>
+              {title.replace(' Notes — ','').replace(' Notes','')}
+            </h1>
+            <div style={{ fontSize:13, color:'#64748b', fontWeight:600, fontFamily:"'Source Sans 3',sans-serif" }}>
+              {title.includes('—') && <span style={{ color:'#3730a3' }}>{title.split('—')[1]?.trim()}</span>}
+              {' · '}CBSE 2024-25
+            </div>
+          </div>
+
+          {/* Content */}
+          <div style={{ fontFamily:"'Source Sans 3','Georgia',sans-serif" }}>
+            {rendered}
+          </div>
+
+        </div>
+      </div>
+    </>
+  )
+}
+
 // ══════════════════════════════════════════════════════════════
 //  NOTES MAKER
 // ══════════════════════════════════════════════════════════════
@@ -1969,7 +2157,7 @@ function NotesMaker({ user, prefill, onClearPrefill }) {
   const [chapter,setChapter]=useState(''); const [customCh,setCustomCh]=useState(''); const [style_,setStyle_]=useState('Detailed')
   const [result,setResult]=useState(''); const [loading,setLoading]=useState(false); const [saved,setSaved]=useState(false); const [err,setErr]=useState('')
   const chapters=getChapters(subject,cls); const finalChapter=chapter||customCh||chapters[0]
-  
+
   const STYLE_INSTRUCTIONS = {
   'Detailed': `Write in thorough prose under every heading. Explain the "why" behind every concept, not just the "what". Every sub-topic gets its own ### heading with at least 3-4 full paragraphs of explanation.`,
   'Concise': `Write in tight, information-dense paragraphs. No filler. Every sentence must carry a fact, definition, or insight useful for exams.`,
@@ -2123,11 +2311,15 @@ FINAL REMINDER: You must write AT LEAST 3500 words. Every section above must be 
       </Card>
       <ErrMsg msg={err}/>
       {result&&<>
-        <ContentBox content={result} label={`${finalChapter} Notes — ${subject} ${cls}`} downloadName={`${finalChapter}-notes.txt`} onDownload={()=>downloadText(result,`${finalChapter}-notes.txt`)}/>
-        <div style={{ display:'flex', gap:8, marginTop:12 }}>
-          {!saved?<GhostBtn small onClick={saveNote}>💾 Save to Library</GhostBtn>:<SuccessMsg msg="Saved to Library!"/>}
-        </div>
-      </>}
+  <NotesDocument
+    content={result}
+    title={`${finalChapter} Notes — ${subject} ${cls}`}
+    onDownload={()=>downloadText(result,`${finalChapter}-notes.txt`)}
+  />
+  <div style={{ display:'flex', gap:8, marginTop:12 }}>
+    {!saved?<GhostBtn small onClick={saveNote}>💾 Save to Library</GhostBtn>:<SuccessMsg msg="Saved to Library!"/>}
+  </div>
+</>}
       <XPBadge amount={20} label="per notes generated"/>
     </div>
   )
