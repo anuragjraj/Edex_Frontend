@@ -374,6 +374,471 @@ async function downloadNotesAsPDF(content, title) {
 
 
 
+async function downloadQPaperAsPDF(paper, opts = {}) {
+  await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
+  const { jsPDF } = window.jspdf
+  const doc = new jsPDF({ unit: 'mm', format: 'a4' })
+
+  const clean = s => (s || '').replace(/[^\x00-\x7F]/g, '').replace(/\*\*/g, '').trim()
+  const PAGE_W = 210, MARGIN = 20, MAX_W = 170, PAGE_H = 297, BOT = 277
+  let y = MARGIN
+
+  function newPage() { doc.addPage(); y = MARGIN }
+  function check(need = 8) { if (y + need > BOT) newPage() }
+
+  function line(text, opts2 = {}) {
+    const { size = 11, bold = false, color = [0,0,0], indent = 0, gap = 3, center = false } = opts2
+    doc.setFontSize(size); doc.setFont('times', bold ? 'bold' : 'normal'); doc.setTextColor(...color)
+    const wrapped = doc.splitTextToSize(clean(text), MAX_W - indent)
+    for (const l of wrapped) {
+      check(size * 0.4 + 2)
+      const x = center ? (PAGE_W / 2) : (MARGIN + indent)
+      doc.text(l, x, y, center ? { align: 'center' } : {})
+      y += size * 0.42 + 1
+    }
+    y += gap
+  }
+
+  function hline(thickness = 0.4) {
+    doc.setDrawColor(0); doc.setLineWidth(thickness)
+    doc.line(MARGIN, y, PAGE_W - MARGIN, y); y += 3
+  }
+
+  const h = paper.header || {}
+  const school = opts.schoolName || 'CBSE Affiliated School'
+
+  // ── Header ──────────────────────────────────────────────────
+  doc.setFillColor(240, 240, 240); doc.rect(MARGIN, y - 2, MAX_W, 36, 'F')
+  line(school.toUpperCase(), { size: 15, bold: true, center: true, gap: 1 })
+  line(`${clean(h.board || 'CBSE')} Examination ${clean(h.year || '2024-25')}`, { size: 11, center: true, gap: 1 })
+  hline(0.8)
+
+  const info = [
+    `Subject: ${clean(h.subject)}`,
+    `Class: ${clean(h.class_level)}`,
+    `Max. Marks: ${h.max_marks || ''}`,
+    `Time: ${clean(h.duration)}`
+  ]
+  doc.setFontSize(11); doc.setFont('times', 'normal')
+  const colW = MAX_W / 2
+  doc.text(clean(info[0]), MARGIN, y); doc.text(clean(info[1]), MARGIN + colW, y); y += 6
+  doc.text(clean(info[2]), MARGIN, y); doc.text(clean(info[3]), MARGIN + colW, y); y += 4
+  hline(0.8)
+  y += 2
+
+  // ── General Instructions ─────────────────────────────────────
+  line('General Instructions:', { size: 11, bold: true, gap: 2 })
+  for (let i = 0; i < (paper.general_instructions || []).length; i++) {
+    line(`${i + 1}. ${clean(paper.general_instructions[i])}`, { size: 10, indent: 4, gap: 2 })
+  }
+  hline(); y += 3
+
+  // ── Sections ─────────────────────────────────────────────────
+  for (const sec of (paper.sections || [])) {
+    check(14)
+    line(sec.name.toUpperCase(), { size: 13, bold: true, gap: 1 })
+    if (sec.description) line(sec.description, { size: 10, gap: 3 })
+
+    for (const q of (sec.questions || [])) {
+      check(14)
+      const qText = `Q${q.number}. ${clean(q.text)}`
+      const marksLabel = `[${q.marks} Mark${q.marks > 1 ? 's' : ''}]`
+
+      // Question text + marks on same line at end
+      doc.setFontSize(11); doc.setFont('times', 'normal'); doc.setTextColor(0,0,0)
+      const wrappedQ = doc.splitTextToSize(qText, MAX_W - 20)
+      for (let wi = 0; wi < wrappedQ.length; wi++) {
+        check(7)
+        if (wi === wrappedQ.length - 1) {
+          doc.text(clean(wrappedQ[wi]), MARGIN, y)
+          doc.setFont('times', 'bold')
+          doc.text(marksLabel, PAGE_W - MARGIN, y, { align: 'right' })
+          doc.setFont('times', 'normal')
+        } else {
+          doc.text(clean(wrappedQ[wi]), MARGIN, y)
+        }
+        y += 5.5
+      }
+
+      // Options for MCQ
+      if (q.options?.length) {
+        const half = Math.ceil(q.options.length / 2)
+        for (let oi = 0; oi < q.options.length; oi += 2) {
+          check(6)
+          const o1 = clean(q.options[oi] || '')
+          const o2 = clean(q.options[oi + 1] || '')
+          doc.setFontSize(10.5)
+          doc.text(o1, MARGIN + 8, y)
+          if (o2) doc.text(o2, MARGIN + 8 + 80, y)
+          y += 5.5
+        }
+      }
+
+      // Long answer space (lines)
+      if (sec.type === 'long' || (q.marks >= 5)) {
+        for (let li = 0; li < Math.min(q.marks, 8); li++) {
+          check(5); doc.setDrawColor(200); doc.setLineWidth(0.2)
+          doc.line(MARGIN, y + 1, PAGE_W - MARGIN, y + 1); y += 6
+          doc.setDrawColor(0)
+        }
+      } else if (sec.type === 'short' || q.marks <= 3) {
+        for (let li = 0; li < 2; li++) {
+          check(5); doc.setDrawColor(200); doc.setLineWidth(0.2)
+          doc.line(MARGIN, y + 1, PAGE_W - MARGIN, y + 1); y += 6
+          doc.setDrawColor(0)
+        }
+      }
+      y += 2
+    }
+    y += 4
+  }
+
+  // ── Answer Key (if requested) ────────────────────────────────
+  if (opts.includeAnswers) {
+    newPage()
+    hline(0.8)
+    line('ANSWER KEY', { size: 14, bold: true, center: true, gap: 2 })
+    hline(0.8); y += 4
+
+    for (const sec of (paper.sections || [])) {
+      line(sec.name, { size: 12, bold: true, gap: 2 })
+      for (const q of (sec.questions || [])) {
+        check(10)
+        line(`Q${q.number}. Answer: ${clean(q.answer)}`, { size: 10.5, bold: true, indent: 4, gap: 1 })
+        if (q.solution) line(`Solution: ${clean(q.solution)}`, { size: 10, indent: 8, color: [60,60,60], gap: 3 })
+      }
+      y += 3
+    }
+  }
+
+  // ── Footer ───────────────────────────────────────────────────
+  const total = doc.internal.getNumberOfPages()
+  for (let p = 1; p <= total; p++) {
+    doc.setPage(p); doc.setFontSize(9); doc.setFont('times', 'normal'); doc.setTextColor(120,120,120)
+    doc.text(`${clean(h.subject)} | ${clean(h.class_level)} | Page ${p} of ${total}`, PAGE_W / 2, PAGE_H - 8, { align: 'center' })
+  }
+
+  const fname = `${clean(h.subject)}-${clean(h.class_level)}-${h.max_marks}M-paper.pdf`
+  doc.save(fname)
+}
+
+
+function QPaperDocument({ paper, onPaperChange, schoolName, onSchoolNameChange }) {
+  const [showAnswers, setShowAnswers] = useState(false)
+  const [editingQ, setEditingQ] = useState(null)  // {sIdx, qIdx}
+  const [editingInstr, setEditingInstr] = useState(null)
+
+  const h = paper.header || {}
+
+  function updateQuestion(sIdx, qIdx, field, value) {
+    const updated = JSON.parse(JSON.stringify(paper))
+    updated.sections[sIdx].questions[qIdx][field] = value
+    onPaperChange(updated)
+  }
+
+  function updateOption(sIdx, qIdx, oIdx, value) {
+    const updated = JSON.parse(JSON.stringify(paper))
+    updated.sections[sIdx].questions[qIdx].options[oIdx] = value
+    onPaperChange(updated)
+  }
+
+  function updateInstruction(idx, value) {
+    const updated = JSON.parse(JSON.stringify(paper))
+    updated.general_instructions[idx] = value
+    onPaperChange(updated)
+  }
+
+  function addQuestion(sIdx) {
+    const updated = JSON.parse(JSON.stringify(paper))
+    const sec = updated.sections[sIdx]
+    const lastNum = sec.questions[sec.questions.length - 1]?.number || 0
+    sec.questions.push({ number: lastNum + 1, text: 'New question', options: [], marks: 2, answer: '', solution: '' })
+    onPaperChange(updated)
+  }
+
+  function deleteQuestion(sIdx, qIdx) {
+    const updated = JSON.parse(JSON.stringify(paper))
+    updated.sections[sIdx].questions.splice(qIdx, 1)
+    onPaperChange(updated)
+  }
+
+  return (
+    <>
+      <link href="https://fonts.googleapis.com/css2?family=IM+Fell+English&family=Source+Serif+4:wght@400;600;700&display=swap" rel="stylesheet"/>
+
+      <div style={{ background: '#e8e6e0', borderRadius: 14, padding: '20px 16px', marginTop: 20 }}>
+
+        {/* ── Toolbar ── */}
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14, flexWrap: 'wrap', gap: 8 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {['#ef4444','#f59e0b','#22c55e'].map(c => <div key={c} style={{ width: 10, height: 10, borderRadius: '50%', background: c }}/>)}
+            <input value={schoolName} onChange={e => onSchoolNameChange(e.target.value)} placeholder="School Name" style={{ fontSize: 12, color: '#64748b', background: 'transparent', border: 'none', outline: 'none', fontFamily: "'Nunito', sans-serif", minWidth: 180 }}/>
+          </div>
+          <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+            <button onClick={() => setShowAnswers(v => !v)} style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: showAnswers ? '#1d4ed8' : '#fff', color: showAnswers ? '#fff' : '#374151', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>
+              {showAnswers ? '📖 Hide Answers' : '🔑 Show Answers'}
+            </button>
+            <button onClick={() => downloadQPaperAsPDF(paper, { schoolName, includeAnswers: false })}
+              style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>
+              ⬇ Paper PDF
+            </button>
+            <button onClick={() => downloadQPaperAsPDF(paper, { schoolName, includeAnswers: true })}
+              style={{ padding: '6px 14px', borderRadius: 8, border: '1px solid #d1d5db', background: '#fff', color: '#374151', fontSize: 12.5, fontWeight: 600, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>
+              ⬇ With Answers
+            </button>
+            <button onClick={() => printQPaper(paper, { schoolName, includeAnswers: false })}
+              style={{ padding: '6px 14px', borderRadius: 8, border: 'none', background: '#1e3a5f', color: '#fff', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>
+              🖨 Print Paper
+            </button>
+          </div>
+        </div>
+
+        {/* ── Paper document ── */}
+        <div style={{ background: '#fff', borderRadius: 10, padding: 'clamp(24px,4vw,52px) clamp(18px,5vw,60px)', boxShadow: '0 4px 24px rgba(0,0,0,.12)', maxHeight: '78vh', overflowY: 'auto', fontFamily: "'Source Serif 4', Georgia, serif" }}>
+
+          {/* Header */}
+          <div style={{ textAlign: 'center', borderBottom: '2px solid #000', paddingBottom: 14, marginBottom: 14 }}>
+            <div style={{ fontSize: 'clamp(15px,2.5vw,20px)', fontWeight: 700, letterSpacing: 1.5, marginBottom: 4, textTransform: 'uppercase' }}>
+              {schoolName || 'School Name'}
+            </div>
+            <div style={{ fontSize: 13, marginBottom: 10, color: '#444' }}>
+              {h.board || 'CBSE'} Examination — {h.year || '2024-25'}
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '4px 20px', fontSize: 13, textAlign: 'left', maxWidth: 520, margin: '0 auto' }}>
+              {[['Subject', h.subject], ['Class', h.class_level], ['Max. Marks', h.max_marks], ['Time', h.duration]].map(([l, v]) => (
+                <div key={l} style={{ borderBottom: '1px solid #ddd', paddingBottom: 3 }}>
+                  <span style={{ fontWeight: 700 }}>{l}: </span>{v}
+                </div>
+              ))}
+            </div>
+          </div>
+
+          {/* Instructions */}
+          <div style={{ marginBottom: 16 }}>
+            <div style={{ fontWeight: 700, fontSize: 13, marginBottom: 6, borderBottom: '1px dashed #ccc', paddingBottom: 3 }}>
+              General Instructions:
+            </div>
+            {(paper.general_instructions || []).map((inst, i) => (
+              <div key={i} style={{ display: 'flex', gap: 6, marginBottom: 3 }}>
+                <span style={{ fontWeight: 700, fontSize: 12, flexShrink: 0 }}>{i + 1}.</span>
+                {editingInstr === i ? (
+                  <input value={inst} onChange={e => updateInstruction(i, e.target.value)}
+                    onBlur={() => setEditingInstr(null)} autoFocus
+                    style={{ flex: 1, fontSize: 12, border: '1.5px solid #6366F1', borderRadius: 5, padding: '2px 6px', fontFamily: "'Source Serif 4', serif" }}/>
+                ) : (
+                  <span onClick={() => setEditingInstr(i)} style={{ fontSize: 12, color: '#374151', cursor: 'text', lineHeight: 1.6, flex: 1, padding: '1px 4px', borderRadius: 4, transition: 'background .15s' }}
+                    onMouseEnter={e => e.target.style.background = '#f0f9ff'}
+                    onMouseLeave={e => e.target.style.background = 'transparent'}>{inst}</span>
+                )}
+              </div>
+            ))}
+          </div>
+
+          {/* Sections */}
+          {(paper.sections || []).map((sec, sIdx) => (
+            <div key={sIdx} style={{ marginBottom: 20 }}>
+              <div style={{ borderTop: '1.5px solid #000', borderBottom: '1px solid #000', padding: '6px 0', marginBottom: 10 }}>
+                <div style={{ fontWeight: 700, fontSize: 14, textAlign: 'center', textTransform: 'uppercase', letterSpacing: 1 }}>
+                  {sec.name}
+                </div>
+                {sec.description && <div style={{ textAlign: 'center', fontSize: 12, color: '#555', marginTop: 3, fontStyle: 'italic' }}>{sec.description}</div>}
+              </div>
+
+              {(sec.questions || []).map((q, qIdx) => {
+                const isEditing = editingQ?.sIdx === sIdx && editingQ?.qIdx === qIdx
+                return (
+                  <div key={qIdx} style={{ marginBottom: 14, padding: '10px 12px', borderRadius: 8, border: isEditing ? '1.5px solid #6366F1' : '1px solid transparent', background: isEditing ? '#f8f7ff' : 'transparent', transition: 'all .15s' }}>
+
+                    {/* Question header row */}
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 4 }}>
+                      <div style={{ display: 'flex', gap: 6, flex: 1, alignItems: 'flex-start' }}>
+                        <span style={{ fontWeight: 700, fontSize: 13, flexShrink: 0, marginTop: 1 }}>Q{q.number}.</span>
+                        {isEditing ? (
+                          <textarea value={q.text} onChange={e => updateQuestion(sIdx, qIdx, 'text', e.target.value)}
+                            style={{ flex: 1, fontSize: 13, border: '1px solid #d1d5db', borderRadius: 6, padding: '4px 8px', resize: 'vertical', minHeight: 60, fontFamily: "'Source Serif 4', serif" }}/>
+                        ) : (
+                          <span onClick={() => setEditingQ({ sIdx, qIdx })} style={{ fontSize: 13, lineHeight: 1.7, cursor: 'text', flex: 1, padding: '1px 4px', borderRadius: 4 }}
+                            onMouseEnter={e => e.target.style.background = '#f0f9ff'}
+                            onMouseLeave={e => e.target.style.background = 'transparent'}>{q.text}</span>
+                        )}
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 6, flexShrink: 0, marginLeft: 10 }}>
+                        {isEditing ? (
+                          <input type="number" value={q.marks} onChange={e => updateQuestion(sIdx, qIdx, 'marks', parseInt(e.target.value))}
+                            style={{ width: 48, fontSize: 12, border: '1px solid #d1d5db', borderRadius: 5, padding: '2px 5px', textAlign: 'center' }}/>
+                        ) : (
+                          <span style={{ fontWeight: 700, fontSize: 12, background: '#1e3a5f', color: '#fff', padding: '2px 10px', borderRadius: 12 }}>{q.marks}M</span>
+                        )}
+                        <button onClick={() => setEditingQ(isEditing ? null : { sIdx, qIdx })}
+                          style={{ padding: '2px 8px', borderRadius: 6, border: '1px solid #d1d5db', background: isEditing ? '#6366F1' : '#f8fafc', color: isEditing ? '#fff' : '#374151', fontSize: 11, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>
+                          {isEditing ? 'Done' : '✏️'}
+                        </button>
+                        <button onClick={() => deleteQuestion(sIdx, qIdx)}
+                          style={{ padding: '2px 7px', borderRadius: 6, border: '1px solid #fecaca', background: '#fff5f5', color: '#ef4444', fontSize: 11, cursor: 'pointer' }}>✕</button>
+                      </div>
+                    </div>
+
+                    {/* Options */}
+                    {q.options?.length > 0 && (
+                      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '3px 12px', margin: '6px 0 4px 24px' }}>
+                        {q.options.map((opt, oIdx) => (
+                          <div key={oIdx} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                            {isEditing ? (
+                              <input value={opt} onChange={e => updateOption(sIdx, qIdx, oIdx, e.target.value)}
+                                style={{ flex: 1, fontSize: 12, border: '1px solid #d1d5db', borderRadius: 5, padding: '2px 6px', fontFamily: "'Source Serif 4', serif" }}/>
+                            ) : (
+                              <span style={{ fontSize: 12.5, color: '#374151' }}>{opt}</span>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Answer lines */}
+                    {!showAnswers && (
+                      <div style={{ marginTop: 6, marginLeft: 24 }}>
+                        {Array(Math.min(q.marks >= 5 ? q.marks : 2, 6)).fill(0).map((_, li) => (
+                          <div key={li} style={{ borderBottom: '1px solid #ccc', height: 20, marginBottom: 2 }}/>
+                        ))}
+                      </div>
+                    )}
+
+                    {/* Answer key (visible when toggled) */}
+                    {showAnswers && (
+                      <div style={{ marginTop: 8, marginLeft: 24, padding: '8px 12px', background: '#eff6ff', borderRadius: 8, border: '1px solid #bfdbfe' }}>
+                        <div style={{ fontSize: 12, fontWeight: 700, color: '#1d4ed8', marginBottom: isEditing ? 4 : 0 }}>
+                          Answer:&nbsp;
+                          {isEditing ? (
+                            <input value={q.answer} onChange={e => updateQuestion(sIdx, qIdx, 'answer', e.target.value)}
+                              style={{ fontSize: 12, border: '1px solid #bfdbfe', borderRadius: 5, padding: '2px 8px', fontFamily: "'Source Serif 4', serif", width: '90%' }}/>
+                          ) : (
+                            <span style={{ fontWeight: 400, color: '#1e40af' }}>{q.answer}</span>
+                          )}
+                        </div>
+                        {(q.solution || isEditing) && (
+                          <div style={{ fontSize: 11.5, color: '#374151', marginTop: 4 }}>
+                            <span style={{ fontWeight: 600 }}>Solution: </span>
+                            {isEditing ? (
+                              <textarea value={q.solution || ''} onChange={e => updateQuestion(sIdx, qIdx, 'solution', e.target.value)}
+                                style={{ width: '100%', fontSize: 11.5, border: '1px solid #bfdbfe', borderRadius: 5, padding: '3px 8px', resize: 'vertical', fontFamily: "'Source Serif 4', serif" }} rows={2}/>
+                            ) : q.solution}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+
+              {/* Add question button */}
+              <button onClick={() => addQuestion(sIdx)} style={{ display: 'flex', alignItems: 'center', gap: 5, padding: '5px 14px', borderRadius: 8, border: '1.5px dashed #94a3b8', background: 'transparent', color: '#64748b', fontSize: 12, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", marginTop: 4 }}>
+                + Add Question to {sec.name}
+              </button>
+            </div>
+          ))}
+
+          <div style={{ textAlign: 'center', fontSize: 12, color: '#888', marginTop: 16, paddingTop: 12, borderTop: '1px solid #e2e8f0' }}>
+            — End of Question Paper —
+          </div>
+        </div>
+      </div>
+    </>
+  )
+}
+
+
+
+function printQPaper(paper, opts = {}) {
+  const clean = s => (s || '').replace(/[^\x00-\x7F]/g, '').replace(/\*\*/g, '').trim()
+  const h = paper.header || {}
+  const school = opts.schoolName || 'CBSE Affiliated School'
+
+  let sectionsHTML = ''
+  for (const sec of (paper.sections || [])) {
+    let qs = ''
+    for (const q of (sec.questions || [])) {
+      const opts2 = q.options?.length
+        ? `<div class="opts">${q.options.map((o, i) => `<span class="opt">${clean(o)}</span>`).join('')}</div>`
+        : ''
+      const lines = sec.type === 'long' || q.marks >= 5
+        ? `<div class="lines">${Array(Math.min(q.marks, 8)).fill('<div class="line"></div>').join('')}</div>`
+        : `<div class="lines">${Array(2).fill('<div class="line"></div>').join('')}</div>`
+      qs += `<div class="q"><p class="qtext"><span class="qnum">Q${q.number}.</span> ${clean(q.text)} <span class="marks">[${q.marks} Mark${q.marks > 1 ? 's' : ''}]</span></p>${opts2}${lines}</div>`
+    }
+    sectionsHTML += `<div class="section"><h3>${clean(sec.name)}</h3><p class="sec-desc">${clean(sec.description || '')}</p>${qs}</div>`
+  }
+
+  let answersHTML = ''
+  if (opts.includeAnswers) {
+    let aks = ''
+    for (const sec of (paper.sections || [])) {
+      aks += `<h4>${clean(sec.name)}</h4>`
+      for (const q of (sec.questions || [])) {
+        aks += `<p class="ak-q"><strong>Q${q.number}.</strong> ${clean(q.answer)}${q.solution ? `<br><span class="sol">${clean(q.solution)}</span>` : ''}</p>`
+      }
+    }
+    answersHTML = `<div class="answer-key"><h2>ANSWER KEY</h2>${aks}</div>`
+  }
+
+  const html = `<!DOCTYPE html><html><head><meta charset="UTF-8"/><title>${clean(h.subject)} Question Paper</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Times New Roman',serif;font-size:12pt;color:#000;background:#fff;padding:0}
+  .page{max-width:210mm;margin:0 auto;padding:15mm 20mm}
+  .header{border:1px solid #000;padding:12px;text-align:center;margin-bottom:12px}
+  .school{font-size:16pt;font-weight:bold;letter-spacing:1px;margin-bottom:4px}
+  .exam-line{font-size:11pt;margin-bottom:8px}
+  .info-row{display:flex;justify-content:space-between;font-size:11pt;margin:3px 0}
+  .instructions{margin:10px 0}
+  .instructions h4{font-size:11pt;margin-bottom:4px}
+  .instructions ol{padding-left:20px;font-size:10.5pt;line-height:1.7}
+  .section h3{font-size:12pt;font-weight:bold;text-transform:uppercase;border-bottom:1px solid #000;padding-bottom:4px;margin:14px 0 4px}
+  .sec-desc{font-size:10.5pt;color:#444;margin-bottom:8px;font-style:italic}
+  .q{margin:10px 0 4px}
+  .qtext{font-size:11pt;line-height:1.6}
+  .qnum{font-weight:bold}
+  .marks{float:right;font-weight:bold;font-size:10.5pt}
+  .opts{display:grid;grid-template-columns:1fr 1fr;gap:4px;margin:6px 0 4px 20px}
+  .opt{font-size:10.5pt}
+  .lines{margin:4px 0 8px}
+  .line{border-bottom:1px solid #aaa;height:18px;margin:2px 0}
+  .answer-key{page-break-before:always;padding-top:10mm}
+  .answer-key h2{text-align:center;font-size:14pt;border:1px solid #000;padding:6px;margin-bottom:14px}
+  .answer-key h4{font-size:11pt;margin:10px 0 4px;border-bottom:1px dashed #ccc;padding-bottom:2px}
+  .ak-q{font-size:10.5pt;margin:4px 0 4px 12px;line-height:1.6}
+  .sol{color:#555;font-size:10pt}
+  .footer{text-align:center;font-size:9pt;color:#888;margin-top:16px;border-top:1px solid #ccc;padding-top:6px}
+  @media print{
+    body{padding:0} .page{padding:10mm 15mm}
+    @page{margin:0.5in; size:A4}
+  }
+</style></head><body>
+<div class="page">
+  <div class="header">
+    <div class="school">${school.toUpperCase()}</div>
+    <div class="exam-line">${clean(h.board || 'CBSE')} Examination ${clean(h.year || '2024-25')}</div>
+    <div class="info-row"><span><strong>Subject:</strong> ${clean(h.subject)}</span><span><strong>Class:</strong> ${clean(h.class_level)}</span></div>
+    <div class="info-row"><span><strong>Max. Marks:</strong> ${h.max_marks}</span><span><strong>Time Allowed:</strong> ${clean(h.duration)}</span></div>
+  </div>
+  <div class="instructions">
+    <h4>General Instructions:</h4>
+    <ol>${(paper.general_instructions || []).map(i => `<li>${clean(i)}</li>`).join('')}</ol>
+  </div>
+  ${sectionsHTML}
+  ${answersHTML}
+</div>
+<script>window.addEventListener('load',function(){setTimeout(function(){window.print()},400)})<\/script>
+</body></html>`
+
+  const blob = new Blob([html], { type: 'text/html;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const win = window.open(url, '_blank')
+  if (win) win.addEventListener('load', () => URL.revokeObjectURL(url), { once: true })
+  else setTimeout(() => URL.revokeObjectURL(url), 30000)
+}
+
+
+
 function downloadText(content, filename = 'brainspark.txt') {
   const blob = new Blob([content], { type: 'text/plain' })
   const url  = URL.createObjectURL(blob)
@@ -2547,55 +3012,167 @@ ${chapters.map(ch=>`
 //  QUESTION PAPER MAKER
 // ══════════════════════════════════════════════════════════════
 function QPMaker({ user, prefill, onClearPrefill }) {
-  const [subject,setSubject]=useState('Mathematics'); const [cls,setCls]=useState('Class 10')
-  const [chapters,setChapters]=useState([]); const [marks,setMarks]=useState('80'); const [duration,setDuration]=useState('3 Hours'); const [desc,setDesc]=useState('')
-  const [result,setResult]=useState(''); const [loading,setLoading]=useState(false); const [saved,setSaved]=useState(false); const [err,setErr]=useState('')
+  const [subject, setSubject] = useState('Mathematics')
+  const [cls, setCls] = useState('Class 10')
+  const [chapters, setChapters] = useState([])
+  const [marks, setMarks] = useState('80')
+  const [duration, setDuration] = useState('3 Hours')
+  const [desc, setDesc] = useState('')
+  const [paper, setPaper] = useState(null)
+  const [loading, setLoading] = useState(false)
+  const [saved, setSaved] = useState(false)
+  const [err, setErr] = useState('')
+  const [schoolName, setSchoolName] = useState('')
+
   useEffect(() => {
-  if (!prefill) return
-  if (prefill.subject) setSubject(prefill.subject)
-  if (prefill.chapters?.length) setChapters(prefill.chapters)
-  else if (prefill.chapter) setChapters([prefill.chapter])
-  onClearPrefill?.()
-  loadSavedContent('paper', prefill.subject, prefill.chapter, prefill.chapters).then(content => {
-    if (content) { setResult(content); setSaved(true) }
-  })
-}, [])
+    if (!prefill) return
+    if (prefill.subject) setSubject(prefill.subject)
+    if (prefill.chapters?.length) setChapters(prefill.chapters)
+    else if (prefill.chapter) setChapters([prefill.chapter])
+    onClearPrefill?.()
+  }, [])
+
+  const buildPrompt = () => `You are an expert CBSE question paper setter.
+Create a formal, standard ${marks}-mark question paper for CBSE ${cls} ${subject}.
+Chapters: ${chapters.join(', ')} | Duration: ${duration}
+Extra notes: ${desc || 'Standard CBSE pattern'}
+
+STRICT RULES:
+- Questions must be clear, grammatically correct, exam-standard
+- NO emojis, NO markdown, NO asterisks, NO special symbols anywhere
+- MCQ options must be labeled A. B. C. D.
+- Every question must have a complete correct answer and brief solution
+- Follow exact CBSE marking scheme
+- Total marks must be exactly ${marks}
+
+Return ONLY valid JSON (no markdown, no explanation):
+{
+  "header": {
+    "subject": "${subject}",
+    "class_level": "${cls}",
+    "board": "CBSE",
+    "max_marks": ${parseInt(marks)},
+    "duration": "${duration}",
+    "year": "2024-25"
+  },
+  "general_instructions": [
+    "All questions are compulsory.",
+    "This question paper consists of 4 sections — A, B, C and D.",
+    "Section A has MCQs worth 1 mark each. No negative marking.",
+    "Section B has short-answer questions worth 2 marks each.",
+    "Section C has questions worth 3 marks each.",
+    "Section D has long-answer questions worth 5 marks each.",
+    "Draw neat, labelled diagrams wherever required.",
+    "Write legibly. Marks will be deducted for untidy work."
+  ],
+  "sections": [
+    {
+      "name": "Section A",
+      "type": "mcq",
+      "description": "Multiple Choice Questions. Choose the most appropriate answer.",
+      "marks_per_question": 1,
+      "questions": [
+        {"number": 1, "text": "question text without any symbols", "options": ["A. option1", "B. option2", "C. option3", "D. option4"], "marks": 1, "answer": "A. correct option", "solution": "Brief explanation why A is correct"}
+      ]
+    },
+    {
+      "name": "Section B",
+      "type": "short",
+      "description": "Short Answer Questions. Answer in 2-3 sentences.",
+      "marks_per_question": 2,
+      "questions": [
+        {"number": 6, "text": "question text", "options": [], "marks": 2, "answer": "Model answer in 2-3 sentences", "solution": "Step-by-step solution"}
+      ]
+    },
+    {
+      "name": "Section C",
+      "type": "medium",
+      "description": "Answer the following questions.",
+      "marks_per_question": 3,
+      "questions": [
+        {"number": 9, "text": "question text", "options": [], "marks": 3, "answer": "Detailed model answer", "solution": "Complete solution with steps"}
+      ]
+    },
+    {
+      "name": "Section D",
+      "type": "long",
+      "description": "Long Answer Questions. Answer in detail.",
+      "marks_per_question": 5,
+      "questions": [
+        {"number": 12, "text": "question text", "options": [], "marks": 5, "answer": "Comprehensive model answer", "solution": "Full detailed solution"}
+      ]
+    }
+  ]
+}
+Generate enough questions so total marks = exactly ${marks}.`
 
   async function generate() {
-    if(chapters.length===0) return alert('Please select at least one chapter')
-    setErr(''); setLoading(true); setSaved(false)
-    try{
-      const prompt=`Create a complete, formal ${marks}-mark CBSE question paper following CBSE 2024-25 pattern.
-Subject: ${subject} | Class: ${cls} | Duration: ${duration} | Chapters: ${chapters.join(', ')}
-Special instructions: ${desc||'Standard CBSE pattern with Section A (MCQ), Section B (Short), Section C (Long)'}
-CRITICAL: Total marks must equal EXACTLY ${marks}. Number all questions clearly. Write "SECTION A", "SECTION B" etc.
-Include general instructions at the top. No markdown formatting — plain text only.`
-      const r=await api.post('/api/ai/paper',{messages:[{role:'user',content:prompt}],subject,chapters}); setResult(r.content)
-    } catch(e){ if(e.status===402){setErr('Free trial ended. Please subscribe.')}else{setErr(e.message)} }
+    if (chapters.length === 0) return alert('Please select at least one chapter')
+    setErr(''); setLoading(true); setSaved(false); setPaper(null)
+    try {
+      const r = await api.post('/api/ai/paper', {
+        messages: [{ role: 'user', content: buildPrompt() }],
+        subject, chapters
+      })
+      const raw = typeof r.content === 'string' ? r.content : r.content[0]?.text || ''
+      const parsed = JSON.parse(raw.replace(/```[\w]*\n?/gi, '').trim())
+      if (!parsed.sections) throw new Error('Invalid paper structure')
+      setPaper(parsed)
+    } catch (e) {
+      if (e.status === 402) setErr('Free trial ended. Please subscribe.')
+      else setErr('Failed to generate paper. Try again.')
+    }
     setLoading(false)
   }
 
   return (
-    <div style={{ padding:24, width:'100%', boxSizing:'border-box', fontFamily:"'Nunito',sans-serif", animation:'slideUp .25s ease-out' }}>
-      <PageHeader icon="📄" title="Question Paper Maker" subtitle="Generate multi-chapter CBSE papers — download and print" color="#8B5CF6"/>
-      <Card style={{ marginBottom:18 }}>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:16, marginBottom:4 }}>
-          <Field label="Subject"><BSSelect value={subject} onChange={v=>{setSubject(v);setChapters([])}} options={SUBJECTS}/></Field>
-          <Field label="Class"><BSSelect value={cls} onChange={v=>{setCls(v);setChapters([])}} options={CLASSES}/></Field>
+    <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
+      <PageHeader icon="📄" title="Question Paper Maker" subtitle="Standard CBSE papers with answer key — edit questions inline, print or download PDF" color="#8B5CF6"/>
+
+      <Card style={{ marginBottom: 18 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(180px,1fr))', gap: 16, marginBottom: 4 }}>
+          <Field label="Subject"><BSSelect value={subject} onChange={v => { setSubject(v); setChapters([]) }} options={SUBJECTS}/></Field>
+          <Field label="Class"><BSSelect value={cls} onChange={v => { setCls(v); setChapters([]) }} options={CLASSES}/></Field>
           <Field label="Total Marks"><BSSelect value={marks} onChange={setMarks} options={['10','20','25','30','40','50','60','70','80','100']}/></Field>
           <Field label="Duration"><BSSelect value={duration} onChange={setDuration} options={['30 min','45 min','1 Hour','1.5 Hours','2 Hours','2.5 Hours','3 Hours']}/></Field>
         </div>
-        <Field label="Select Chapters"><ChapterSelector subject={subject} cls={cls} selected={chapters} onChange={setChapters}/></Field>
-        <Field label="Additional Instructions (optional)"><BSTextarea value={desc} onChange={setDesc} rows={2} placeholder="e.g. 'Focus on derivations', 'Half-yearly exam style', 'Include map questions'"/></Field>
-        <PrimaryBtn onClick={generate} disabled={loading||chapters.length===0} color="#8B5CF6">{loading?<><Spinner/> Generating paper...</>:`📄 Generate ${marks}M Paper (${chapters.length} chapter${chapters.length!==1?'s':''})`}</PrimaryBtn>
+        <Field label="School Name (for header)">
+          <BSInput value={schoolName} onChange={setSchoolName} placeholder="e.g. Delhi Public School"/>
+        </Field>
+        <Field label="Select Chapters">
+          <ChapterSelector subject={subject} cls={cls} selected={chapters} onChange={setChapters}/>
+        </Field>
+        <Field label="Additional Instructions (optional)">
+          <BSTextarea value={desc} onChange={setDesc} rows={2} placeholder="e.g. 'Focus on derivations', 'Include case study', 'Competency-based questions'"/>
+        </Field>
+        <PrimaryBtn onClick={generate} disabled={loading || chapters.length === 0} color="#8B5CF6">
+          {loading ? <><Spinner/> Generating paper...</> : `📄 Generate ${marks}M Paper`}
+        </PrimaryBtn>
       </Card>
+
       <ErrMsg msg={err}/>
-      {result&&<>
-        <ContentBox content={result} label={`${subject} ${cls} — ${marks}M Question Paper`} downloadName={`${subject}-${cls}-${marks}M-paper.txt`} onDownload={()=>downloadText(result,`${subject}-${cls}-${marks}M-paper.txt`)}/>
-        <div style={{ display:'flex', gap:8, marginTop:12 }}>
-          {!saved?<GhostBtn small onClick={async()=>{try{await api.post('/api/user/papers',{subject,classLevel:cls,chapters,marks:parseInt(marks),duration,description:desc,content:result});setSaved(true)}catch(e){alert(e.message)}}}>💾 Save Paper</GhostBtn>:<SuccessMsg msg="Saved!"/>}
-        </div>
-      </>}
+
+      {paper && (
+        <>
+          <QPaperDocument
+            paper={paper}
+            onPaperChange={setPaper}
+            schoolName={schoolName}
+            onSchoolNameChange={setSchoolName}
+          />
+          <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+            {!saved
+              ? <GhostBtn small onClick={async () => {
+                  try {
+                    await api.post('/api/user/papers', { subject, classLevel: cls, chapters, marks: parseInt(marks), duration, description: desc, content: JSON.stringify(paper) })
+                    setSaved(true)
+                  } catch (e) { alert(e.message) }
+                }}>💾 Save Paper</GhostBtn>
+              : <SuccessMsg msg="Saved!"/>
+            }
+          </div>
+        </>
+      )}
       <XPBadge amount={25} label="per paper generated"/>
     </div>
   )
