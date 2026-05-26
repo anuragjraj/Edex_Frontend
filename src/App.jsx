@@ -387,72 +387,96 @@ async function downloadQPaperAsPDF(paper, opts = {}) {
   function check(need = 8) { if (y + need > BOT) newPage() }
 
   function line(text, opts2 = {}) {
-    const { size = 11, bold = false, color = [0,0,0], indent = 0, gap = 3, center = false } = opts2
-    doc.setFontSize(size); doc.setFont('times', bold ? 'bold' : 'normal'); doc.setTextColor(...color)
+    const { size = 11, bold = false, color = [0, 0, 0], indent = 0, gap = 3, center = false } = opts2
+    doc.setFontSize(size)
+    doc.setFont('times', bold ? 'bold' : 'normal')
+    doc.setTextColor(...color)
     const wrapped = doc.splitTextToSize(clean(text), MAX_W - indent)
     for (const l of wrapped) {
       check(size * 0.4 + 2)
-      const x = center ? (PAGE_W / 2) : (MARGIN + indent)
+      const x = center ? PAGE_W / 2 : MARGIN + indent
       doc.text(l, x, y, center ? { align: 'center' } : {})
       y += size * 0.42 + 1
     }
     y += gap
   }
 
-  function hline(thickness = 0.4) {
-    doc.setDrawColor(0); doc.setLineWidth(thickness)
-    doc.line(MARGIN, y, PAGE_W - MARGIN, y); y += 3
+  function hline(thickness = 0.4, color = 0) {
+    doc.setDrawColor(color)
+    doc.setLineWidth(thickness)
+    doc.line(MARGIN, y, PAGE_W - MARGIN, y)
+    y += 3
   }
 
-  const h = paper.header || {}
+  const h     = paper.header || {}
   const school = opts.schoolName || 'CBSE Affiliated School'
 
-  // ── Header ──────────────────────────────────────────────────
-  doc.setFillColor(240, 240, 240); doc.rect(MARGIN, y - 2, MAX_W, 36, 'F')
-  line(school.toUpperCase(), { size: 15, bold: true, center: true, gap: 1 })
-  line(`${clean(h.board || 'CBSE')} Examination ${clean(h.year || '2024-25')}`, { size: 11, center: true, gap: 1 })
-  hline(0.8)
+  // ── Header box ───────────────────────────────────────────────
+  doc.setFillColor(245, 245, 245)
+  doc.rect(MARGIN, y - 2, MAX_W, 38, 'F')
+  doc.setDrawColor(0); doc.setLineWidth(0.6)
+  doc.rect(MARGIN, y - 2, MAX_W, 38)
 
-  const info = [
-    `Subject: ${clean(h.subject)}`,
-    `Class: ${clean(h.class_level)}`,
-    `Max. Marks: ${h.max_marks || ''}`,
-    `Time: ${clean(h.duration)}`
-  ]
-  doc.setFontSize(11); doc.setFont('times', 'normal')
-  const colW = MAX_W / 2
-  doc.text(clean(info[0]), MARGIN, y); doc.text(clean(info[1]), MARGIN + colW, y); y += 6
-  doc.text(clean(info[2]), MARGIN, y); doc.text(clean(info[3]), MARGIN + colW, y); y += 4
-  hline(0.8)
-  y += 2
+  line(school.toUpperCase(), { size: 15, bold: true, center: true, gap: 2 })
+  line(`${clean(h.board || 'CBSE')} Examination — ${clean(h.year || '2024-25')}`, { size: 11, center: true, gap: 3 })
+
+  // Info row
+  doc.setFontSize(11); doc.setFont('times', 'normal'); doc.setTextColor(0, 0, 0)
+  const half = MAX_W / 2
+  doc.text(`Subject: ${clean(h.subject)}`,       MARGIN + 4,        y)
+  doc.text(`Class: ${clean(h.class_level)}`,      MARGIN + half + 4, y); y += 6
+  doc.text(`Max. Marks: ${h.max_marks || ''}`,    MARGIN + 4,        y)
+  doc.text(`Time: ${clean(h.duration)}`,          MARGIN + half + 4, y); y += 5
+  hline(0.6); y += 2
 
   // ── General Instructions ─────────────────────────────────────
   line('General Instructions:', { size: 11, bold: true, gap: 2 })
   for (let i = 0; i < (paper.general_instructions || []).length; i++) {
-    line(`${i + 1}. ${clean(paper.general_instructions[i])}`, { size: 10, indent: 4, gap: 2 })
+    line(`${i + 1}. ${clean(paper.general_instructions[i])}`, { size: 10, indent: 5, gap: 1.5 })
   }
-  hline(); y += 3
+  hline(0.5); y += 3
 
   // ── Sections ─────────────────────────────────────────────────
   for (const sec of (paper.sections || [])) {
-    check(14)
-    line(sec.name.toUpperCase(), { size: 13, bold: true, gap: 1 })
-    if (sec.description) line(sec.description, { size: 10, gap: 3 })
+    check(16)
+
+    // Section heading bar
+    doc.setFillColor(230, 230, 230)
+    doc.rect(MARGIN, y - 1, MAX_W, 8, 'F')
+    doc.setFontSize(12); doc.setFont('times', 'bold'); doc.setTextColor(0, 0, 0)
+    doc.text(clean(sec.name).toUpperCase(), PAGE_W / 2, y + 5, { align: 'center' })
+    y += 9
+
+    if (sec.description) {
+      doc.setFontSize(10); doc.setFont('times', 'italic'); doc.setTextColor(80, 80, 80)
+      doc.text(clean(sec.description), PAGE_W / 2, y, { align: 'center' })
+      y += 5
+    }
+    y += 2
 
     for (const q of (sec.questions || [])) {
-      check(14)
-      const qText = `Q${q.number}. ${clean(q.text)}`
-      const marksLabel = `[${q.marks} Mark${q.marks > 1 ? 's' : ''}]`
+      // Estimate space needed: question lines + options
+      const qText    = `Q${q.number}.  ${clean(q.text)}`
+      const wrappedQ = doc.splitTextToSize(qText, MAX_W - 18)
+      const optLines = q.options?.length ? Math.ceil(q.options.length / 2) : 0
+      const needed   = wrappedQ.length * 5.5 + optLines * 5.5 + 8
+      check(needed)
 
-      // Question text + marks on same line at end
-      doc.setFontSize(11); doc.setFont('times', 'normal'); doc.setTextColor(0,0,0)
-      const wrappedQ = doc.splitTextToSize(qText, MAX_W - 20)
+      // Thin separator between questions
+      doc.setDrawColor(210); doc.setLineWidth(0.15)
+      doc.line(MARGIN, y, PAGE_W - MARGIN, y)
+      doc.setDrawColor(0)
+      y += 3
+
+      // Question text
+      doc.setFontSize(11); doc.setFont('times', 'normal'); doc.setTextColor(0, 0, 0)
       for (let wi = 0; wi < wrappedQ.length; wi++) {
-        check(7)
+        check(6)
         if (wi === wrappedQ.length - 1) {
+          // Last line: question text left, marks right
           doc.text(clean(wrappedQ[wi]), MARGIN, y)
           doc.setFont('times', 'bold')
-          doc.text(marksLabel, PAGE_W - MARGIN, y, { align: 'right' })
+          doc.text(`[${q.marks} Mark${q.marks > 1 ? 's' : ''}]`, PAGE_W - MARGIN, y, { align: 'right' })
           doc.setFont('times', 'normal')
         } else {
           doc.text(clean(wrappedQ[wi]), MARGIN, y)
@@ -460,65 +484,78 @@ async function downloadQPaperAsPDF(paper, opts = {}) {
         y += 5.5
       }
 
-      // Options for MCQ
+      // MCQ options — 2 per row
       if (q.options?.length) {
-        const half = Math.ceil(q.options.length / 2)
+        y += 1
         for (let oi = 0; oi < q.options.length; oi += 2) {
           check(6)
-          const o1 = clean(q.options[oi] || '')
-          const o2 = clean(q.options[oi + 1] || '')
           doc.setFontSize(10.5)
-          doc.text(o1, MARGIN + 8, y)
-          if (o2) doc.text(o2, MARGIN + 8 + 80, y)
+          doc.text(clean(q.options[oi]     || ''), MARGIN + 10,      y)
+          doc.text(clean(q.options[oi + 1] || ''), MARGIN + 10 + 82, y)
           y += 5.5
         }
       }
 
-      // Long answer space (lines)
-      if (sec.type === 'long' || (q.marks >= 5)) {
-        for (let li = 0; li < Math.min(q.marks, 8); li++) {
-          check(5); doc.setDrawColor(200); doc.setLineWidth(0.2)
-          doc.line(MARGIN, y + 1, PAGE_W - MARGIN, y + 1); y += 6
-          doc.setDrawColor(0)
-        }
-      } else if (sec.type === 'short' || q.marks <= 3) {
-        for (let li = 0; li < 2; li++) {
-          check(5); doc.setDrawColor(200); doc.setLineWidth(0.2)
-          doc.line(MARGIN, y + 1, PAGE_W - MARGIN, y + 1); y += 6
-          doc.setDrawColor(0)
-        }
-      }
-      y += 2
+      y += 3  // small gap after each question — no answer lines
     }
-    y += 4
+
+    y += 5  // gap between sections
   }
 
-  // ── Answer Key (if requested) ────────────────────────────────
+  // ── Answer Key ───────────────────────────────────────────────
   if (opts.includeAnswers) {
     newPage()
-    hline(0.8)
-    line('ANSWER KEY', { size: 14, bold: true, center: true, gap: 2 })
-    hline(0.8); y += 4
+
+    doc.setFillColor(230, 230, 230)
+    doc.rect(MARGIN, y - 2, MAX_W, 10, 'F')
+    doc.setFontSize(14); doc.setFont('times', 'bold'); doc.setTextColor(0, 0, 0)
+    doc.text('ANSWER KEY', PAGE_W / 2, y + 5.5, { align: 'center' })
+    y += 14
+    hline(0.5); y += 2
 
     for (const sec of (paper.sections || [])) {
-      line(sec.name, { size: 12, bold: true, gap: 2 })
+      check(10)
+      line(sec.name, { size: 11, bold: true, gap: 2 })
+
       for (const q of (sec.questions || [])) {
-        check(10)
-        line(`Q${q.number}. Answer: ${clean(q.answer)}`, { size: 10.5, bold: true, indent: 4, gap: 1 })
-        if (q.solution) line(`Solution: ${clean(q.solution)}`, { size: 10, indent: 8, color: [60,60,60], gap: 3 })
+        check(12)
+
+        // Q number + answer on same line
+        doc.setFontSize(10.5); doc.setFont('times', 'bold'); doc.setTextColor(0, 0, 0)
+        doc.text(`Q${q.number}.`, MARGIN + 2, y)
+        doc.setFont('times', 'normal')
+        const ansText = doc.splitTextToSize(`Ans: ${clean(q.answer)}`, MAX_W - 18)
+        for (const al of ansText) {
+          check(5); doc.text(al, MARGIN + 12, y); y += 5
+        }
+
+        if (q.solution) {
+          doc.setTextColor(60, 60, 60); doc.setFontSize(10)
+          const solText = doc.splitTextToSize(`Solution: ${clean(q.solution)}`, MAX_W - 22)
+          for (const sl of solText) {
+            check(5); doc.text(sl, MARGIN + 14, y); y += 4.5
+          }
+          doc.setTextColor(0, 0, 0)
+        }
+        y += 3
       }
-      y += 3
+      y += 4
     }
   }
 
-  // ── Footer ───────────────────────────────────────────────────
-  const total = doc.internal.getNumberOfPages()
-  for (let p = 1; p <= total; p++) {
-    doc.setPage(p); doc.setFontSize(9); doc.setFont('times', 'normal'); doc.setTextColor(120,120,120)
-    doc.text(`${clean(h.subject)} | ${clean(h.class_level)} | Page ${p} of ${total}`, PAGE_W / 2, PAGE_H - 8, { align: 'center' })
+  // ── Footer on every page ─────────────────────────────────────
+  const totalPages = doc.internal.getNumberOfPages()
+  for (let p = 1; p <= totalPages; p++) {
+    doc.setPage(p)
+    doc.setFontSize(8.5); doc.setFont('times', 'normal'); doc.setTextColor(140, 140, 140)
+    doc.line(MARGIN, PAGE_H - 12, PAGE_W - MARGIN, PAGE_H - 12)
+    doc.text(
+      `${clean(h.subject)}  |  ${clean(h.class_level)}  |  Page ${p} of ${totalPages}`,
+      PAGE_W / 2, PAGE_H - 7, { align: 'center' }
+    )
   }
 
-  const fname = `${clean(h.subject)}-${clean(h.class_level)}-${h.max_marks}M-paper.pdf`
+  const fname = `${clean(h.subject)}-${clean(h.class_level)}-${h.max_marks || ''}M-paper.pdf`
   doc.save(fname)
 }
 
