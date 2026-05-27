@@ -4734,7 +4734,6 @@ export default function App() {
     { id: 'quiz',        icon: '🎯', label: 'Quiz',            color: '#F59E0B' },
     { id: 'flashcards',  icon: '🃏', label: 'Flashcards',      color: '#EF4444' },
     { id: 'doubt',       icon: '🤔', label: 'Doubt Solver',    color: '#818CF8' },
-    { id: 'feed',        icon: '📣', label: 'Study Feed',      color: '#6366F1' },
     { id: 'search',      icon: '🔍', label: 'Search',          color: '#06b6d4' },
     { id: 'messages',    icon: '💬', label: 'Messages',        color: '#10B981' },
     // { id: 'video',       icon: '🎬', label: 'Video Learning',  color: '#06b6d4' },
@@ -4746,6 +4745,7 @@ export default function App() {
       { id: 'timetable',   icon: '📅', label: 'Timetable',   color: '#06b6d4' },
     ] : []),
     ...(isTeacher && isSchool ? [{ id: 'school', icon: '🏫', label: 'Analytics', color: '#A855F7' }] : []),
+    { id: 'feed',        icon: '📣', label: 'Study Feed',      color: '#6366F1' },
     { id: 'history',     icon: '🕘', label: 'History',         color: '#6366F1' }
   ]
 
