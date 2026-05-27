@@ -3756,11 +3756,12 @@ function QuizGenerator({ user, prefill, onClearPrefill }) {
     const PROMPT = `Generate a high-quality ${num}-question MCQ quiz on "${topic}" in ${subject} ${cls}. Difficulty: ${diff}. CBSE-standard exam-style questions.
 Return ONLY valid JSON (no markdown):
 {"title":"${topic} Quiz","questions":[{"q":"Question text?","options":["Option A","Option B","Option C","Option D"],"answer":0,"explanation":"Why this option is correct"}]}`
-    setErr(''); setLoading(true); setQuiz(null); saveSessionContent({ tool:'quiz', subject, chapter:topic, classLevel:cls, content:parsed }); setAnswers({}); setSubmitted(false)
+    setErr(''); setLoading(true); setQuiz(null); 
     try {
       const r = await api.post('/api/ai/quiz', { messages: [{ role: 'user', content: PROMPT }], subject, chapter: topic })
       const raw = typeof r.content === 'string' ? r.content : r.content[0]?.text || ''
       setQuiz(JSON.parse(raw.replace(/```[\w]*\n?/gi, '').trim()))
+      saveSessionContent({ tool:'quiz', subject, chapter:topic, classLevel:cls, content:parsed }); setAnswers({}); setSubmitted(false)
     } catch (e) {
       if (e.status === 402) setErr('Free trial ended. Please subscribe.')
       else setErr('Failed to generate quiz. Try again.')
