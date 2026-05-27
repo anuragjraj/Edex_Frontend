@@ -89,6 +89,49 @@ const CBSE_CHAPTERS = {
 const getChapters = (subject, cls) =>
   CBSE_CHAPTERS[subject]?.[cls] || Array.from({ length: 15 }, (_, i) => `Chapter ${i + 1}`)
 
+// ══════════════════════════════════════════════════════════════
+//  SESSION STORAGE  (saves generated content for history replay)
+// ══════════════════════════════════════════════════════════════
+const SESSION_PREFIX = 'bs_sess_'
+const MAX_SESSIONS   = 200
+
+export function saveSessionContent({ tool, subject='', chapter='', chapters=[], classLevel='', content, extra={} }) {
+  try {
+    const id  = `${tool}-${subject}-${chapter||(chapters||[]).join(',')}-${Date.now()}`
+    const key = SESSION_PREFIX + id
+    localStorage.setItem(key, JSON.stringify({
+      id, tool, subject, chapter, chapters, classLevel, content, extra,
+      savedAt: new Date().toISOString(),
+    }))
+    // Prune oldest beyond MAX_SESSIONS
+    const allKeys = Object.keys(localStorage).filter(k=>k.startsWith(SESSION_PREFIX)).sort()
+    if (allKeys.length > MAX_SESSIONS)
+      allKeys.slice(0, allKeys.length - MAX_SESSIONS).forEach(k=>localStorage.removeItem(k))
+    return id
+  } catch(e) { console.warn('[saveSessionContent]', e.message); return null }
+}
+
+function listAllSessions() {
+  try {
+    return Object.keys(localStorage)
+      .filter(k=>k.startsWith(SESSION_PREFIX))
+      .map(k=>{ try{ return JSON.parse(localStorage.getItem(k)) }catch{ return null } })
+      .filter(Boolean)
+      .sort((a,b)=>new Date(b.savedAt)-new Date(a.savedAt))
+  } catch { return [] }
+}
+
+function findSessionForActivity(item) {
+  const sessions = listAllSessions()
+  return sessions.find(s =>
+    s.tool    === item.tool    &&
+    s.subject === item.subject &&
+    (s.chapter === item.chapter ||
+     (item.chapters||[]).some(c => s.chapter===c || (s.chapters||[]).includes(c))) &&
+    Math.abs(new Date(s.savedAt) - new Date(item.created_at)) < 2 * 60 * 60 * 1000 // within 2 hours
+  ) || null
+}
+
 const LEVELS = [
   { min: 0,      label: 'Beginner',        color: '#94A3B8', emoji: '🌱' },
   { min: 200,    label: 'Learner',          color: '#6EE7B7', emoji: '📗' },
@@ -2911,6 +2954,7 @@ function DoubtSolver({ user, prefill, onClearPrefill }) {
     try {
       const r = await api.post('/api/ai/doubt', { messages: [...messages, userMsg], system: SYSTEM, subject })
       setMessages(m => [...m, { role: 'assistant', content: r.content }])
+      saveSessionContent({ tool:'doubt', subject, chapter, classLevel:cls, content:newMessages })
     } catch (e) {
       if (e.status === 402) setErr('Free trial ended. Please subscribe.')
       else setErr(e.message)
@@ -3191,7 +3235,8 @@ FINAL REMINDER: You must write AT LEAST 3500 words. Every section above must be 
 
   async function generate() {
     if(!finalChapter) return; setErr(''); setLoading(true); setSaved(false)
-    try{ const r=await api.post('/api/ai/notes',{messages:[{role:'user',content:buildPrompt()}],subject,chapter:finalChapter}); setResult(r.content) }
+    try{ const r=await api.post('/api/ai/notes',{messages:[{role:'user',content:buildPrompt()}],subject,chapter:finalChapter}); setResult(r.content)   
+    saveSessionContent({ tool:'notes', subject, chapter:finalChapter, classLevel:cls, content:r.content })}
     catch(e){ if(e.status===402){setErr('Free trial ended. Please subscribe.')}else{setErr(e.message)} }
     setLoading(false)
   }
@@ -3264,7 +3309,8 @@ ${chapters.map(ch=>`
   async function generate() {
     if(chapters.length===0) return alert('Please select at least one chapter')
     setErr(''); setLoading(true); setSaved(false)
-    try{ const r=await api.post('/api/ai/cheatsheet',{messages:[{role:'user',content:buildPrompt()}],subject,chapters}); setResult(r.content) }
+    try{ const r=await api.post('/api/ai/cheatsheet',{messages:[{role:'user',content:buildPrompt()}],subject,chapters}); setResult(r.content)
+  saveSessionContent({ tool:'cheatsheet', subject, chapters, classLevel:cls, content:r.content }) }
     catch(e){ if(e.status===402){setErr('Free trial ended. Please subscribe.')}else{setErr(e.message)} }
     setLoading(false)
   }
@@ -3525,6 +3571,7 @@ async function generate() {
     }
 
     setPaper(parsed)
+    saveSessionContent({ tool:'paper', subject, chapters, classLevel:cls, content:parsed, extra:{ marks, duration } })
   } catch (e) {
     if (e.status === 402) setErr('Free trial ended. Please subscribe.')
     else setErr('Failed to generate paper. Try again.')
@@ -3637,7 +3684,8 @@ MINIMUM 1500 words. This must be genuinely useful and specific.
   async function generate() {
     if(!topic.trim()) return alert('Please enter a topic')
     setErr(''); setLoading(true); setSaved(false); setRating(0)
-    try{ const r=await api.post('/api/ai/lessonplan',{messages:[{role:'user',content:buildPrompt()}],subject,chapter:topic}); setResult(r.content) }
+    try{ const r=await api.post('/api/ai/lessonplan',{messages:[{role:'user',content:buildPrompt()}],subject,chapter:topic}); setResult(r.content) 
+  saveSessionContent({ tool:'cheatsheet', subject, chapters, classLevel:cls, content:r.content })}
     catch(e){ if(e.status===402){setErr('Free trial ended. Please subscribe.')}else{setErr(e.message)} }
     setLoading(false)
   }
@@ -3708,7 +3756,7 @@ function QuizGenerator({ user, prefill, onClearPrefill }) {
     const PROMPT = `Generate a high-quality ${num}-question MCQ quiz on "${topic}" in ${subject} ${cls}. Difficulty: ${diff}. CBSE-standard exam-style questions.
 Return ONLY valid JSON (no markdown):
 {"title":"${topic} Quiz","questions":[{"q":"Question text?","options":["Option A","Option B","Option C","Option D"],"answer":0,"explanation":"Why this option is correct"}]}`
-    setErr(''); setLoading(true); setQuiz(null); setAnswers({}); setSubmitted(false)
+    setErr(''); setLoading(true); setQuiz(null); saveSessionContent({ tool:'quiz', subject, chapter:topic, classLevel:cls, content:parsed }); setAnswers({}); setSubmitted(false)
     try {
       const r = await api.post('/api/ai/quiz', { messages: [{ role: 'user', content: PROMPT }], subject, chapter: topic })
       const raw = typeof r.content === 'string' ? r.content : r.content[0]?.text || ''
@@ -3851,6 +3899,7 @@ Return ONLY valid JSON:
       const parsed = JSON.parse(raw.replace(/```[\w]*\n?/gi, '').trim())
       if (!parsed.cards?.length) throw new Error('No cards in response')
       setCards(parsed.cards)
+    saveSessionContent({ tool:'flashcards', subject, chapter:topic, classLevel:cls, content:parsed.cards })
     } catch (e) {
       if (e.status === 402) setErr('Free trial ended. Please subscribe.')
       else setErr('Failed to generate flashcards. Try again.')
@@ -4657,194 +4706,372 @@ Generate 6 quiz questions.`}],subject:'General'})
 }
 
 
-function HistoryPage({ onNavigate }) {
-  const [history, setHistory] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [page,    setPage]    = useState(1);
-  const [hasMore, setHasMore] = useState(true);
-  const [filter,  setFilter]  = useState('all');
+// ══════════════════════════════════════════════════════════════
+//  HISTORY SESSION VIEW  (full-screen modal)
+// ══════════════════════════════════════════════════════════════
+function HistorySessionView({ item, session, onClose }) {
+  const TOOL_META_LOCAL = {
+    doubt:      { icon:'🤔', label:'Doubt',        color:'#818CF8', bg:'rgba(129,140,248,.13)' },
+    notes:      { icon:'📖', label:'Notes',         color:'#10B981', bg:'rgba(16,185,129,.13)'  },
+    quiz:       { icon:'🎯', label:'Quiz',          color:'#F59E0B', bg:'rgba(245,158,11,.13)'  },
+    paper:      { icon:'📄', label:'Paper',         color:'#A855F7', bg:'rgba(168,85,247,.13)'  },
+    flashcards: { icon:'🃏', label:'Flashcards',    color:'#EF4444', bg:'rgba(239,68,68,.13)'   },
+    cheatsheet: { icon:'📋', label:'Cheat Sheet',   color:'#F97316', bg:'rgba(249,115,22,.13)'  },
+    lessonplan: { icon:'🎓', label:'Lesson Plan',   color:'#7C3AED', bg:'rgba(124,58,237,.13)'  },
+    courses:    { icon:'📚', label:'Course Module', color:'#8B5CF6', bg:'rgba(139,92,246,.13)'  },
+  }
+  const meta    = TOOL_META_LOCAL[item?.tool] || { icon:'⚡', label:item?.tool, color:'#6366F1', bg:'rgba(99,102,241,.13)' }
+  const chapter = session?.chapter || item?.chapter || (item?.chapters||[])[0] || ''
 
   useEffect(() => {
-    setLoading(true);
-    api.get(`/api/user/history?page=${page}`)
-      .then(data => {
-        setHistory(prev => page === 1 ? data : [...prev, ...data]);
-        setHasMore(data.length === 50);
-      })
-      .catch(() => {})
-      .finally(() => setLoading(false));
-  }, [page]);
+    const h = e => { if (e.key === 'Escape') onClose?.() }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [onClose])
 
-  const TOOL_META = {
-    doubt:      { icon: '🤔', label: 'Doubt Solved',    color: '#818CF8' },
-    notes:      { icon: '📖', label: 'Notes Generated', color: '#10B981' },
-    quiz:       { icon: '🎯', label: 'Quiz Generated',  color: '#F59E0B' },
-    paper:      { icon: '📄', label: 'Question Paper',  color: '#A855F7' },
-    flashcards: { icon: '🃏', label: 'Flashcards',      color: '#EF4444' },
-    cheatsheet: { icon: '📋', label: 'Cheat Sheet',     color: '#F97316' },
-    lessonplan: { icon: '🎓', label: 'Lesson Plan',     color: '#7C3AED' },
-  };
+  // ── Render content using EXISTING app components ─────────
+  function renderContent() {
+    if (!session?.content) return null
+    const { tool, content, subject, chapter: ch, classLevel } = session
 
-  const tools = ['all', ...Object.keys(TOOL_META)];
+    if (tool === 'notes' || tool === 'cheatsheet' || tool === 'lessonplan') {
+      return (
+        <NotesDocument
+          content={content}
+          title={`${ch || subject} Notes — ${subject} ${classLevel}`}
+          onDownload={() => downloadText(content, `${ch}-notes.txt`)}
+        />
+      )
+    }
 
-  const shown = filter === 'all'
-    ? history
-    : history.filter(h => h.tool === filter);
+    if (tool === 'paper') {
+      const parsed = typeof content === 'string' ? JSON.parse(content) : content
+      return (
+        <QPaperDocument
+          paper={parsed}
+          onPaperChange={() => {}}
+          schoolName={session.extra?.schoolName || ''}
+          onSchoolNameChange={() => {}}
+        />
+      )
+    }
 
-  // Group by date
-  const grouped = shown.reduce((acc, item) => {
-    const date = new Date(item.created_at).toLocaleDateString('en-IN', {
-      weekday: 'long', day: 'numeric', month: 'long', year: 'numeric',
-    });
-    if (!acc[date]) acc[date] = [];
-    acc[date].push(item);
-    return acc;
-  }, {});
+    if (tool === 'quiz') {
+      return <ReplayQuiz session={session}/>
+    }
+
+    if (tool === 'flashcards') {
+      return <ReplayFlashcards session={session}/>
+    }
+
+    if (tool === 'doubt') {
+      return <ReplayDoubt session={session}/>
+    }
+
+    return null
+  }
 
   return (
-    <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif" }}>
-      <PageHeader icon="🕘" title="Activity History" subtitle="Everything you've generated — notes, quizzes, papers and more" color="#6366F1" />
+    <div style={{ position:'fixed', inset:0, zIndex:2000, background:'rgba(5,5,14,.94)', backdropFilter:'blur(14px)', overflowY:'auto' }}>
+      {/* Header */}
+      <div style={{ position:'sticky', top:0, zIndex:10, background:'rgba(11,11,30,.97)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(255,255,255,.07)', padding:'12px 24px', display:'flex', alignItems:'center', gap:14 }}>
+        <button onClick={onClose} style={{ width:36, height:36, borderRadius:10, border:'1px solid rgba(255,255,255,.1)', background:'rgba(255,255,255,.05)', color:'#e2e8f0', fontSize:16, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'center', fontFamily:"'Nunito',sans-serif" }}>←</button>
+        <div style={{ width:36, height:36, borderRadius:10, background:meta.bg, border:`1px solid ${meta.color}44`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>{meta.icon}</div>
+        <div style={{ flex:1, minWidth:0 }}>
+          <div style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:15, color:'#e2e8f0', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>
+            {meta.label}: {chapter || item?.subject}
+          </div>
+          <div style={{ fontSize:11.5, color:'#64748b' }}>
+            {item?.subject} {session?.classLevel ? `· ${session.classLevel}` : ''} · {new Date(item?.created_at).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'})}
+            {!session && <span style={{ color:'#F59E0B', marginLeft:8 }}>⚠ No saved content for this session</span>}
+          </div>
+        </div>
+        <div style={{ fontSize:11, fontWeight:700, color:meta.color, background:meta.bg, borderRadius:20, padding:'3px 12px', border:`1px solid ${meta.color}33`, flexShrink:0 }}>
+          {session ? '📂 Session Replay' : '📋 Activity Record'}
+        </div>
+      </div>
+
+      {/* Content */}
+      <div style={{ maxWidth:920, margin:'0 auto', padding:'28px 24px 60px' }}>
+        {session ? renderContent() || (
+          <div style={{ padding:32, textAlign:'center', color:'var(--text)' }}>Content type not supported for replay yet.</div>
+        ) : (
+          <div style={{ textAlign:'center', padding:'60px 24px', background:'rgba(255,255,255,.02)', borderRadius:16, border:'1px solid rgba(255,255,255,.07)' }}>
+            <div style={{ fontSize:52, marginBottom:14 }}>{meta.icon}</div>
+            <div style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:18, color:'#e2e8f0', marginBottom:8 }}>No saved content</div>
+            <p style={{ fontSize:13.5, color:'#64748b', maxWidth:360, margin:'0 auto 24px', lineHeight:1.7 }}>
+              Content is now auto-saved after every generation. Older records show your stats only.
+            </p>
+            <div style={{ display:'flex', gap:10, justifyContent:'center', flexWrap:'wrap' }}>
+              <div style={{ padding:'10px 18px', borderRadius:10, background:meta.bg, border:`1px solid ${meta.color}33`, fontSize:13, color:meta.color, fontWeight:700 }}>
+                📅 {new Date(item?.created_at).toLocaleString('en-IN',{dateStyle:'medium',timeStyle:'short'})}
+              </div>
+              {item?.xp_earned > 0 && <div style={{ padding:'10px 18px', borderRadius:10, background:'rgba(252,211,77,.08)', border:'1px solid rgba(252,211,77,.2)', fontSize:13, color:'#FCD34D', fontWeight:700 }}>⚡ +{item.xp_earned} XP earned</div>}
+            </div>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
+// ── Small replay components (only used for tools that don't have
+//    a dedicated app-level component) ─────────────────────────
+
+function ReplayQuiz({ session }) {
+  const quiz = session.content?.questions || (Array.isArray(session.content) ? session.content : [])
+  const [ans, setAns] = useState({})
+  const [done, setDone] = useState(false)
+  const score = done ? quiz.filter((q,i) => ans[i] === (q.answer ?? q.ans)).length : 0
+  return (
+    <div>
+      {done && (
+        <div style={{ background:'linear-gradient(135deg,#F59E0B,#F97316)', borderRadius:16, padding:24, textAlign:'center', marginBottom:20, color:'#fff' }}>
+          <div style={{ fontSize:42, marginBottom:6 }}>{score===quiz.length?'🏆':score>=quiz.length*.7?'🎉':'📚'}</div>
+          <div style={{ fontFamily:"'Sora',sans-serif", fontWeight:900, fontSize:28 }}>{score}/{quiz.length}</div>
+          <div style={{ opacity:.85, fontSize:14, marginBottom:12 }}>{Math.round((score/quiz.length)*100)}% correct</div>
+          <button onClick={()=>{setAns({});setDone(false)}} style={{ padding:'7px 20px', borderRadius:9, background:'rgba(255,255,255,.2)', border:'none', color:'#fff', fontSize:13, fontWeight:600, cursor:'pointer' }}>↺ Retake</button>
+        </div>
+      )}
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(340px,1fr))', gap:12 }}>
+        {quiz.map((q,i) => {
+          const sel=ans[i], correct=q.answer??q.ans
+          return (
+            <Card key={i} style={{ borderLeft: done ? `4px solid ${sel===correct?'#22c55e':'#ef4444'}` : '' }}>
+              <p style={{ fontWeight:700, fontSize:14.5, color:'var(--text-h)', margin:'0 0 12px', lineHeight:1.5 }}><span style={{ color:'var(--accent)' }}>Q{i+1}.</span> {q.q||q.text}</p>
+              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+                {(q.options||q.opts||[]).map((opt,j)=>{
+                  const isAns=j===correct, isSel=sel===j
+                  let bg='var(--social-bg)', border='var(--border)', color='var(--text-h)'
+                  if(done){if(isAns){bg='rgba(34,197,94,.1)';border='#6ee7b7';color='#6ee7b7';}else if(isSel){bg='rgba(239,68,68,.1)';border='#fca5a5';color='#fca5a5';}}
+                  else if(isSel){bg='var(--accent-bg)';border='var(--accent)';color='var(--accent)';}
+                  return <button key={j} disabled={done} onClick={()=>setAns(a=>({...a,[i]:j}))} style={{ padding:'9px 12px', borderRadius:9, border:`1.5px solid ${border}`, background:bg, color, cursor:done?'default':'pointer', textAlign:'left', fontSize:13.5, fontFamily:"'Nunito',sans-serif", fontWeight:600 }}><span style={{ fontWeight:800, marginRight:4 }}>{String.fromCharCode(65+j)}.</span>{typeof opt==='string'?opt.replace(/^[A-D]\.\s*/,''):opt}{done&&isAns?' ✓':''}</button>
+                })}
+              </div>
+              {done&&(q.explanation||q.exp)&&<div style={{ marginTop:10, padding:'9px 13px', background:'var(--accent-bg)', borderRadius:9, fontSize:13, color:'var(--accent)' }}>💡 {q.explanation||q.exp}</div>}
+            </Card>
+          )
+        })}
+      </div>
+      {!done && Object.keys(ans).length===quiz.length && <PrimaryBtn onClick={()=>setDone(true)} color='#F59E0B' style={{ marginTop:16 }}>Submit Quiz →</PrimaryBtn>}
+    </div>
+  )
+}
+
+function ReplayFlashcards({ session }) {
+  const cards   = Array.isArray(session.content) ? session.content : (session.content?.cards||[])
+  const [flipped, setFlipped] = useState({})
+  const [mode, setMode]       = useState('grid')
+  const [cur, setCur]         = useState(0)
+  const card = cards[cur]
+  return (
+    <div>
+      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+        <h3 style={{ margin:0, fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:16, color:'var(--text-h)' }}>{session.chapter} — {cards.length} Cards</h3>
+        <div style={{ display:'flex', gap:7 }}>
+          {[['grid','⊞ Grid'],['study','▶ Study']].map(([m,l])=>(
+            <button key={m} onClick={()=>setMode(m)} style={{ padding:'6px 14px', borderRadius:8, border:'none', fontWeight:700, fontSize:12.5, cursor:'pointer', fontFamily:"'Nunito',sans-serif", background:mode===m?'#EF4444':'var(--social-bg)', color:mode===m?'#fff':'var(--text-h)' }}>{l}</button>
+          ))}
+        </div>
+      </div>
+      {mode==='grid'?(
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(210px,1fr))', gap:14 }}>
+          {cards.map((c,i)=>(
+            <div key={i} onClick={()=>setFlipped(f=>({...f,[i]:!f[i]}))} style={{ height:130, borderRadius:14, cursor:'pointer', perspective:1000 }}>
+              <div style={{ width:'100%', height:'100%', position:'relative', transformStyle:'preserve-3d', transition:'transform .5s', transform:flipped[i]?'rotateY(180deg)':'none' }}>
+                <div style={{ position:'absolute', inset:0, backfaceVisibility:'hidden', background:'linear-gradient(135deg,#EF4444,#F97316)', borderRadius:14, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:14, textAlign:'center' }}><span style={{ fontSize:9, color:'rgba(255,255,255,.7)', fontWeight:800, marginBottom:7, letterSpacing:1 }}>TAP TO REVEAL</span><span style={{ color:'#fff', fontWeight:800, fontSize:13.5, lineHeight:1.4 }}>{c.front}</span></div>
+                <div style={{ position:'absolute', inset:0, backfaceVisibility:'hidden', transform:'rotateY(180deg)', background:'var(--bg2)', borderRadius:14, border:'2px solid #EF4444', display:'flex', alignItems:'center', justifyContent:'center', padding:14, textAlign:'center' }}><span style={{ color:'var(--text-h)', fontWeight:700, fontSize:13, lineHeight:1.5 }}>{c.back}</span></div>
+              </div>
+            </div>
+          ))}
+        </div>
+      ):(
+        <Card style={{ textAlign:'center', maxWidth:560, margin:'0 auto' }}>
+          <div style={{ fontSize:12, color:'var(--text)', marginBottom:8, fontWeight:700 }}>Card {cur+1} of {cards.length}</div>
+          <div style={{ background:'var(--border)', borderRadius:999, height:5, margin:'0 auto 18px', maxWidth:240 }}><div style={{ background:'#EF4444', width:`${((cur+1)/cards.length)*100}%`, height:'100%', borderRadius:999 }}/></div>
+          <div onClick={()=>setFlipped(f=>({...f,[cur]:!f[cur]}))} style={{ height:180, background:flipped[cur]?'var(--code-bg)':'linear-gradient(135deg,#EF4444,#F97316)', borderRadius:14, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', cursor:'pointer', border:flipped[cur]?'2px solid #EF4444':'none', marginBottom:18, padding:24 }}>
+            <span style={{ fontSize:10, color:flipped[cur]?'var(--text)':'rgba(255,255,255,.7)', fontWeight:800, letterSpacing:1, marginBottom:10 }}>{flipped[cur]?'ANSWER':'TERM — TAP TO FLIP'}</span>
+            <span style={{ color:flipped[cur]?'var(--text-h)':'#fff', fontWeight:800, fontSize:16, lineHeight:1.5 }}>{flipped[cur]?card?.back:card?.front}</span>
+          </div>
+          <div style={{ display:'flex', justifyContent:'center', gap:12 }}>
+            <GhostBtn disabled={cur===0} onClick={()=>{setCur(c=>c-1);setFlipped({})}}>← Prev</GhostBtn>
+            <PrimaryBtn color='#EF4444' onClick={()=>setFlipped(f=>({...f,[cur]:!f[cur]}))}>Flip</PrimaryBtn>
+            <GhostBtn disabled={cur===cards.length-1} onClick={()=>{setCur(c=>c+1);setFlipped({})}}>Next →</GhostBtn>
+          </div>
+        </Card>
+      )}
+    </div>
+  )
+}
+
+function ReplayDoubt({ session }) {
+  const messages = Array.isArray(session.content) ? session.content : []
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:14 }}>
+      {messages.filter(m=>m.role!=='system').map((m,i)=>(
+        <div key={i} style={{ display:'flex', justifyContent:m.role==='user'?'flex-end':'flex-start', alignItems:'flex-start', gap:10 }}>
+          {m.role==='assistant'&&<div style={{ width:32, height:32, borderRadius:9, background:'linear-gradient(135deg,#6366F1,#8B5CF6)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:16, marginTop:2 }}>🧠</div>}
+          <div style={{ maxWidth:'78%', padding:'11px 15px', borderRadius:m.role==='user'?'14px 4px 14px 14px':'4px 14px 14px 14px', fontSize:14, lineHeight:1.75, background:m.role==='user'?'linear-gradient(135deg,#6366F1,#8B5CF6)':'var(--code-bg)', color:m.role==='user'?'#fff':'var(--text-h)', border:m.role==='assistant'?'1px solid var(--border)':'none' }}
+            dangerouslySetInnerHTML={{ __html: m.content.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>') }}
+          />
+        </div>
+      ))}
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════
+//  HISTORY PAGE  (Coursera-style grid)
+// ══════════════════════════════════════════════════════════════
+function HistoryPage({ onNavigate }) {
+  const TOOL_META_H = {
+    doubt:      { icon:'🤔', label:'Doubt',        color:'#818CF8' },
+    notes:      { icon:'📖', label:'Notes',         color:'#10B981' },
+    quiz:       { icon:'🎯', label:'Quiz',          color:'#F59E0B' },
+    paper:      { icon:'📄', label:'Paper',         color:'#A855F7' },
+    flashcards: { icon:'🃏', label:'Flashcards',    color:'#EF4444' },
+    cheatsheet: { icon:'📋', label:'Cheat Sheet',   color:'#F97316' },
+    lessonplan: { icon:'🎓', label:'Lesson Plan',   color:'#7C3AED' },
+    courses:    { icon:'📚', label:'Course Module', color:'#8B5CF6' },
+  }
+
+  const [history,  setHistory]  = useState([])
+  const [loading,  setLoading]  = useState(true)
+  const [page,     setPage]     = useState(1)
+  const [hasMore,  setHasMore]  = useState(true)
+  const [filter,   setFilter]   = useState('all')
+  const [selected, setSelected] = useState(null)   // { item, session }
+  const [sessions, setSessions] = useState([])
+
+  useEffect(() => { setSessions(listAllSessions()) }, [])
+
+  useEffect(() => {
+    setLoading(true)
+    api.get(`/api/user/history?page=${page}`)
+      .then(data => {
+        setHistory(prev => page===1 ? data : [...prev, ...data])
+        setHasMore(data.length === 50)
+      })
+      .catch(()=>{})
+      .finally(()=>setLoading(false))
+  }, [page])
+
+  const shown   = filter==='all' ? history : history.filter(h=>h.tool===filter)
+  const grouped = shown.reduce((acc,item) => {
+    const key = new Date(item.created_at).toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'})
+    if (!acc[key]) acc[key] = []
+    acc[key].push(item)
+    return acc
+  }, {})
+
+  const hasSessionFor = useCallback(item =>
+    sessions.some(s =>
+      s.tool===item.tool && s.subject===item.subject &&
+      (s.chapter===item.chapter || (item.chapters||[]).some(c=>s.chapter===c||(s.chapters||[]).includes(c))) &&
+      Math.abs(new Date(s.savedAt)-new Date(item.created_at)) < 2*60*60*1000
+    ), [sessions])
+
+  const openItem = useCallback(item => {
+    const sess = findSessionForActivity(item)
+    setSelected({ item, session:sess })
+  }, [])
+
+  const tools = ['all', ...Object.keys(TOOL_META_H)]
+
+  function HistoryCard({ item }) {
+    const meta = TOOL_META_H[item.tool] || { icon:'⚡', label:item.tool, color:'#6366F1' }
+    const [hov, setHov] = useState(false)
+    const chapter = item.chapter || (item.chapters||[])[0] || ''
+    return (
+      <div
+        onClick={()=>openItem(item)}
+        onMouseEnter={()=>setHov(true)}
+        onMouseLeave={()=>setHov(false)}
+        style={{
+          position:'relative', width:'100%', aspectRatio:'1 / 1.1',
+          borderRadius:16, cursor:'pointer', padding:'14px 12px 12px',
+          display:'flex', flexDirection:'column', justifyContent:'space-between',
+          background: hov ? `${meta.color}14` : 'rgba(255,255,255,.025)',
+          border: `1.5px solid ${hov ? meta.color+'55' : 'rgba(255,255,255,.07)'}`,
+          transition:'all .18s ease',
+          transform: hov ? 'translateY(-3px)' : 'none',
+          boxShadow: hov ? `0 8px 28px ${meta.color}20` : 'none',
+          fontFamily:"'Nunito',sans-serif", overflow:'hidden',
+        }}
+      >
+        <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:`linear-gradient(90deg,${meta.color},transparent)`, borderRadius:'16px 16px 0 0', opacity:hov?1:0, transition:'opacity .18s' }}/>
+        {hasSessionFor(item) && <div style={{ position:'absolute', top:9, right:9, width:7, height:7, borderRadius:'50%', background:meta.color, boxShadow:`0 0 7px ${meta.color}` }}/>}
+        <div style={{ width:42, height:42, borderRadius:11, background:`${meta.color}18`, border:`1px solid ${meta.color}33`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:21, flexShrink:0, marginBottom:7 }}>{meta.icon}</div>
+        <div style={{ flex:1, minHeight:0 }}>
+          <div style={{ fontSize:10.5, fontWeight:800, color:meta.color, textTransform:'uppercase', letterSpacing:'.5px', marginBottom:3 }}>{meta.label}</div>
+          {item.subject && <div style={{ fontSize:12.5, fontWeight:700, color:'var(--text-h)', marginBottom:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.subject}</div>}
+          {chapter && <div style={{ fontSize:11, color:'var(--text)', lineHeight:1.4, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{chapter}</div>}
+        </div>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:8, paddingTop:8, borderTop:'1px solid rgba(255,255,255,.05)' }}>
+          <span style={{ fontSize:10, color:'#475569' }}>{(() => { const diff=(Date.now()-new Date(item.created_at))/1000; if(diff<3600) return `${Math.floor(diff/60)}m ago`; if(diff<86400) return `${Math.floor(diff/3600)}h ago`; return new Date(item.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short'}) })()}</span>
+          {item.xp_earned>0 && <span style={{ fontSize:10, fontWeight:800, color:'#FCD34D', background:'rgba(252,211,77,.08)', borderRadius:20, padding:'1px 7px' }}>+{item.xp_earned}</span>}
+        </div>
+        <div style={{ position:'absolute', bottom:10, right:10, fontSize:13, color:meta.color, opacity:hov?1:0, transition:'opacity .15s' }}>→</div>
+      </div>
+    )
+  }
+
+  return (
+    <div style={{ padding:24, width:'100%', boxSizing:'border-box', fontFamily:"'Nunito',sans-serif", animation:'slideUp .25s ease-out' }}>
+      <PageHeader icon="🕘" title="Activity History" subtitle="Tap any card to replay the full session" color="#6366F1"/>
 
       {/* Filter pills */}
-      <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 22 }}>
+      <div style={{ display:'flex', gap:7, flexWrap:'wrap', marginBottom:20 }}>
         {tools.map(t => {
-          const meta = TOOL_META[t];
+          const meta = TOOL_META_H[t]
           return (
-            <button key={t} onClick={() => setFilter(t)}
-              style={{
-                padding: '5px 15px', borderRadius: 20, border: 'none', fontWeight: 700,
-                fontSize: 12.5, cursor: 'pointer', fontFamily: "'Nunito', sans-serif",
-                background: filter === t ? (meta?.color || 'var(--accent)') : 'var(--social-bg)',
-                color: filter === t ? '#fff' : 'var(--text-h)', transition: 'all .15s',
-                display: 'flex', alignItems: 'center', gap: 5,
-              }}>
+            <button key={t} onClick={()=>setFilter(t)} style={{ padding:'5px 14px', borderRadius:20, border:'none', fontWeight:700, fontSize:12, cursor:'pointer', fontFamily:"'Nunito',sans-serif", background:filter===t?(meta?.color||'#6366F1'):'var(--social-bg)', color:filter===t?'#fff':'var(--text-h)', transition:'all .15s', display:'flex', alignItems:'center', gap:4 }}>
               {meta ? `${meta.icon} ${meta.label}` : '⚡ All'}
             </button>
-          );
+          )
         })}
       </div>
 
-      {loading && page === 1 && <PageSpinner />}
+      {/* Legend */}
+      <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:22, padding:'9px 14px', background:'rgba(255,255,255,.02)', borderRadius:10, border:'1px solid rgba(255,255,255,.05)', fontSize:12, color:'var(--text)', flexWrap:'wrap' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:5 }}><div style={{ width:7, height:7, borderRadius:'50%', background:'#6366F1', boxShadow:'0 0 6px #6366F1' }}/> Glowing dot = full session saved (tap to replay)</div>
+        <div style={{ display:'flex', alignItems:'center', gap:5 }}><div style={{ width:7, height:7, borderRadius:'50%', background:'rgba(255,255,255,.15)' }}/> No dot = metadata only (older sessions)</div>
+      </div>
 
-      {!loading && shown.length === 0 && (
-        <div style={{ textAlign: 'center', padding: 52, color: 'var(--text)' }}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>🕘</div>
-          <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 16, color: 'var(--text-h)', marginBottom: 6 }}>No history yet</div>
-          <p style={{ fontSize: 13 }}>Start using AI tools and your activity will appear here.</p>
+      {loading && page===1 && <PageSpinner/>}
+      {!loading && shown.length===0 && (
+        <div style={{ textAlign:'center', padding:60, color:'var(--text)' }}>
+          <div style={{ fontSize:48, marginBottom:12 }}>🕘</div>
+          <div style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:16, color:'var(--text-h)', marginBottom:6 }}>No history yet</div>
+          <p style={{ fontSize:13 }}>Start using AI tools and every session will appear here.</p>
         </div>
       )}
 
-      {Object.entries(grouped).map(([date, items]) => (
-        <div key={date} style={{ marginBottom: 24 }}>
-          <div style={{
-            fontSize: 11.5, fontWeight: 800, color: 'var(--text)', textTransform: 'uppercase',
-            letterSpacing: '0.6px', marginBottom: 10, paddingLeft: 4,
-            display: 'flex', alignItems: 'center', gap: 8,
-          }}>
-            <div style={{ height: 1, width: 20, background: 'var(--border)' }} />
-            {date}
-            <div style={{ height: 1, flex: 1, background: 'var(--border)' }} />
+      {/* Grouped grids */}
+      {Object.entries(grouped).map(([date,items]) => (
+        <div key={date} style={{ marginBottom:32 }}>
+          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
+            <div style={{ height:1, width:14, background:'var(--border)' }}/>
+            <span style={{ fontSize:11, fontWeight:800, color:'var(--text)', textTransform:'uppercase', letterSpacing:'.6px', whiteSpace:'nowrap' }}>{date}</span>
+            <div style={{ height:1, flex:1, background:'var(--border)' }}/>
+            <span style={{ fontSize:11, color:'#1e293b', fontWeight:700 }}>{items.length} session{items.length!==1?'s':''}</span>
           </div>
-
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
-            {items.map((item, i) => {
-              const meta = TOOL_META[item.tool] || { icon: '⚡', label: item.tool, color: '#6366F1' };
-              const chapters = item.chapters?.length > 0
-                ? item.chapters.join(', ')
-                : item.chapter || null;
-
-              return (
-                      <div key={i}
-          onClick={() => onNavigate?.(item)}
-          style={{
-            display: 'flex', alignItems: 'center', gap: 12, padding: '12px 16px',
-            background: 'var(--bg2)', borderRadius: 12, cursor: 'pointer',
-            border: '1px solid var(--border)', transition: 'all .18s',
-          }}
-          onMouseEnter={e => {
-            e.currentTarget.style.borderColor = meta.color + '66';
-            e.currentTarget.style.background  = `${meta.color}08`;
-            e.currentTarget.style.transform   = 'translateX(3px)';
-          }}
-          onMouseLeave={e => {
-            e.currentTarget.style.borderColor = 'var(--border)';
-            e.currentTarget.style.background  = 'var(--bg2)';
-            e.currentTarget.style.transform   = 'none';
-          }}>
-
-          {/* Icon — NO CHANGE */}
-          <div style={{
-            width: 40, height: 40, borderRadius: 11, flexShrink: 0,
-            background: `${meta.color}18`, border: `1px solid ${meta.color}28`,
-            display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 19,
-          }}>
-            {meta.icon}
-          </div>
-
-          {/* Details — NO CHANGE */}
-          <div style={{ flex: 1, minWidth: 0 }}>
-            <div style={{ display: 'flex', alignItems: 'center', gap: 7, flexWrap: 'wrap', marginBottom: 2 }}>
-              <span style={{ fontWeight: 800, fontSize: 13.5, color: 'var(--text-h)' }}>
-                {meta.label}
-              </span>
-              {item.subject && (
-                <span style={{
-                  fontSize: 11.5, fontWeight: 700, color: meta.color,
-                  background: `${meta.color}15`, borderRadius: 20,
-                  padding: '1px 8px', border: `1px solid ${meta.color}25`,
-                }}>
-                  {item.subject}
-                </span>
-              )}
-            </div>
-            {chapters && (
-              <div style={{
-                fontSize: 12, color: 'var(--text)', overflow: 'hidden',
-                textOverflow: 'ellipsis', whiteSpace: 'nowrap',
-              }}>
-                📌 {chapters}
-              </div>
-            )}
-          </div>
-
-          {/* Right side: XP + time — NO CHANGE */}
-          <div style={{ textAlign: 'right', flexShrink: 0 }}>
-            {item.xp_earned > 0 && (
-              <div style={{ fontSize: 12.5, fontWeight: 800, color: '#FCD34D', marginBottom: 2 }}>
-                +{item.xp_earned} XP
-              </div>
-            )}
-            <div style={{ fontSize: 11, color: 'var(--text)' }}>
-              {new Date(item.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
-            </div>
-            {item.ai_provider && (
-              <div style={{ fontSize: 10, color: 'var(--text)', marginTop: 1, opacity: .6 }}>
-                via {item.ai_provider}
-              </div>
-            )}
-          </div>
-
-          {/* ✅ CHANGE 2: arrow added here, after the time block, before closing div */}
-          <span style={{ fontSize: 13, color: 'var(--text)', opacity: .5, flexShrink: 0 }}>→</span>
-
-        </div>  
-              );
-            })}
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(148px,1fr))', gap:12 }}>
+            {items.map((item,i) => <HistoryCard key={item.id||i} item={item}/>)}
           </div>
         </div>
       ))}
 
-      {/* Load more */}
-      {hasMore && !loading && shown.length > 0 && (
-        <div style={{ textAlign: 'center', marginTop: 16 }}>
-          <GhostBtn onClick={() => setPage(p => p + 1)}>Load More</GhostBtn>
+      {hasMore && !loading && shown.length>0 && (
+        <div style={{ textAlign:'center', marginTop:16 }}>
+          <GhostBtn onClick={()=>setPage(p=>p+1)}>Load More</GhostBtn>
         </div>
       )}
-      {loading && page > 1 && (
-        <div style={{ display: 'flex', justifyContent: 'center', padding: 16 }}><Spinner size={20} /></div>
-      )}
+      {loading && page>1 && <div style={{ display:'flex', justifyContent:'center', padding:16 }}><Spinner size={22}/></div>}
+
+      {selected && <HistorySessionView item={selected.item} session={selected.session} onClose={()=>setSelected(null)}/>}
     </div>
-  );
+  )
 }
 
 // ══════════════════════════════════════════════════════════════
@@ -4892,15 +5119,15 @@ export default function App() {
     setUser(u); localStorage.setItem('bs_user', JSON.stringify(u))
   }
 
-  function handleHistoryNav(item) {
-    setPrefill({
-      tool:     item.tool,
-      subject:  item.subject  || '',
-      chapter:  item.chapter  || '',
-      chapters: item.chapters || [],
-    })
-    setTab(item.tool)
-  }
+  // function handleHistoryNav(item) {
+  //   setPrefill({
+  //     tool:     item.tool,
+  //     subject:  item.subject  || '',
+  //     chapter:  item.chapter  || '',
+  //     chapters: item.chapters || [],
+  //   })
+  //   setTab(item.tool)
+  // }
 
   function clearPrefill() { setPrefill(null) }
 
@@ -4976,7 +5203,7 @@ export default function App() {
     if (tab === 'feed')       return <SocialFeed user={user} />
     if (tab === 'search')     return <SearchPage currentUser={user} onViewProfile={id => { setViewProfileId(id); setTab('profile') }} />
     if (tab === 'messages')   return <MessagingPage currentUser={user} startWithUserId={msgUserId} />
-    if (tab === 'history')    return <HistoryPage onNavigate={handleHistoryNav} />
+    if (tab === 'history')    return <HistoryPage  />
     if (tab === 'doubt')      return <DoubtSolver    user={user} prefill={prefill} onClearPrefill={clearPrefill} />
     if (tab === 'notes')      return <NotesMaker      user={user} prefill={prefill} onClearPrefill={clearPrefill} />
     if (tab === 'courses')    return <ChapterCourses  user={user} prefill={prefill} onClearPrefill={clearPrefill} />
