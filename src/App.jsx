@@ -1146,6 +1146,155 @@ function XPBadge({ amount, label }) {
     </div>
   )
 }
+
+function MultiChapterSelect({ subject, cls, selected = [], onChange, max = 20 }) {
+  const [open, setOpen] = useState(false)
+  const [search, setSearch] = useState('')
+  const ref = useRef(null)
+  const chapters = getChapters(subject, cls)
+
+  // Close when clicking outside
+  useEffect(() => {
+    const handler = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const filtered = search.trim()
+    ? chapters.filter(c => c.toLowerCase().includes(search.toLowerCase()))
+    : chapters
+
+  const toggle = ch => {
+    if (selected.includes(ch)) onChange(selected.filter(c => c !== ch))
+    else if (selected.length < max) onChange([...selected, ch])
+  }
+
+  const selectAll   = () => onChange(chapters.slice(0, max))
+  const clearAll    = () => onChange([])
+
+  const triggerLabel = selected.length === 0
+    ? '── Select chapters ──'
+    : selected.length === 1
+    ? selected[0]
+    : `${selected.length} chapters selected`
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+
+      {/* ── Trigger button ── */}
+      <button
+        type="button"
+        onClick={() => setOpen(o => !o)}
+        style={{
+          width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '10px 14px', borderRadius: 10,
+          border: `1.5px solid ${open ? 'var(--accent)' : 'var(--border)'}`,
+          background: '#0f0f23', color: selected.length ? '#e2e8f0' : '#64748b',
+          fontSize: 14, fontFamily: "'Nunito', sans-serif", cursor: 'pointer',
+          transition: 'border-color .2s', textAlign: 'left',
+        }}
+      >
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+          {triggerLabel}
+        </span>
+        <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--text)', flexShrink: 0, transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}>▼</span>
+      </button>
+
+      {/* ── Selected pills (shown below trigger) ── */}
+      {selected.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 8 }}>
+          {selected.map(ch => (
+            <span key={ch} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid var(--accent-border)', borderRadius: 20, padding: '3px 10px', fontSize: 12, fontWeight: 700, fontFamily: "'Nunito', sans-serif" }}>
+              {ch}
+              <span
+                onClick={e => { e.stopPropagation(); toggle(ch) }}
+                style={{ cursor: 'pointer', fontSize: 13, fontWeight: 900, lineHeight: 1 }}
+              >×</span>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* ── Dropdown panel ── */}
+      {open && (
+        <div style={{
+          position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0,
+          background: '#0f0f23', border: '1.5px solid var(--accent-border)',
+          borderRadius: 12, boxShadow: '0 12px 40px rgba(0,0,0,.5)',
+          zIndex: 500, overflow: 'hidden',
+        }}>
+          {/* Search + bulk actions */}
+          <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8, alignItems: 'center' }}>
+            <input
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              placeholder="Search chapters…"
+              style={{
+                flex: 1, padding: '6px 10px', borderRadius: 8,
+                border: '1px solid var(--border)', background: 'rgba(255,255,255,.05)',
+                color: '#e2e8f0', fontSize: 13, fontFamily: "'Nunito', sans-serif", outline: 'none',
+              }}
+            />
+            <button onClick={selectAll} style={{ padding: '5px 10px', borderRadius: 7, border: '1px solid var(--border)', background: 'transparent', color: 'var(--accent)', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: "'Nunito', sans-serif" }}>All</button>
+            <button onClick={clearAll}  style={{ padding: '5px 10px', borderRadius: 7, border: '1px solid var(--border)', background: 'transparent', color: '#94a3b8', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>Clear</button>
+          </div>
+
+          {/* Chapter list */}
+          <div style={{ maxHeight: 240, overflowY: 'auto', padding: '6px 0' }}>
+            {filtered.map(ch => {
+              const checked = selected.includes(ch)
+              const disabled = !checked && selected.length >= max
+              return (
+                <div
+                  key={ch}
+                  onClick={() => !disabled && toggle(ch)}
+                  style={{
+                    display: 'flex', alignItems: 'center', gap: 10,
+                    padding: '8px 14px', cursor: disabled ? 'not-allowed' : 'pointer',
+                    background: checked ? 'var(--accent-bg)' : 'transparent',
+                    opacity: disabled ? .4 : 1,
+                    transition: 'background .12s',
+                  }}
+                  onMouseEnter={e => { if (!disabled && !checked) e.currentTarget.style.background = 'rgba(255,255,255,.04)' }}
+                  onMouseLeave={e => { if (!checked) e.currentTarget.style.background = 'transparent' }}
+                >
+                  {/* Custom checkbox */}
+                  <div style={{
+                    width: 16, height: 16, borderRadius: 4, flexShrink: 0,
+                    border: `2px solid ${checked ? 'var(--accent)' : '#475569'}`,
+                    background: checked ? 'var(--accent)' : 'transparent',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    transition: 'all .15s',
+                  }}>
+                    {checked && <span style={{ color: '#fff', fontSize: 10, fontWeight: 900, lineHeight: 1 }}>✓</span>}
+                  </div>
+                  <span style={{ fontSize: 13.5, color: checked ? 'var(--accent)' : '#e2e8f0', fontWeight: checked ? 700 : 400, fontFamily: "'Nunito', sans-serif" }}>
+                    {ch}
+                  </span>
+                </div>
+              )
+            })}
+            {filtered.length === 0 && (
+              <div style={{ padding: '14px', textAlign: 'center', fontSize: 13, color: '#64748b' }}>No chapters match</div>
+            )}
+          </div>
+
+          {/* Footer */}
+          <div style={{ padding: '8px 14px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 12, color: '#64748b' }}>{selected.length}/{max} selected</span>
+            <button
+              onClick={() => setOpen(false)}
+              style={{ padding: '5px 16px', borderRadius: 8, border: 'none', background: 'var(--accent)', color: '#fff', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}
+            >
+              Done ✓
+            </button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function ChapterSelector({ subject, cls, selected, onChange, max=20 }) {
   const chapters = getChapters(subject, cls)
   const toggle = (ch) => {
@@ -2732,44 +2881,94 @@ async function loadSavedContent(tool, subject, chapter, chapters) {
 //  DOUBT SOLVER
 // ══════════════════════════════════════════════════════════════
 function DoubtSolver({ user, prefill, onClearPrefill }) {
-  const [messages,setMessages]=useState([{role:'assistant',content:"👋 Hi! Ask me any doubt — I'll give you a **clear, step-by-step explanation** tailored to your CBSE syllabus. 🎯"}])
-  const [input,setInput]=useState(''); const [subject,setSubject]=useState('Mathematics'); const [loading,setLoading]=useState(false); const [err,setErr]=useState('')
-  const bottomRef=useRef(null)
-  useEffect(()=>{bottomRef.current?.scrollIntoView({behavior:'smooth'})},[messages])
+  const [subject,  setSubject]  = useState('Mathematics')
+  const [cls,      setCls]      = useState('Class 10')
+  const [chapter,  setChapter]  = useState('')
+  const [messages, setMessages] = useState([{ role: 'assistant', content: "👋 Hi! Ask me any doubt — I'll give you a **clear, step-by-step explanation** tailored to your CBSE syllabus. 🎯" }])
+  const [input,    setInput]    = useState('')
+  const [loading,  setLoading]  = useState(false)
+  const [err,      setErr]      = useState('')
+  const bottomRef = useRef(null)
+
+  const chapters = getChapters(subject, cls)
+
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+
   useEffect(() => {
-  if (!prefill) return
-  if (prefill.subject) setSubject(prefill.subject)
-  onClearPrefill?.()
-}, [])
-  const SYSTEM=`You are an expert CBSE teacher specializing in ${subject}. Help students understand concepts clearly with step-by-step explanations. Use simple language and relatable examples. Use **bold** for key terms. Be encouraging and thorough.`
-  const send=async()=>{
+    if (!prefill) return
+    if (prefill.subject) setSubject(prefill.subject)
+    if (prefill.chapter) setChapter(prefill.chapter)
+    onClearPrefill?.()
+  }, [])
+
+  const chapterContext = chapter ? ` specifically the chapter "${chapter}"` : ''
+  const SYSTEM = `You are an expert CBSE teacher specializing in ${subject}${chapterContext} for ${cls}. Help students understand concepts clearly with step-by-step explanations. Use simple language and relatable examples. Use **bold** for key terms. Be encouraging and thorough. If the question is about a different chapter, still answer helpfully but note the actual chapter it belongs to.`
+
+  async function send() {
     if (!input.trim()) return
-    const userMsg={role:'user',content:input.trim()}; setMessages(m=>[...m,userMsg]); setInput(''); setErr(''); setLoading(true)
-    try{
-      const r=await api.post('/api/ai/doubt',{messages:[...messages,userMsg],system:SYSTEM,subject})
-      setMessages(m=>[...m,{role:'assistant',content:r.content}])
-    } catch(e){ if(e.status===402){setErr('Free trial ended. Please subscribe.')}else{setErr(e.message)} }
+    const userMsg = { role: 'user', content: input.trim() }
+    setMessages(m => [...m, userMsg]); setInput(''); setErr(''); setLoading(true)
+    try {
+      const r = await api.post('/api/ai/doubt', { messages: [...messages, userMsg], system: SYSTEM, subject })
+      setMessages(m => [...m, { role: 'assistant', content: r.content }])
+    } catch (e) {
+      if (e.status === 402) setErr('Free trial ended. Please subscribe.')
+      else setErr(e.message)
+    }
     setLoading(false)
   }
+
   return (
-    <div style={{ padding:24, width:'100%', boxSizing:'border-box', display:'flex', flexDirection:'column', height:'calc(100vh - 100px)', fontFamily:"'Nunito',sans-serif", animation:'slideUp .25s ease-out' }}>
-      <PageHeader icon="🤔" title="AI Doubt Solver" subtitle="Ask anything — get clear, step-by-step CBSE explanations" color="#6366F1"/>
-      <div style={{ marginBottom:14 }}><BSSelect value={subject} onChange={setSubject} options={SUBJECTS} style={{ maxWidth:220 }}/></div>
-      <div style={{ ...T.card, flex:1, overflowY:'auto', marginBottom:14, minHeight:200, display:'flex', flexDirection:'column', gap:14 }}>
-        {messages.map((m,i)=>(
-          <div key={i} style={{ display:'flex', justifyContent:m.role==='user'?'flex-end':'flex-start', alignItems:'flex-start', gap:10 }}>
-            {m.role==='assistant'&&<div style={{ width:32, height:32, borderRadius:9, background:'linear-gradient(135deg,#6366F1,#8B5CF6)', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0, fontSize:16, marginTop:2 }}>🧠</div>}
-            <div style={{ maxWidth:'78%', padding:'11px 15px', borderRadius:m.role==='user'?'14px 4px 14px 14px':'4px 14px 14px 14px', fontSize:14, lineHeight:1.75, background:m.role==='user'?'linear-gradient(135deg,#6366F1,#8B5CF6)':'var(--code-bg)', color:m.role==='user'?'#fff':'var(--text-h)', border:m.role==='assistant'?'1px solid var(--border)':'none' }}
-              dangerouslySetInnerHTML={{__html:m.role==='assistant'?m.content.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br>'):m.content}}/>
+    <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 100px)', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
+      <PageHeader icon="🤔" title="AI Doubt Solver" subtitle="Ask anything — get clear, step-by-step CBSE explanations" color="#6366F1" />
+
+      {/* Compact context bar */}
+      <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
+        <div style={{ flex: '1 1 140px' }}>
+          <BSSelect value={subject} onChange={v => { setSubject(v); setChapter('') }} options={SUBJECTS} />
+        </div>
+        <div style={{ flex: '1 1 120px' }}>
+          <BSSelect value={cls} onChange={v => { setCls(v); setChapter('') }} options={CLASSES} />
+        </div>
+        <div style={{ flex: '2 1 200px' }}>
+          <BSSelect
+            value={chapter}
+            onChange={setChapter}
+            options={[{ value: '', label: '── All chapters ──' }, ...chapters.map(c => ({ value: c, label: c }))]}
+          />
+        </div>
+      </div>
+
+      {chapter && (
+        <div style={{ fontSize: 12, color: 'var(--accent)', background: 'var(--accent-bg)', border: '1px solid var(--accent-border)', borderRadius: 8, padding: '6px 12px', marginBottom: 10, fontWeight: 700 }}>
+          📌 Context: {subject} › {cls} › {chapter}
+        </div>
+      )}
+
+      {/* Chat window */}
+      <div style={{ ...T.card, flex: 1, overflowY: 'auto', marginBottom: 14, minHeight: 200, display: 'flex', flexDirection: 'column', gap: 14 }}>
+        {messages.map((m, i) => (
+          <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', alignItems: 'flex-start', gap: 10 }}>
+            {m.role === 'assistant' && <div style={{ width: 32, height: 32, borderRadius: 9, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 16, marginTop: 2 }}>🧠</div>}
+            <div style={{ maxWidth: '78%', padding: '11px 15px', borderRadius: m.role === 'user' ? '14px 4px 14px 14px' : '4px 14px 14px 14px', fontSize: 14, lineHeight: 1.75, background: m.role === 'user' ? 'linear-gradient(135deg,#6366F1,#8B5CF6)' : 'var(--code-bg)', color: m.role === 'user' ? '#fff' : 'var(--text-h)', border: m.role === 'assistant' ? '1px solid var(--border)' : 'none' }}
+              dangerouslySetInnerHTML={{ __html: m.role === 'assistant' ? m.content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>') : m.content }} />
           </div>
         ))}
-        {loading&&<div style={{ display:'flex', alignItems:'center', gap:10 }}><div style={{ width:32, height:32, borderRadius:9, background:'linear-gradient(135deg,#6366F1,#8B5CF6)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:16 }}>🧠</div><div style={{ background:'var(--code-bg)', padding:'12px 16px', borderRadius:'4px 14px 14px 14px', border:'1px solid var(--border)', display:'flex', gap:5, alignItems:'center' }}>{[0,1,2].map(j=><div key={j} style={{ width:7, height:7, borderRadius:'50%', background:'var(--accent)', animation:`dotBounce 1s ${j*.2}s infinite ease-in-out`}}/>)}</div></div>}
-        <div ref={bottomRef}/>
+        {loading && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ width: 32, height: 32, borderRadius: 9, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 16 }}>🧠</div>
+            <div style={{ background: 'var(--code-bg)', padding: '12px 16px', borderRadius: '4px 14px 14px 14px', border: '1px solid var(--border)', display: 'flex', gap: 5, alignItems: 'center' }}>
+              {[0, 1, 2].map(j => <div key={j} style={{ width: 7, height: 7, borderRadius: '50%', background: 'var(--accent)', animation: `dotBounce 1s ${j * .2}s infinite ease-in-out` }} />)}
+            </div>
+          </div>
+        )}
+        <div ref={bottomRef} />
       </div>
-      <ErrMsg msg={err}/>
-      <div style={{ display:'flex', gap:10 }}>
-        <input style={{ ...T.input, flex:1 }} value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&!e.shiftKey&&send()} placeholder={`Ask a ${subject} question... (Enter to send)`} disabled={loading}/>
-        <PrimaryBtn onClick={send} disabled={loading||!input.trim()}>Send →</PrimaryBtn>
+
+      <ErrMsg msg={err} />
+      <div style={{ display: 'flex', gap: 10 }}>
+        <input style={{ ...T.input, flex: 1 }} value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()} placeholder={`Ask a ${subject}${chapter ? ` › ${chapter}` : ''} question… (Enter to send)`} disabled={loading} />
+        <PrimaryBtn onClick={send} disabled={loading || !input.trim()}>Send →</PrimaryBtn>
       </div>
     </div>
   )
@@ -3347,9 +3546,9 @@ async function generate() {
         <Field label="School Name (for header)">
           <BSInput value={schoolName} onChange={setSchoolName} placeholder="e.g. Delhi Public School"/>
         </Field>
-        <Field label="Select Chapters">
-          <ChapterSelector subject={subject} cls={cls} selected={chapters} onChange={setChapters}/>
-        </Field>
+        <Field label={`Select Chapters${chapters.length > 0 ? ` (${chapters.length} selected)` : ''}`}>
+  <MultiChapterSelect subject={subject} cls={cls} selected={chapters} onChange={setChapters} />
+</Field>
         <Field label="Additional Instructions (optional)">
           <BSTextarea value={desc} onChange={setDesc} rows={2} placeholder="e.g. 'Focus on derivations', 'Include case study', 'Competency-based questions'"/>
         </Field>
@@ -3482,90 +3681,135 @@ MINIMUM 1500 words. This must be genuinely useful and specific.
 //  QUIZ GENERATOR
 // ══════════════════════════════════════════════════════════════
 function QuizGenerator({ user, prefill, onClearPrefill }) {
-  const [subject,setSubject]=useState('Mathematics'); const [topic,setTopic]=useState(''); const [diff,setDiff]=useState('Medium'); const [num,setNum]=useState('5')
-  const [quiz,setQuiz]=useState(null); const [answers,setAnswers]=useState({}); const [submitted,setSubmitted]=useState(false); const [loading,setLoading]=useState(false); const [err,setErr]=useState('')
+  const [subject,   setSubject]   = useState('Mathematics')
+  const [cls,       setCls]       = useState('Class 10')
+  const [chapter,   setChapter]   = useState('')
+  const [customTopic, setCustomTopic] = useState('')
+  const [diff,      setDiff]      = useState('Medium')
+  const [num,       setNum]       = useState('5')
+  const [quiz,      setQuiz]      = useState(null)
+  const [answers,   setAnswers]   = useState({})
+  const [submitted, setSubmitted] = useState(false)
+  const [loading,   setLoading]   = useState(false)
+  const [err,       setErr]       = useState('')
+
+  const chapters = getChapters(subject, cls)
+  const topic    = chapter || customTopic   // what gets sent to the AI
+
   useEffect(() => {
-  if (!prefill) return
-  if (prefill.subject) setSubject(prefill.subject)
-  if (prefill.chapter) setTopic(prefill.chapter)
-  onClearPrefill?.()
-}, [])
+    if (!prefill) return
+    if (prefill.subject) setSubject(prefill.subject)
+    if (prefill.chapter) setChapter(prefill.chapter)
+    onClearPrefill?.()
+  }, [])
 
   async function generate() {
-    if(!topic.trim()) return alert('Enter a topic')
-    const PROMPT=`Generate a high-quality ${num}-question MCQ quiz on "${topic}" in ${subject}. Difficulty: ${diff}. CBSE Class-appropriate with real exam-style questions.
-Return ONLY valid JSON (no markdown, no explanation):
-{"title":"${topic} Quiz","questions":[{"q":"Question text here?","options":["Option A","Option B","Option C","Option D"],"answer":0,"explanation":"Why this option is correct"}]}`
+    if (!topic.trim()) return alert('Please select or enter a chapter/topic')
+    const PROMPT = `Generate a high-quality ${num}-question MCQ quiz on "${topic}" in ${subject} ${cls}. Difficulty: ${diff}. CBSE-standard exam-style questions.
+Return ONLY valid JSON (no markdown):
+{"title":"${topic} Quiz","questions":[{"q":"Question text?","options":["Option A","Option B","Option C","Option D"],"answer":0,"explanation":"Why this option is correct"}]}`
     setErr(''); setLoading(true); setQuiz(null); setAnswers({}); setSubmitted(false)
-    try{
-      const r=await api.post('/api/ai/quiz',{messages:[{role:'user',content:PROMPT}],subject,chapter:topic})
-      const raw=typeof r.content==='string'?r.content:r.content[0]?.text||''
-      setQuiz(JSON.parse(raw.replace(/```[\w]*\n?/gi,'').trim()))
-    } catch(e){ if(e.status===402){setErr('Free trial ended. Please subscribe.')}else{setErr('Failed to generate quiz. Try again.')} }
+    try {
+      const r = await api.post('/api/ai/quiz', { messages: [{ role: 'user', content: PROMPT }], subject, chapter: topic })
+      const raw = typeof r.content === 'string' ? r.content : r.content[0]?.text || ''
+      setQuiz(JSON.parse(raw.replace(/```[\w]*\n?/gi, '').trim()))
+    } catch (e) {
+      if (e.status === 402) setErr('Free trial ended. Please subscribe.')
+      else setErr('Failed to generate quiz. Try again.')
+    }
     setLoading(false)
   }
 
   async function submit() {
     setSubmitted(true)
-    const correct=quiz.questions.filter((q,i)=>answers[i]===q.answer).length
-    const xpEarned=Math.round((correct/quiz.questions.length)*50)+5
-    try{await api.post('/api/user/quiz-history',{subject,topic,difficulty:diff,totalQuestions:quiz.questions.length,correctAnswers:correct,xpEarned,isPerfect:correct===quiz.questions.length})}catch{}
+    const correct = quiz.questions.filter((q, i) => answers[i] === q.answer).length
+    const xpEarned = Math.round((correct / quiz.questions.length) * 50) + 5
+    try { await api.post('/api/user/quiz-history', { subject, topic, difficulty: diff, totalQuestions: quiz.questions.length, correctAnswers: correct, xpEarned, isPerfect: correct === quiz.questions.length }) } catch {}
   }
 
-  const score=submitted?quiz.questions.filter((q,i)=>answers[i]===q.answer).length:0
-  const pct=submitted?Math.round((score/quiz.questions.length)*100):0
+  const score = submitted ? quiz.questions.filter((q, i) => answers[i] === q.answer).length : 0
+  const pct   = submitted ? Math.round((score / quiz.questions.length) * 100) : 0
 
   return (
-    <div style={{ padding:24, width:'100%', boxSizing:'border-box', fontFamily:"'Nunito',sans-serif", animation:'slideUp .25s ease-out' }}>
-      <PageHeader icon="🎯" title="Quiz Generator" subtitle="Auto-generate MCQ quizzes with instant scoring and explanations" color="#F59E0B"/>
-      {!quiz?(
+    <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
+      <PageHeader icon="🎯" title="Quiz Generator" subtitle="Auto-generate MCQ quizzes with instant scoring and explanations" color="#F59E0B" />
+
+      {!quiz ? (
         <Card>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:16, marginBottom:4 }}>
-            <Field label="Subject"><BSSelect value={subject} onChange={setSubject} options={SUBJECTS}/></Field>
-            <Field label="Questions"><BSSelect value={num} onChange={setNum} options={['5','8','10','15']}/></Field>
+          {/* Row 1: Subject + Class + Question count */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 14, marginBottom: 4 }}>
+            <Field label="Subject">
+              <BSSelect value={subject} onChange={v => { setSubject(v); setChapter('') }} options={SUBJECTS} />
+            </Field>
+            <Field label="Class">
+              <BSSelect value={cls} onChange={v => { setCls(v); setChapter('') }} options={CLASSES} />
+            </Field>
+            <Field label="Questions">
+              <BSSelect value={num} onChange={setNum} options={['5','8','10','15']} />
+            </Field>
+            <Field label="Difficulty">
+              <BSSelect value={diff} onChange={setDiff} options={['Easy','Medium','Hard','Mixed']} />
+            </Field>
           </div>
-          <Field label="Topic"><BSInput value={topic} onChange={setTopic} placeholder="e.g. Quadratic Equations, World War II, Photosynthesis"/></Field>
-          <Field label="Difficulty"><BSSelect value={diff} onChange={setDiff} options={['Easy','Medium','Hard','Mixed']}/></Field>
-          <ErrMsg msg={err}/>
-          <PrimaryBtn onClick={generate} disabled={loading||!topic.trim()} color="#F59E0B" style={{ marginTop:4 }}>{loading?<><Spinner/> Generating...</>:'✨ Generate Quiz'}</PrimaryBtn>
+
+          {/* Chapter dropdown */}
+          <Field label="Chapter">
+            <BSSelect
+              value={chapter}
+              onChange={setChapter}
+              options={[{ value: '', label: '── Select a Chapter ──' }, ...chapters.map(c => ({ value: c, label: c }))]}
+            />
+          </Field>
+
+          {/* Custom topic fallback */}
+          {!chapter && (
+            <Field label="Or enter a custom topic">
+              <BSInput value={customTopic} onChange={setCustomTopic} placeholder="e.g. Organic Chemistry, World War II, Trigonometry" />
+            </Field>
+          )}
+
+          <ErrMsg msg={err} />
+          <PrimaryBtn onClick={generate} disabled={loading || !topic.trim()} color="#F59E0B" style={{ marginTop: 4 }}>
+            {loading ? <><Spinner /> Generating…</> : '✨ Generate Quiz'}
+          </PrimaryBtn>
         </Card>
-      ):(
+      ) : (
         <div>
-          {submitted&&(
-            <div style={{ background:`linear-gradient(135deg,${pct>=80?'#F97316':'#F59E0B'},${pct>=80?'#FB923C':'#FBBF24'})`, borderRadius:18, padding:24, textAlign:'center', color:'#fff', marginBottom:18 }}>
-              <div style={{ fontSize:48, marginBottom:6 }}>{pct===100?'🏆':pct>=80?'🎉':pct>=50?'👍':'📚'}</div>
-              <h3 style={{ fontFamily:"'Sora',sans-serif", fontSize:28, fontWeight:900, margin:'0 0 6px' }}>{score}/{quiz.questions.length}</h3>
-              <p style={{ opacity:.9, marginBottom:10 }}>{pct===100?'Perfect score! 🌟':pct>=80?'Excellent!':pct>=50?'Good effort! Keep going!':'Keep practicing — you\'ll get there!'}</p>
-              <div style={{ background:'rgba(255,255,255,.2)', padding:'4px 16px', borderRadius:20, display:'inline-block', fontWeight:700, fontSize:13 }}>+{Math.round((score/quiz.questions.length)*50)+5} XP ⚡</div>
-              <br/><br/>
-              <GhostBtn small onClick={()=>{setQuiz(null);setAnswers({});setSubmitted(false)}} style={{ background:'rgba(255,255,255,.2)', border:'none', color:'#fff' }}>New Quiz</GhostBtn>
+          {submitted && (
+            <div style={{ background: `linear-gradient(135deg,${pct >= 80 ? '#F97316' : '#F59E0B'},${pct >= 80 ? '#FB923C' : '#FBBF24'})`, borderRadius: 18, padding: 24, textAlign: 'center', color: '#fff', marginBottom: 18 }}>
+              <div style={{ fontSize: 48, marginBottom: 6 }}>{pct === 100 ? '🏆' : pct >= 80 ? '🎉' : pct >= 50 ? '👍' : '📚'}</div>
+              <h3 style={{ fontFamily: "'Sora', sans-serif", fontSize: 28, fontWeight: 900, margin: '0 0 6px' }}>{score}/{quiz.questions.length}</h3>
+              <p style={{ opacity: .9, marginBottom: 10 }}>{pct === 100 ? 'Perfect score! 🌟' : pct >= 80 ? 'Excellent!' : pct >= 50 ? 'Good effort!' : 'Keep practicing!'}</p>
+              <div style={{ background: 'rgba(255,255,255,.2)', padding: '4px 16px', borderRadius: 20, display: 'inline-block', fontWeight: 700, fontSize: 13 }}>+{Math.round((score / quiz.questions.length) * 50) + 5} XP ⚡</div>
+              <br /><br />
+              <GhostBtn small onClick={() => { setQuiz(null); setAnswers({}); setSubmitted(false) }} style={{ background: 'rgba(255,255,255,.2)', border: 'none', color: '#fff' }}>New Quiz</GhostBtn>
             </div>
           )}
-          <h3 style={{ marginBottom:18, fontFamily:"'Sora',sans-serif", color:'var(--text-h)' }}>{quiz.title}</h3>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(400px,1fr))', gap:14 }}>
-            {quiz.questions.map((q,i)=>{
-              const selected=answers[i],correct=q.answer,isRight=submitted&&selected===correct,isWrong=submitted&&selected!==undefined&&selected!==correct
+          <h3 style={{ marginBottom: 18, fontFamily: "'Sora', sans-serif", color: 'var(--text-h)' }}>{quiz.title}</h3>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(400px,1fr))', gap: 14 }}>
+            {quiz.questions.map((q, i) => {
+              const sel = answers[i], correct = q.answer, isRight = submitted && sel === correct, isWrong = submitted && sel !== undefined && sel !== correct
               return (
-                <Card key={i} style={{ borderLeft:submitted?`4px solid ${isRight?'#22c55e':isWrong?'#ef4444':'var(--border)'}`:'' }}>
-                  <p style={{ margin:'0 0 12px', fontWeight:700, fontSize:14.5, color:'var(--text-h)' }}><span style={{ color:'var(--accent)' }}>Q{i+1}.</span> {q.q}</p>
-                  <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
-                    {q.options.map((opt,j)=>{
-                      const isSelected=selected===j,isAnswer=j===correct
-                      let bg='var(--social-bg)',border='var(--border)',color='var(--text-h)'
-                      if(submitted){if(isAnswer){bg='rgba(16,185,129,.1)';border='#6ee7b7';color='#6ee7b7'}else if(isSelected&&!isAnswer){bg='rgba(239,68,68,.1)';border='#fca5a5';color='#fca5a5'}}
-                      else if(isSelected){bg='var(--accent-bg)';border='var(--accent)';color='var(--accent)'}
-                      return <button key={j} disabled={submitted} onClick={()=>setAnswers(a=>({...a,[i]:j}))} style={{ padding:'9px 12px', borderRadius:9, border:`1.5px solid ${border}`, background:bg, color, cursor:submitted?'default':'pointer', textAlign:'left', fontSize:13.5, fontFamily:"'Nunito',sans-serif", fontWeight:600, transition:'all .15s' }}><span style={{ fontWeight:800, marginRight:4 }}>{String.fromCharCode(65+j)}.</span>{opt}{submitted&&isAnswer?' ✓':''}</button>
+                <Card key={i} style={{ borderLeft: submitted ? `4px solid ${isRight ? '#22c55e' : isWrong ? '#ef4444' : 'var(--border)'}` : '' }}>
+                  <p style={{ margin: '0 0 12px', fontWeight: 700, fontSize: 14.5, color: 'var(--text-h)' }}><span style={{ color: 'var(--accent)' }}>Q{i + 1}.</span> {q.q}</p>
+                  <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
+                    {q.options.map((opt, j) => {
+                      const isSelected = sel === j, isAnswer = j === correct
+                      let bg = 'var(--social-bg)', border = 'var(--border)', color = 'var(--text-h)'
+                      if (submitted) { if (isAnswer) { bg = 'rgba(16,185,129,.1)'; border = '#6ee7b7'; color = '#6ee7b7' } else if (isSelected && !isAnswer) { bg = 'rgba(239,68,68,.1)'; border = '#fca5a5'; color = '#fca5a5' } }
+                      else if (isSelected) { bg = 'var(--accent-bg)'; border = 'var(--accent)'; color = 'var(--accent)' }
+                      return <button key={j} disabled={submitted} onClick={() => setAnswers(a => ({ ...a, [i]: j }))} style={{ padding: '9px 12px', borderRadius: 9, border: `1.5px solid ${border}`, background: bg, color, cursor: submitted ? 'default' : 'pointer', textAlign: 'left', fontSize: 13.5, fontFamily: "'Nunito', sans-serif", fontWeight: 600, transition: 'all .15s' }}><span style={{ fontWeight: 800, marginRight: 4 }}>{String.fromCharCode(65 + j)}.</span>{opt}{submitted && isAnswer ? ' ✓' : ''}</button>
                     })}
                   </div>
-                  {submitted&&q.explanation&&<div style={{ marginTop:11, padding:'9px 13px', background:'var(--accent-bg)', borderRadius:9, fontSize:13, color:'var(--accent)' }}>💡 {q.explanation}</div>}
+                  {submitted && q.explanation && <div style={{ marginTop: 11, padding: '9px 13px', background: 'var(--accent-bg)', borderRadius: 9, fontSize: 13, color: 'var(--accent)' }}>💡 {q.explanation}</div>}
                 </Card>
               )
             })}
           </div>
-          {!submitted&&<PrimaryBtn onClick={submit} disabled={Object.keys(answers).length<quiz.questions.length} color="#F59E0B" style={{ marginTop:16 }}>Submit ({Object.keys(answers).length}/{quiz.questions.length} answered) →</PrimaryBtn>}
+          {!submitted && <PrimaryBtn onClick={submit} disabled={Object.keys(answers).length < quiz.questions.length} color="#F59E0B" style={{ marginTop: 16 }}>Submit ({Object.keys(answers).length}/{quiz.questions.length} answered) →</PrimaryBtn>}
         </div>
       )}
-      <XPBadge amount="5–50" label="per quiz"/>
+      <XPBadge amount="5–50" label="per quiz" />
     </div>
   )
 }
@@ -3574,89 +3818,132 @@ Return ONLY valid JSON (no markdown, no explanation):
 //  FLASHCARDS
 // ══════════════════════════════════════════════════════════════
 function FlashCards({ user, prefill, onClearPrefill }) {
-  const [subject,setSubject]=useState('Mathematics'); const [cls,setCls]=useState('Class 10'); const [topic,setTopic]=useState('')
-  const [cards,setCards]=useState([]); const [current,setCurrent]=useState(0); const [flipped,setFlipped]=useState({}); const [mode,setMode]=useState('grid'); const [loading,setLoading]=useState(false); const [err,setErr]=useState('')
+  const [subject,     setSubject]     = useState('Mathematics')
+  const [cls,         setCls]         = useState('Class 10')
+  const [chapter,     setChapter]     = useState('')
+  const [customTopic, setCustomTopic] = useState('')
+  const [cards,       setCards]       = useState([])
+  const [current,     setCurrent]     = useState(0)
+  const [flipped,     setFlipped]     = useState({})
+  const [mode,        setMode]        = useState('grid')
+  const [loading,     setLoading]     = useState(false)
+  const [err,         setErr]         = useState('')
+
+  const chapters = getChapters(subject, cls)
+  const topic    = chapter || customTopic
+
   useEffect(() => {
-  if (!prefill) return
-  if (prefill.subject) setSubject(prefill.subject)
-  if (prefill.chapter) setTopic(prefill.chapter)
-  onClearPrefill?.()
-}, [])
+    if (!prefill) return
+    if (prefill.subject) setSubject(prefill.subject)
+    if (prefill.chapter) setChapter(prefill.chapter)
+    onClearPrefill?.()
+  }, [])
 
   async function generate() {
-    if(!topic.trim()) return alert('Enter a topic')
-    const PROMPT=`Create 8 high-quality flashcards for "${topic}" in ${subject} ${cls} CBSE. Cover the most important terms, formulas, and concepts.
+    if (!topic.trim()) return alert('Please select or enter a chapter/topic')
+    const PROMPT = `Create 8 high-quality flashcards for "${topic}" in ${subject} ${cls} CBSE. Cover the most important terms, formulas, and concepts.
 Return ONLY valid JSON:
 {"cards":[{"front":"Key term or concept","back":"Clear, concise definition or explanation (1-2 sentences max)"}]}`
     setErr(''); setLoading(true); setCurrent(0); setFlipped({})
-    try{
-      const r=await api.post('/api/ai/flashcards',{messages:[{role:'user',content:PROMPT}],subject,chapter:topic})
-      const raw=typeof r.content==='string'?r.content:r.content[0]?.text||''
-      const parsed=JSON.parse(raw.replace(/```[\w]*\n?/gi,'').trim())
-      if(!parsed.cards?.length) throw new Error('No cards in response')
+    try {
+      const r = await api.post('/api/ai/flashcards', { messages: [{ role: 'user', content: PROMPT }], subject, chapter: topic })
+      const raw = typeof r.content === 'string' ? r.content : r.content[0]?.text || ''
+      const parsed = JSON.parse(raw.replace(/```[\w]*\n?/gi, '').trim())
+      if (!parsed.cards?.length) throw new Error('No cards in response')
       setCards(parsed.cards)
-    } catch(e){ if(e.status===402){setErr('Free trial ended. Please subscribe.')}else{setErr('Failed to generate flashcards. Try again.')} }
+    } catch (e) {
+      if (e.status === 402) setErr('Free trial ended. Please subscribe.')
+      else setErr('Failed to generate flashcards. Try again.')
+    }
     setLoading(false)
   }
 
-  const card=cards[current]
+  const card = cards[current]
+
   return (
-    <div style={{ padding:24, width:'100%', boxSizing:'border-box', fontFamily:"'Nunito',sans-serif", animation:'slideUp .25s ease-out' }}>
-      <PageHeader icon="🃏" title="Flashcards" subtitle="Grid mode & Study mode for fast revision" color="#EF4444"/>
-      <Card style={{ marginBottom:18 }}>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:16, marginBottom:4 }}>
-          <Field label="Subject"><BSSelect value={subject} onChange={setSubject} options={SUBJECTS}/></Field>
-          <Field label="Class"><BSSelect value={cls} onChange={setCls} options={CLASSES}/></Field>
+    <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
+      <PageHeader icon="🃏" title="Flashcards" subtitle="Grid mode & Study mode for fast revision" color="#EF4444" />
+
+      <Card style={{ marginBottom: 18 }}>
+        {/* Subject + Class */}
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 14, marginBottom: 4 }}>
+          <Field label="Subject">
+            <BSSelect value={subject} onChange={v => { setSubject(v); setChapter('') }} options={SUBJECTS} />
+          </Field>
+          <Field label="Class">
+            <BSSelect value={cls} onChange={v => { setCls(v); setChapter('') }} options={CLASSES} />
+          </Field>
         </div>
-        <Field label="Topic"><BSInput value={topic} onChange={setTopic} placeholder="e.g. Chemical Bonding, Mughal Empire, Trigonometry"/></Field>
-        <ErrMsg msg={err}/>
-        <PrimaryBtn onClick={generate} disabled={loading||!topic.trim()} color="#EF4444">{loading?<><Spinner/> Creating cards...</>:'🃏 Generate Flashcards'}</PrimaryBtn>
+
+        {/* Chapter dropdown */}
+        <Field label="Chapter">
+          <BSSelect
+            value={chapter}
+            onChange={setChapter}
+            options={[{ value: '', label: '── Select a Chapter ──' }, ...chapters.map(c => ({ value: c, label: c }))]}
+          />
+        </Field>
+
+        {!chapter && (
+          <Field label="Or enter a custom topic">
+            <BSInput value={customTopic} onChange={setCustomTopic} placeholder="e.g. Chemical Bonding, Trigonometry" />
+          </Field>
+        )}
+
+        <ErrMsg msg={err} />
+        <PrimaryBtn onClick={generate} disabled={loading || !topic.trim()} color="#EF4444">
+          {loading ? <><Spinner /> Creating cards…</> : '🃏 Generate Flashcards'}
+        </PrimaryBtn>
       </Card>
 
-      {cards.length>0&&<>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
-          <h3 style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:16, color:'var(--text-h)', margin:0 }}>{topic} — {cards.length} Cards</h3>
-          <div style={{ display:'flex', gap:7 }}>
-            {[['grid','⊞ Grid'],['study','▶ Study']].map(([m,l])=>(
-              <button key={m} onClick={()=>setMode(m)} style={{ padding:'6px 14px', borderRadius:8, border:'none', fontWeight:700, fontSize:12.5, cursor:'pointer', fontFamily:"'Nunito',sans-serif", background:mode===m?'#EF4444':'var(--social-bg)', color:mode===m?'#fff':'var(--text-h)', transition:'all .15s' }}>{l}</button>
-            ))}
+      {cards.length > 0 && (
+        <>
+          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
+            <h3 style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 16, color: 'var(--text-h)', margin: 0 }}>{topic} — {cards.length} Cards</h3>
+            <div style={{ display: 'flex', gap: 7 }}>
+              {[['grid', '⊞ Grid'], ['study', '▶ Study']].map(([m, l]) => (
+                <button key={m} onClick={() => setMode(m)} style={{ padding: '6px 14px', borderRadius: 8, border: 'none', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", background: mode === m ? '#EF4444' : 'var(--social-bg)', color: mode === m ? '#fff' : 'var(--text-h)', transition: 'all .15s' }}>{l}</button>
+              ))}
+            </div>
           </div>
-        </div>
 
-        {mode==='grid'?(
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(210px,1fr))', gap:14 }}>
-            {cards.map((c,i)=>(
-              <div key={i} onClick={()=>setFlipped(f=>({...f,[i]:!f[i]}))} style={{ height:130, borderRadius:14, cursor:'pointer', perspective:1000 }}>
-                <div style={{ width:'100%', height:'100%', position:'relative', transformStyle:'preserve-3d', transition:'transform .5s', transform:flipped[i]?'rotateY(180deg)':'none' }}>
-                  <div style={{ position:'absolute', inset:0, backfaceVisibility:'hidden', background:'linear-gradient(135deg,#EF4444,#F97316)', borderRadius:14, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', padding:14, textAlign:'center' }}>
-                    <span style={{ fontSize:9, color:'rgba(255,255,255,.7)', fontWeight:800, marginBottom:7, letterSpacing:1 }}>TAP TO REVEAL</span>
-                    <span style={{ color:'#fff', fontWeight:800, fontSize:13.5, lineHeight:1.4 }}>{c.front}</span>
-                  </div>
-                  <div style={{ position:'absolute', inset:0, backfaceVisibility:'hidden', transform:'rotateY(180deg)', background:'var(--bg2)', borderRadius:14, border:'2px solid #EF4444', display:'flex', alignItems:'center', justifyContent:'center', padding:14, textAlign:'center' }}>
-                    <span style={{ color:'var(--text-h)', fontWeight:700, fontSize:13, lineHeight:1.5 }}>{c.back}</span>
+          {mode === 'grid' ? (
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(210px,1fr))', gap: 14 }}>
+              {cards.map((c, i) => (
+                <div key={i} onClick={() => setFlipped(f => ({ ...f, [i]: !f[i] }))} style={{ height: 130, borderRadius: 14, cursor: 'pointer', perspective: 1000 }}>
+                  <div style={{ width: '100%', height: '100%', position: 'relative', transformStyle: 'preserve-3d', transition: 'transform .5s', transform: flipped[i] ? 'rotateY(180deg)' : 'none' }}>
+                    <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', background: 'linear-gradient(135deg,#EF4444,#F97316)', borderRadius: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', padding: 14, textAlign: 'center' }}>
+                      <span style={{ fontSize: 9, color: 'rgba(255,255,255,.7)', fontWeight: 800, marginBottom: 7, letterSpacing: 1 }}>TAP TO REVEAL</span>
+                      <span style={{ color: '#fff', fontWeight: 800, fontSize: 13.5, lineHeight: 1.4 }}>{c.front}</span>
+                    </div>
+                    <div style={{ position: 'absolute', inset: 0, backfaceVisibility: 'hidden', transform: 'rotateY(180deg)', background: 'var(--bg2)', borderRadius: 14, border: '2px solid #EF4444', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 14, textAlign: 'center' }}>
+                      <span style={{ color: 'var(--text-h)', fontWeight: 700, fontSize: 13, lineHeight: 1.5 }}>{c.back}</span>
+                    </div>
                   </div>
                 </div>
+              ))}
+            </div>
+          ) : (
+            <Card style={{ textAlign: 'center', maxWidth: 560, margin: '0 auto' }}>
+              <div style={{ fontSize: 12, color: 'var(--text)', marginBottom: 8, fontWeight: 700 }}>Card {current + 1} of {cards.length}</div>
+              <div style={{ background: 'var(--border)', borderRadius: 999, height: 5, margin: '0 auto 18px', maxWidth: 240 }}>
+                <div style={{ background: '#EF4444', width: `${((current + 1) / cards.length) * 100}%`, height: '100%', borderRadius: 999 }} />
               </div>
-            ))}
-          </div>
-        ):(
-          <Card style={{ textAlign:'center', maxWidth:560, margin:'0 auto' }}>
-            <div style={{ fontSize:12, color:'var(--text)', marginBottom:8, fontWeight:700 }}>Card {current+1} of {cards.length}</div>
-            <div style={{ background:'var(--border)', borderRadius:999, height:5, margin:'0 auto 18px', maxWidth:240 }}><div style={{ background:'#EF4444', width:`${((current+1)/cards.length)*100}%`, height:'100%', borderRadius:999 }}/></div>
-            <div onClick={()=>setFlipped(f=>({...f,[current]:!f[current]}))} style={{ height:180, background:flipped[current]?'var(--code-bg)':'linear-gradient(135deg,#EF4444,#F97316)', borderRadius:14, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', cursor:'pointer', border:flipped[current]?'2px solid #EF4444':'none', marginBottom:18, padding:24 }}>
-              <span style={{ fontSize:10, color:flipped[current]?'var(--text)':'rgba(255,255,255,.7)', fontWeight:800, letterSpacing:1, marginBottom:10 }}>{flipped[current]?'ANSWER':'TERM — TAP TO FLIP'}</span>
-              <span style={{ color:flipped[current]?'var(--text-h)':'#fff', fontWeight:800, fontSize:16, lineHeight:1.5 }}>{flipped[current]?card.back:card.front}</span>
-            </div>
-            <div style={{ display:'flex', justifyContent:'center', gap:12 }}>
-              <GhostBtn disabled={current===0} onClick={()=>{setCurrent(c=>c-1);setFlipped({})}}>← Prev</GhostBtn>
-              <PrimaryBtn color="#EF4444" onClick={()=>setFlipped(f=>({...f,[current]:!f[current]}))}>Flip</PrimaryBtn>
-              <GhostBtn disabled={current===cards.length-1} onClick={()=>{setCurrent(c=>c+1);setFlipped({})}}>Next →</GhostBtn>
-            </div>
-          </Card>
-        )}
-        <GhostBtn small onClick={()=>setCards([])} style={{ marginTop:14 }}>↺ New Flashcards</GhostBtn>
-      </>}
-      <XPBadge amount={15} label="per set"/>
+              <div onClick={() => setFlipped(f => ({ ...f, [current]: !f[current] }))} style={{ height: 180, background: flipped[current] ? 'var(--code-bg)' : 'linear-gradient(135deg,#EF4444,#F97316)', borderRadius: 14, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', border: flipped[current] ? '2px solid #EF4444' : 'none', marginBottom: 18, padding: 24 }}>
+                <span style={{ fontSize: 10, color: flipped[current] ? 'var(--text)' : 'rgba(255,255,255,.7)', fontWeight: 800, letterSpacing: 1, marginBottom: 10 }}>{flipped[current] ? 'ANSWER' : 'TERM — TAP TO FLIP'}</span>
+                <span style={{ color: flipped[current] ? 'var(--text-h)' : '#fff', fontWeight: 800, fontSize: 16, lineHeight: 1.5 }}>{flipped[current] ? card.back : card.front}</span>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'center', gap: 12 }}>
+                <GhostBtn disabled={current === 0} onClick={() => { setCurrent(c => c - 1); setFlipped({}) }}>← Prev</GhostBtn>
+                <PrimaryBtn color="#EF4444" onClick={() => setFlipped(f => ({ ...f, [current]: !f[current] }))}>Flip</PrimaryBtn>
+                <GhostBtn disabled={current === cards.length - 1} onClick={() => { setCurrent(c => c + 1); setFlipped({}) }}>Next →</GhostBtn>
+              </div>
+            </Card>
+          )}
+          <GhostBtn small onClick={() => setCards([])} style={{ marginTop: 14 }}>↺ New Flashcards</GhostBtn>
+        </>
+      )}
+      <XPBadge amount={15} label="per set" />
     </div>
   )
 }
