@@ -3311,7 +3311,7 @@ FINAL REMINDER: You must write AT LEAST 3500 words. Every section above must be 
     try{
       // ── Check DB cache first — if someone already generated this, reuse it ──
       const list = await api.get('/api/user/notes').catch(()=>[])
-      const cached = list.find(n => n.subject===subject && n.chapter===finalChapter)
+      const cached = list.find(n => n.subject===subject && n.chapter===finalChapter && n.style===style_)
       if (cached) {
         const full = await api.get(`/api/user/notes/${cached.id}`)
         setResult(full.content); setSaved(true); setLoading(false); return
