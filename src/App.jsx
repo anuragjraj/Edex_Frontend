@@ -4263,12 +4263,11 @@ function ChapterCourses({ user, prefill, onClearPrefill }) {
 
   function connectSSE(key) {
   const token = localStorage.getItem('bs_token')
-  const es    = new EventSource(`${API_URL}/api/chapter-courses/stream/${key}?token=${token}`)
+  const es = new EventSource(`${API_URL}/api/chapter-courses/stream/${key}?token=${token}`)
   sseRef.current = es
   es.onmessage = e => { try { handleSSEMessage(JSON.parse(e.data)) } catch {} }
-  es.onerror   = () => {
+  es.onerror = () => {
     es.close()
-    // Fallback: poll the list endpoint until modules appear
     let attempts = 0
     const poll = setInterval(async () => {
       attempts++
@@ -4278,58 +4277,75 @@ function ChapterCourses({ user, prefill, onClearPrefill }) {
         setModules(cached.modules)
         setPhase('course')
       }
-      if (attempts > 24) clearInterval(poll) // stop after 2 minutes
+      if (attempts > 24) clearInterval(poll)
     }, 5000)
   }
 }
 
-  function handleSSEMessage(msg) {
-    switch (msg.type) {
-      case 'status':           setStatusMsg(msg.message); break
-      case 'modules_listed':
-        setModules(msg.modules || []);
-        setProgress({ done: 0, total: msg.modules?.length || 0 });
-        setStatusMsg('Searching YouTube & generating content…');
-        setPhase('course');
-        break
-
-      case 'module_building':  setModules(p => p.map(m => m.id === msg.moduleId ? { ...m, status: 'building' } : m)); setStatusMsg(`Building: "${msg.title}"…`); break
-      case 'module_done':
-  setModules(p => {
-    const updated = p.map(m => m.id === msg.moduleId
-      ? { ...m, status: 'done', videoId: msg.videoId, transcriptStatus: msg.transcriptStatus }
-      : m
-    );
-    // Auto-open first completed module if nothing is open yet
-    if (!activeModuleId) {
-      const firstDone = updated.find(m => m.status === 'done');
-      if (firstDone) {
-        setTimeout(() => openModule(firstDone), 100);
-      }
-    }
-    return updated;
-  });
-  setProgress(p => ({ ...p, done: p.done + 1 }));
-  break
-      case 'module_error':     setModules(p => p.map(m => m.id === msg.moduleId ? { ...m, status: 'error' } : m)); break
-      case 'generation_complete': if (msg.modules) setModules(msg.modules); setPhase('course'); sseRef.current?.close(); break
-      case 'already_done':
-          if (msg.data?.modules) setModules(msg.data.modules);
-          else if (msg.data) setModules(msg.data?.modules || []);
-          setPhase('course');
-          sseRef.current?.close();
-          break
-      case 'error':            setErr(msg.message || 'Generation failed'); setPhase('select'); sseRef.current?.close(); break
-    }
+  const handleSSEMessage = useCallback((msg) => {
+  switch (msg.type) {
+    case 'status':
+      setStatusMsg(msg.message)
+      break
+    case 'modules_listed':
+      setModules(msg.modules || [])
+      setProgress({ done: 0, total: msg.modules?.length || 0 })
+      setStatusMsg('Searching YouTube & generating content…')
+      setPhase('course')
+      break
+    case 'module_building':
+      setModules(p => p.map(m => m.id === msg.moduleId ? { ...m, status: 'building' } : m))
+      setStatusMsg(`Building: "${msg.title}"…`)
+      break
+    case 'module_done':
+      setModules(p => {
+        const updated = p.map(m => m.id === msg.moduleId
+          ? { ...m, status: 'done', videoId: msg.videoId, transcriptStatus: msg.transcriptStatus }
+          : m
+        )
+        // Auto-open first completed module
+        const firstDone = updated.find(m => m.status === 'done')
+        if (firstDone) setTimeout(() => setActiveModuleId(prev => prev ?? firstDone.id), 100)
+        return updated
+      })
+      setProgress(p => ({ ...p, done: p.done + 1 }))
+      break
+    case 'module_error':
+      setModules(p => p.map(m => m.id === msg.moduleId ? { ...m, status: 'error' } : m))
+      break
+    case 'generation_complete':
+      if (msg.modules) setModules(msg.modules)
+      setPhase('course')
+      sseRef.current?.close()
+      break
+    case 'already_done':
+      if (msg.data?.modules) setModules(msg.data.modules)
+      setPhase('course')
+      sseRef.current?.close()
+      break
+    case 'error':
+      setErr(msg.message || 'Generation failed')
+      setPhase('select')
+      sseRef.current?.close()
+      break
   }
+}, [])
 
-  async function openModule(mod) {
-    if (mod.status !== 'done') return
-    setActiveModuleId(mod.id); setModuleData(null)
-    const modKey = buildModKey(subj, cls, chapter, mod.id)
-    try { setModuleData(await api.get(`/api/chapter-courses/module/${modKey}`)) }
-    catch (e) { setErr('Could not load module: ' + e.message) }
-  }
+  function openModule(mod) {
+  if (mod.status !== 'done') return
+  setActiveModuleId(mod.id)
+}
+
+useEffect(() => {
+  if (!activeModuleId) return
+  const mod = modules.find(m => m.id === activeModuleId)
+  if (!mod || mod.status !== 'done') return
+  setModuleData(null)
+  const modKey = buildModKey(subj, cls, chapter, mod.id)
+  api.get(`/api/chapter-courses/module/${modKey}`)
+    .then(setModuleData)
+    .catch(e => setErr('Could not load module: ' + e.message))
+}, [activeModuleId])
 
   function buildModKey(subject, c, ch, moduleId) {
     const safe = s => s.replace(/[^a-zA-Z0-9]/g, '').toLowerCase().slice(0, 16)
