@@ -1858,16 +1858,17 @@ function Dashboard({ user, onNavigate }) {
   const streak=stats?.stats?.current_streak||0; const unlocked=achs.filter(a=>a.unlocked).slice(0,3)
   const hour=new Date().getHours(); const greeting=hour<12?'Good morning':hour<17?'Good afternoon':'Good evening'
   const quickStart = [
-    { icon: '🕘', label: 'My History', tab: 'history', color: '#6366F1' },
-    {icon:'📣',label:'Study Feed',tab:'feed',color:'#6366F1'},
-    {icon:'📚',label:'Chapter Courses',tab:'courses',color:'#8B5CF6'},
-    {icon:'🤔',label:'Ask a Doubt',tab:'doubt',color:'#818CF8'},
     {icon:'📖',label:'Generate Notes',tab:'notes',color:'#10B981'},
-    ...(user.type==='school'?[{icon:'📝',label:'Assignments',tab:'assignments',color:'#F59E0B'}]:[]),
-    ...(user.role==='student'?[{icon:'📋',label:'Exam Cheat Sheet',tab:'cheatsheet',color:'#F97316'}]:[{icon:'🎓',label:'Lesson Planner',tab:'lessonplan',color:'#7C3AED'}]),
     {icon:'🎯',label:'Take a Quiz',tab:'quiz',color:'#F59E0B'},
-    {icon:'🔍',label:'Find People',tab:'search',color:'#06b6d4'},
-    
+    {icon:'🃏',label:'Flashcards',tab:'flashcards',color:'#EF4444'},
+    // HIDDEN FOR NOW — uncomment to re-enable:
+    // { icon: '🕘', label: 'My History', tab: 'history', color: '#6366F1' },
+    // {icon:'📣',label:'Study Feed',tab:'feed',color:'#6366F1'},
+    // {icon:'📚',label:'Chapter Courses',tab:'courses',color:'#8B5CF6'},
+    // {icon:'🤔',label:'Ask a Doubt',tab:'doubt',color:'#818CF8'},
+    // ...(user.type==='school'?[{icon:'📝',label:'Assignments',tab:'assignments',color:'#F59E0B'}]:[]),
+    // ...(user.role==='student'?[{icon:'📋',label:'Exam Cheat Sheet',tab:'cheatsheet',color:'#F97316'}]:[{icon:'🎓',label:'Lesson Planner',tab:'lessonplan',color:'#7C3AED'}]),
+    // {icon:'🔍',label:'Find People',tab:'search',color:'#06b6d4'},
   ]
   return (
     <div style={{ padding:24, width:'100%', boxSizing:'border-box', fontFamily:"'Nunito',sans-serif", animation:'slideUp .25s ease-out' }}>
@@ -3303,8 +3304,21 @@ FINAL REMINDER: You must write AT LEAST 3500 words. Every section above must be 
 
   async function generate() {
     if(!finalChapter) return; setErr(''); setLoading(true); setSaved(false)
-    try{ const r=await api.post('/api/ai/notes',{messages:[{role:'user',content:buildPrompt()}],subject,chapter:finalChapter}); setResult(r.content)   
-    saveSessionContent({ tool:'notes', subject, chapter:finalChapter, classLevel:cls, content:r.content })}
+    try{
+      // ── Check DB cache first — if someone already generated this, reuse it ──
+      const list = await api.get('/api/user/notes').catch(()=>[])
+      const cached = list.find(n => n.subject===subject && n.chapter===finalChapter)
+      if (cached) {
+        const full = await api.get(`/api/user/notes/${cached.id}`)
+        setResult(full.content); setSaved(true); setLoading(false); return
+      }
+      // ── Not cached — generate fresh ──
+      const r=await api.post('/api/ai/notes',{messages:[{role:'user',content:buildPrompt()}],subject,chapter:finalChapter})
+      setResult(r.content)
+      // Auto-save to DB so next user gets it from cache
+      try { await api.post('/api/user/notes',{subject,classLevel:cls,chapter:finalChapter,style:style_,content:r.content}); setSaved(true) } catch{}
+      saveSessionContent({ tool:'notes', subject, chapter:finalChapter, classLevel:cls, content:r.content })
+    }
     catch(e){ if(e.status===402){setErr('Free trial ended. Please subscribe.')}else{setErr(e.message)} }
     setLoading(false)
   }
@@ -5218,24 +5232,24 @@ export default function App() {
 
   const tabs = [
     { id: 'dashboard',   icon: '🏠', label: 'Dashboard',      color: '#6366F1' },
-    { id: 'courses',     icon: '📚', label: 'Chapter Courses', color: '#8B5CF6' },
+    // { id: 'courses',     icon: '📚', label: 'Chapter Courses', color: '#8B5CF6' },
     { id: 'notes',       icon: '📖', label: 'Notes',           color: '#10B981' },
-    { id: 'paper',       icon: '📄', label: 'Question Paper',  color: '#A855F7' },
+    // { id: 'paper',       icon: '📄', label: 'Question Paper',  color: '#A855F7' },
     { id: 'quiz',        icon: '🎯', label: 'Quiz',            color: '#F59E0B' },
     { id: 'flashcards',  icon: '🃏', label: 'Flashcards',      color: '#EF4444' },
-    { id: 'doubt',       icon: '🤔', label: 'Doubt Solver',    color: '#818CF8' },
-    { id: 'search',      icon: '🔍', label: 'Search',          color: '#06b6d4' },
-    { id: 'messages',    icon: '💬', label: 'Messages',        color: '#10B981' },
+    // { id: 'doubt',       icon: '🤔', label: 'Doubt Solver',    color: '#818CF8' },
+    // { id: 'search',      icon: '🔍', label: 'Search',          color: '#06b6d4' },
+    // { id: 'messages',    icon: '💬', label: 'Messages',        color: '#10B981' },
     // { id: 'video',       icon: '🎬', label: 'Video Learning',  color: '#06b6d4' },
     // ...(isStudent ? [{ id: 'cheatsheet', icon: '📋', label: 'Cheat Sheet',   color: '#F97316' }] : []),
-    ...(isTeacher ? [{ id: 'lessonplan', icon: '🎓', label: 'Lesson Planner', color: '#7C3AED' }] : []),
-    ...(isSchool ? [
-      { id: 'assignments', icon: '📝', label: 'Assignments', color: '#F59E0B' },
-      { id: 'notices',     icon: '📢', label: 'Notices',     color: '#F97316' },
-      { id: 'timetable',   icon: '📅', label: 'Timetable',   color: '#06b6d4' },
-    ] : []),
-    ...(isTeacher && isSchool ? [{ id: 'school', icon: '🏫', label: 'Analytics', color: '#A855F7' }] : []),
-    { id: 'feed',        icon: '📣', label: 'Study Feed',      color: '#6366F1' },
+    // ...(isTeacher ? [{ id: 'lessonplan', icon: '🎓', label: 'Lesson Planner', color: '#7C3AED' }] : []),
+    // ...(isSchool ? [
+    //   { id: 'assignments', icon: '📝', label: 'Assignments', color: '#F59E0B' },
+    //   { id: 'notices',     icon: '📢', label: 'Notices',     color: '#F97316' },
+    //   { id: 'timetable',   icon: '📅', label: 'Timetable',   color: '#06b6d4' },
+    // ] : []),
+    // ...(isTeacher && isSchool ? [{ id: 'school', icon: '🏫', label: 'Analytics', color: '#A855F7' }] : []),
+    // { id: 'feed',        icon: '📣', label: 'Study Feed',      color: '#6366F1' },
     { id: 'history',     icon: '🕘', label: 'History',         color: '#6366F1' }
   ]
 
@@ -5307,11 +5321,13 @@ export default function App() {
         </div>
 
         <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+          {/* SUBSCRIPTION HIDDEN FOR NOW — uncomment to re-enable:
           {!isSchool && user.subscription_status !== 'active' && (
             <button onClick={() => setTab('subscription')} style={{ padding: '6px 14px', borderRadius: 9, border: 'none', background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', color: '#fff', fontWeight: 800, fontSize: 12.5, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>
               ⚡ Upgrade
             </button>
           )}
+          */}
           <button onClick={() => setTab('achievements')} title="Achievements" style={{ width: 36, height: 36, borderRadius: 9, border: '1px solid var(--border)', background: 'var(--social-bg)', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🏆</button>
           <button onClick={() => { setViewProfileId(null); setTab('profile') }} title="My Profile" style={{ width: 36, height: 36, borderRadius: 9, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', cursor: 'pointer', fontSize: 14, fontWeight: 900, color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Sora', sans-serif" }}>
             {user.name?.[0]?.toUpperCase() || '?'}
@@ -5349,11 +5365,13 @@ export default function App() {
         {/* ── Main content ─────────────────────────────────────── */}
         <main style={{ flex: 1, overflowY: 'auto', minWidth: 0 }}>
           <div style={{ padding: '16px 24px 0', paddingBottom: 0 }}>
+            {/* FREE TRIAL COUNTDOWN HIDDEN FOR NOW — uncomment to re-enable:
             <FreeTierCountdown
               user={user}
               onSubscribe={() => setTab('subscription')}
               onExpired={() => { setTrialExpired(true); setTab('subscription') }}
             />
+            */}
           </div>
           {renderPage()}
         </main>
