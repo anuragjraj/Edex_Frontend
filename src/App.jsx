@@ -4974,11 +4974,20 @@ function ReplayQuiz({ session }) {
   const savedScore = quizData?.score
   const savedTotal = quizData?.total
   const wasTimeUp  = quizData?.timeUp
-    const [ans, setAns] = useState({})
+  const [ans, setAns] = useState({})
   const [done, setDone] = useState(false)
   const [bestScore, setBestScore] = useState(savedScore ?? null)
-  const currentScore = done ? quiz.filter((q,i) => ans[i] === (q.answer ?? q.ans)).length : 0
-  const score = bestScore !== null ? Math.max(currentScore, bestScore) : currentScore
+  const [currentScore, setCurrentScore] = useState(0)
+
+  // Compute current score only when done
+  useEffect(() => {
+    if (!done) return
+    const s = quiz.filter((q, i) => ans[i] === (q.answer ?? q.ans)).length
+    setCurrentScore(s)
+    setBestScore(prev => (prev === null ? s : Math.max(prev, s)))
+  }, [done])
+
+  const score = bestScore ?? 0
   const isNewBest = done && currentScore > (savedScore ?? 0)
   return (
     <div>
@@ -5006,7 +5015,7 @@ function ReplayQuiz({ session }) {
               🔥 New Best Score! ({savedScore ?? 0} → {currentScore})
             </div>
           )}
-          <button onClick={()=>{ setBestScore(s => Math.max(s ?? 0, currentScore)); setAns({}); setDone(false) }} style={{ padding:'7px 20px', borderRadius:9, background:'rgba(255,255,255,.2)', border:'none', color:'#fff', fontSize:13, fontWeight:600, cursor:'pointer' }}>↺ Retake</button>
+          <button onClick={() => { setAns({}); setDone(false); setCurrentScore(0) }} style={{ padding:'7px 20px', borderRadius:9, background:'rgba(255,255,255,.2)', border:'none', color:'#fff', fontSize:13, fontWeight:600, cursor:'pointer' }}>↺ Retake</button>
         </div>
       )}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(340px,1fr))', gap:12 }}>
