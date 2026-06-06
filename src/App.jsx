@@ -3822,9 +3822,43 @@ function QuizGenerator({ user, prefill, onClearPrefill }) {
   const [submitted, setSubmitted] = useState(false)
   const [loading,   setLoading]   = useState(false)
   const [err,       setErr]       = useState('')
+  const [timeLeft,  setTimeLeft]  = useState(null)
+  const [timerId,   setTimerId]   = useState(null)
+  const [timeUp,    setTimeUp]    = useState(false)
+  const [finalScore, setFinalScore] = useState(null)
 
   const chapters = getChapters(subject, cls)
-  const topic    = chapter || customTopic   // what gets sent to the AI
+  const topic    = chapter || customTopic
+
+  // seconds per question based on difficulty
+  const SECS_PER_Q = { Easy: 30, Medium: 45, Hard: 60, Mixed: 45 }
+
+  useEffect(() => {
+    if (!quiz) return
+    const totalSecs = parseInt(num) * (SECS_PER_Q[diff] || 45)
+    setTimeLeft(totalSecs)
+    setTimeUp(false)
+    const id = setInterval(() => {
+      setTimeLeft(prev => {
+        if (prev <= 1) {
+          clearInterval(id)
+          setTimeUp(true)
+          // auto-submit
+          setSubmitted(true)
+          const correct = quiz.questions.filter((q, i) => answers[i] === q.answer).length
+          const xpEarned = Math.round((correct / quiz.questions.length) * 50) + 5
+          setFinalScore({ correct, xpEarned })
+          saveSessionContent({ tool:'quiz', subject, chapter:topic, classLevel:cls, content:{ ...quiz, score:correct, total:quiz.questions.length, timeUp:true } })
+          return 0
+        }
+        return prev - 1
+      })
+    }, 1000)
+    setTimerId(id)
+    return () => clearInterval(id)
+  }, [quiz])
+
+  useEffect(() => { return () => { if (timerId) clearInterval(timerId) } }, [timerId]) // what gets sent to the AI
 
   useEffect(() => {
     if (!prefill) return
@@ -3842,8 +3876,10 @@ Return ONLY valid JSON (no markdown):
     try {
       const r = await api.post('/api/ai/quiz', { messages: [{ role: 'user', content: PROMPT }], subject, chapter: topic })
       const raw = typeof r.content === 'string' ? r.content : r.content[0]?.text || ''
-      setQuiz(JSON.parse(raw.replace(/```[\w]*\n?/gi, '').trim()))
-      saveSessionContent({ tool:'quiz', subject, chapter:topic, classLevel:cls, content:parsed }); setAnswers({}); setSubmitted(false)
+      const parsed = JSON.parse(raw.replace(/```[\w]*\n?/gi, '').trim())
+      setQuiz(parsed)
+      saveSessionContent({ tool:'quiz', subject, chapter:topic, classLevel:cls, content:parsed })
+      setAnswers({}); setSubmitted(false)
     } catch (e) {
       if (e.status === 402) setErr('Free trial ended. Please subscribe.')
       else setErr('Failed to generate quiz. Try again.')
@@ -3852,9 +3888,13 @@ Return ONLY valid JSON (no markdown):
   }
 
   async function submit() {
+    if (timerId) clearInterval(timerId)
     setSubmitted(true)
     const correct = quiz.questions.filter((q, i) => answers[i] === q.answer).length
     const xpEarned = Math.round((correct / quiz.questions.length) * 50) + 5
+    setFinalScore({ correct, xpEarned })
+    // Save score into session so history can show it
+    saveSessionContent({ tool:'quiz', subject, chapter:topic, classLevel:cls, content:{ ...quiz, score:correct, total:quiz.questions.length, timeTaken: (parseInt(num) * (SECS_PER_Q[diff]||45)) - timeLeft } })
     try { await api.post('/api/user/quiz-history', { subject, topic, difficulty: diff, totalQuestions: quiz.questions.length, correctAnswers: correct, xpEarned, isPerfect: correct === quiz.questions.length }) } catch {}
   }
 
@@ -3906,6 +3946,33 @@ Return ONLY valid JSON (no markdown):
         </Card>
       ) : (
         <div>
+          {/* ── Timer bar ── */}
+          {!submitted && timeLeft !== null && (
+            <div style={{ marginBottom: 16, background: 'var(--bg2)', border: `1px solid ${timeLeft <= 30 ? 'rgba(239,68,68,.4)' : 'var(--border)'}`, borderRadius: 12, padding: '10px 16px' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
+                <span style={{ fontSize: 13, fontWeight: 700, color: timeLeft <= 30 ? '#fca5a5' : 'var(--text-h)' }}>
+                  {timeLeft <= 30 ? '⚠️' : '⏱'} Time Remaining
+                </span>
+                <span style={{ fontFamily: "'Sora', monospace", fontWeight: 900, fontSize: 20, color: timeLeft <= 30 ? '#ef4444' : 'var(--accent)', animation: timeLeft <= 10 ? 'pulse 1s infinite' : 'none', letterSpacing: 1 }}>
+                  {String(Math.floor(timeLeft / 60)).padStart(2, '0')}:{String(timeLeft % 60).padStart(2, '0')}
+                </span>
+              </div>
+              <div style={{ background: 'var(--border)', borderRadius: 999, height: 6 }}>
+                <div style={{ background: timeLeft <= 30 ? '#ef4444' : timeLeft <= 60 ? '#f59e0b' : 'var(--accent)', width: `${(timeLeft / (parseInt(num) * (SECS_PER_Q[diff] || 45))) * 100}%`, height: '100%', borderRadius: 999, transition: 'width 1s linear, background .3s' }}/>
+              </div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5, fontSize: 11, color: 'var(--text)' }}>
+                <span>{Object.keys(answers).length}/{quiz.questions.length} answered</span>
+                <span>{parseInt(num) * (SECS_PER_Q[diff] || 45)}s total · {SECS_PER_Q[diff] || 45}s per question</span>
+              </div>
+            </div>
+          )}
+
+          {timeUp && !submitted && (
+            <div style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 12, padding: '12px 16px', marginBottom: 14, textAlign: 'center', color: '#fca5a5', fontWeight: 700, fontSize: 14 }}>
+              ⏰ Time's up! Your answers have been submitted automatically.
+            </div>
+          )}
+
           {submitted && (
             <div style={{ background: `linear-gradient(135deg,${pct >= 80 ? '#F97316' : '#F59E0B'},${pct >= 80 ? '#FB923C' : '#FBBF24'})`, borderRadius: 18, padding: 24, textAlign: 'center', color: '#fff', marginBottom: 18 }}>
               <div style={{ fontSize: 48, marginBottom: 6 }}>{pct === 100 ? '🏆' : pct >= 80 ? '🎉' : pct >= 50 ? '👍' : '📚'}</div>
@@ -4902,12 +4969,30 @@ function HistorySessionView({ item, session, onClose }) {
 //    a dedicated app-level component) ─────────────────────────
 
 function ReplayQuiz({ session }) {
-  const quiz = session.content?.questions || (Array.isArray(session.content) ? session.content : [])
+  const quizData = session.content
+  const quiz = quizData?.questions || (Array.isArray(quizData) ? quizData : [])
+  const savedScore = quizData?.score
+  const savedTotal = quizData?.total
+  const wasTimeUp  = quizData?.timeUp
   const [ans, setAns] = useState({})
   const [done, setDone] = useState(false)
   const score = done ? quiz.filter((q,i) => ans[i] === (q.answer ?? q.ans)).length : 0
   return (
     <div>
+      {/* Show saved score from when quiz was taken */}
+      {savedScore !== undefined && !done && (
+        <div style={{ background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', borderRadius: 14, padding: '16px 20px', marginBottom: 18, display: 'flex', justifyContent: 'space-between', alignItems: 'center', color: '#fff' }}>
+          <div>
+            <div style={{ fontSize: 12, opacity: .8, marginBottom: 3 }}>Original Score {wasTimeUp ? '(Time Up)' : ''}</div>
+            <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 900, fontSize: 26 }}>{savedScore}/{savedTotal}</div>
+            <div style={{ fontSize: 12, opacity: .75 }}>{Math.round((savedScore/savedTotal)*100)}% correct</div>
+          </div>
+          <div style={{ textAlign: 'right' }}>
+            <div style={{ fontSize: 12, opacity: .8, marginBottom: 4 }}>Retake to beat your score</div>
+            <div style={{ fontSize: 32 }}>{savedScore === savedTotal ? '🏆' : savedScore >= savedTotal * .8 ? '🎉' : '📚'}</div>
+          </div>
+        </div>
+      )}
       {done && (
         <div style={{ background:'linear-gradient(135deg,#F59E0B,#F97316)', borderRadius:16, padding:24, textAlign:'center', marginBottom:20, color:'#fff' }}>
           <div style={{ fontSize:42, marginBottom:6 }}>{score===quiz.length?'🏆':score>=quiz.length*.7?'🎉':'📚'}</div>
