@@ -4250,14 +4250,20 @@ function ChapterCourses({ user, prefill, onClearPrefill }) {
       })
       setCourseKey(key)
       if (existing) {
-        const cached = await api.get(`/api/chapter-courses/list/${key}`)
-        if (cached?.modules) {
-          setModules(cached.modules)
-          setProgress({ done: cached.modules.filter(m => m.status === 'done').length, total: cached.modules.length })
-          setPhase('course'); return
-        }
-      }
-      connectSSE(key)
+      const cached = await api.get(`/api/chapter-courses/list/${key}?t=${Date.now()}`)
+      if (cached?.modules) {
+        setModules(cached.modules)
+        setProgress({ done: cached.modules.filter(m => m.status === 'done').length, total: cached.modules.length })
+        setPhase('course')
+        // If course is incomplete, connect SSE to receive remaining modules
+        const doneCount = cached.modules.filter(m => m.status === 'done').length
+        if (doneCount < cached.modules.length) {
+          connectSSE(key)
+    }
+    return
+  }
+}
+connectSSE(key)
     } catch (e) { setErr(e.message); setPhase('select') }
   }
 
