@@ -4974,9 +4974,12 @@ function ReplayQuiz({ session }) {
   const savedScore = quizData?.score
   const savedTotal = quizData?.total
   const wasTimeUp  = quizData?.timeUp
-  const [ans, setAns] = useState({})
+    const [ans, setAns] = useState({})
   const [done, setDone] = useState(false)
-  const score = done ? quiz.filter((q,i) => ans[i] === (q.answer ?? q.ans)).length : 0
+  const [bestScore, setBestScore] = useState(savedScore ?? null)
+  const currentScore = done ? quiz.filter((q,i) => ans[i] === (q.answer ?? q.ans)).length : 0
+  const score = bestScore !== null ? Math.max(currentScore, bestScore) : currentScore
+  const isNewBest = done && currentScore > (savedScore ?? 0)
   return (
     <div>
       {/* Show saved score from when quiz was taken */}
@@ -4997,8 +5000,13 @@ function ReplayQuiz({ session }) {
         <div style={{ background:'linear-gradient(135deg,#F59E0B,#F97316)', borderRadius:16, padding:24, textAlign:'center', marginBottom:20, color:'#fff' }}>
           <div style={{ fontSize:42, marginBottom:6 }}>{score===quiz.length?'🏆':score>=quiz.length*.7?'🎉':'📚'}</div>
           <div style={{ fontFamily:"'Sora',sans-serif", fontWeight:900, fontSize:28 }}>{score}/{quiz.length}</div>
-          <div style={{ opacity:.85, fontSize:14, marginBottom:12 }}>{Math.round((score/quiz.length)*100)}% correct</div>
-          <button onClick={()=>{setAns({});setDone(false)}} style={{ padding:'7px 20px', borderRadius:9, background:'rgba(255,255,255,.2)', border:'none', color:'#fff', fontSize:13, fontWeight:600, cursor:'pointer' }}>↺ Retake</button>
+          <div style={{ opacity:.85, fontSize:14, marginBottom: isNewBest ? 4 : 12 }}>{Math.round((score/quiz.length)*100)}% correct</div>
+          {isNewBest && (
+            <div style={{ background:'rgba(255,255,255,.2)', borderRadius:20, padding:'3px 14px', fontSize:12, fontWeight:700, marginBottom:12, display:'inline-block' }}>
+              🔥 New Best Score! ({savedScore ?? 0} → {currentScore})
+            </div>
+          )}
+          <button onClick={()=>{ setBestScore(s => Math.max(s ?? 0, currentScore)); setAns({}); setDone(false) }} style={{ padding:'7px 20px', borderRadius:9, background:'rgba(255,255,255,.2)', border:'none', color:'#fff', fontSize:13, fontWeight:600, cursor:'pointer' }}>↺ Retake</button>
         </div>
       )}
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(340px,1fr))', gap:12 }}>
