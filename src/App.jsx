@@ -4262,27 +4262,37 @@ function ChapterCourses({ user, prefill, onClearPrefill }) {
   }
 
   function connectSSE(key) {
-    const token = localStorage.getItem('bs_token')
-    const es    = new EventSource(`${API_URL}/api/chapter-courses/stream/${key}?token=${token}`)
-    sseRef.current = es
-    es.onmessage = e => { try { handleSSEMessage(JSON.parse(e.data)) } catch {} }
-    es.onerror   = () => {
-      es.close()
-      api.get(`/api/chapter-courses/list/${key}`).then(cached => {
-        if (cached?.modules) { setModules(cached.modules); setPhase('course') }
-      }).catch(() => {})
-    }
+  const token = localStorage.getItem('bs_token')
+  const es    = new EventSource(`${API_URL}/api/chapter-courses/stream/${key}?token=${token}`)
+  sseRef.current = es
+  es.onmessage = e => { try { handleSSEMessage(JSON.parse(e.data)) } catch {} }
+  es.onerror   = () => {
+    es.close()
+    // Fallback: poll the list endpoint until modules appear
+    let attempts = 0
+    const poll = setInterval(async () => {
+      attempts++
+      const cached = await api.get(`/api/chapter-courses/list/${key}`).catch(() => null)
+      if (cached?.modules?.length) {
+        clearInterval(poll)
+        setModules(cached.modules)
+        setPhase('course')
+      }
+      if (attempts > 24) clearInterval(poll) // stop after 2 minutes
+    }, 5000)
   }
+}
 
   function handleSSEMessage(msg) {
     switch (msg.type) {
       case 'status':           setStatusMsg(msg.message); break
       case 'modules_listed':
-          setModules(msg.modules || []);
-          setProgress({ done: 0, total: msg.modules?.length || 0 });
-          setStatusMsg('Searching YouTube & generating content…');
-          setPhase('course'); // ← switch to course view immediately
-          break
+        setModules(msg.modules || []);
+        setProgress({ done: 0, total: msg.modules?.length || 0 });
+        setStatusMsg('Searching YouTube & generating content…');
+        setPhase('course');
+        break
+
       case 'module_building':  setModules(p => p.map(m => m.id === msg.moduleId ? { ...m, status: 'building' } : m)); setStatusMsg(`Building: "${msg.title}"…`); break
       case 'module_done':
   setModules(p => {
@@ -4303,7 +4313,12 @@ function ChapterCourses({ user, prefill, onClearPrefill }) {
   break
       case 'module_error':     setModules(p => p.map(m => m.id === msg.moduleId ? { ...m, status: 'error' } : m)); break
       case 'generation_complete': if (msg.modules) setModules(msg.modules); setPhase('course'); sseRef.current?.close(); break
-      case 'already_done':     if (msg.data?.modules) setModules(msg.data.modules); setPhase('course'); sseRef.current?.close(); break
+      case 'already_done':
+          if (msg.data?.modules) setModules(msg.data.modules);
+          else if (msg.data) setModules(msg.data?.modules || []);
+          setPhase('course');
+          sseRef.current?.close();
+          break
       case 'error':            setErr(msg.message || 'Generation failed'); setPhase('select'); sseRef.current?.close(); break
     }
   }
