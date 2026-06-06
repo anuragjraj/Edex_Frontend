@@ -4330,7 +4330,45 @@ function ChapterCourses({ user, prefill, onClearPrefill }) {
                 </div>
                 <StatusDot status={mod.status} />
               </div>
-              {mod.status === 'building' && <div style={{ fontSize: 11, color: '#F59E0B', display: 'flex', alignItems: 'center', gap: 4 }}><Spinner size={10} /> Searching…</div>}
+              {mod.status === 'building' && (
+  <div style={{ fontSize: 11, color: '#F59E0B', display: 'flex', alignItems: 'center', gap: 4 }}>
+    <Spinner size={10} /> Searching…
+  </div>
+)}
+{mod.status === 'error' && (
+  <button
+    onClick={async e => {
+      e.stopPropagation();
+      setModules(p => p.map(m => m.id === mod.id ? { ...m, status: 'building' } : m));
+      await api.post('/api/chapter-courses/module/retry', {
+        subject: subj, cls, chapter,
+        moduleId: mod.id,
+        moduleTitle: mod.title,
+        searchQuery: mod.searchQuery,
+      });
+      let attempts = 0;
+      const poll = setInterval(async () => {
+        attempts++;
+        const modKey = buildModKey(subj, cls, chapter, mod.id);
+        const data = await api.get(`/api/chapter-courses/module/${modKey}`).catch(() => null);
+        if (data?.notes || attempts > 12) {
+          clearInterval(poll);
+          const updated = await api.get(`/api/chapter-courses/list/${courseKey}`);
+          if (updated?.modules) setModules(updated.modules);
+        }
+      }, 5000);
+    }}
+    style={{
+      padding: '3px 8px', borderRadius: 6,
+      border: '1px solid rgba(239,68,68,.4)',
+      background: 'rgba(239,68,68,.1)', color: '#fca5a5',
+      fontSize: 11, cursor: 'pointer',
+      fontFamily: "'Nunito', sans-serif", fontWeight: 700, marginTop: 4,
+    }}
+  >
+    🔄 Retry
+  </button>
+)}
               {mod.status === 'done' && mod.videoId && <div style={{ fontSize: 10.5, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>▶ {mod.videoTitle?.slice(0, 35) || 'Video found'}</div>}
             </div>
           ))}
