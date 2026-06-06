@@ -5335,7 +5335,7 @@ export default function App() {
 
   const tabs = [
     { id: 'dashboard',   icon: '🏠', label: 'Dashboard',      color: '#6366F1' },
-    // { id: 'courses',     icon: '📚', label: 'Chapter Courses', color: '#8B5CF6' },
+    { id: 'courses',     icon: '📚', label: 'Chapter Courses', color: '#8B5CF6' },
     { id: 'notes',       icon: '📖', label: 'Notes',           color: '#10B981' },
     // { id: 'paper',       icon: '📄', label: 'Question Paper',  color: '#A855F7' },
     { id: 'quiz',        icon: '🎯', label: 'Quiz',            color: '#F59E0B' },
