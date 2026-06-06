@@ -5262,7 +5262,7 @@ export default function App() {
 //   { id: 'flashcards', icon: '🃏', label: 'Flashcards',       color: '#EF4444' },
 //   { id: 'doubt',      icon: '🤔', label: 'Doubt Solver',     color: '#818CF8' },
 //   { id: 'history',    icon: '🕘', label: 'History',          color: '#6366F1' },
-//   { id: 'feed',       icon: '📣', label: 'Study Feed',       color: '#6366F1' },
+  { id: 'feed',       icon: '📣', label: 'Study Feed',       color: '#6366F1' },
 // ]
 
   const renderPage = () => {
