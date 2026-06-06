@@ -4979,15 +4979,7 @@ function ReplayQuiz({ session }) {
   const [bestScore, setBestScore] = useState(savedScore ?? null)
   const [currentScore, setCurrentScore] = useState(0)
 
-  // Compute current score only when done
-  useEffect(() => {
-    if (!done) return
-    const s = quiz.filter((q, i) => ans[i] === (q.answer ?? q.ans)).length
-    setCurrentScore(s)
-    setBestScore(prev => (prev === null ? s : Math.max(prev, s)))
-  }, [done])
-
-  const score = bestScore ?? 0
+  const score = done ? Math.max(currentScore, bestScore ?? 0) : (bestScore ?? 0)
   const isNewBest = done && currentScore > (savedScore ?? 0)
   return (
     <div>
@@ -5038,7 +5030,12 @@ function ReplayQuiz({ session }) {
           )
         })}
       </div>
-      {!done && Object.keys(ans).length===quiz.length && <PrimaryBtn onClick={()=>setDone(true)} color='#F59E0B' style={{ marginTop:16 }}>Submit Quiz →</PrimaryBtn>}
+      {!done && Object.keys(ans).length===quiz.length && <PrimaryBtn onClick={()=>{
+        const s = quiz.filter((q, i) => ans[i] === (q.answer ?? q.ans)).length
+        setCurrentScore(s)
+        setBestScore(prev => (prev === null ? s : Math.max(prev, s)))
+        setDone(true)
+      }} color='#F59E0B' style={{ marginTop:16 }}>Submit Quiz →</PrimaryBtn>}
     </div>
   )
 }
