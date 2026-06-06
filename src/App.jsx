@@ -4271,10 +4271,11 @@ function ChapterCourses({ user, prefill, onClearPrefill }) {
     let attempts = 0
     const poll = setInterval(async () => {
       attempts++
-      const cached = await api.get(`/api/chapter-courses/list/${key}`).catch(() => null)
-      if (cached?.modules?.length) {
+      const cached = await api.get(`/api/chapter-courses/list/${key}?t=${Date.now()}`).catch(() => null)
+      const mods = cached?.modules || cached?.data?.modules
+      if (mods?.length) {
         clearInterval(poll)
-        setModules(cached.modules)
+        setModules(mods)
         setPhase('course')
       }
       if (attempts > 24) clearInterval(poll)
