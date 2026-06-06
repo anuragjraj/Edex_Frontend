@@ -4277,9 +4277,30 @@ function ChapterCourses({ user, prefill, onClearPrefill }) {
   function handleSSEMessage(msg) {
     switch (msg.type) {
       case 'status':           setStatusMsg(msg.message); break
-      case 'modules_listed':   setModules(msg.modules || []); setProgress({ done: 0, total: msg.modules?.length || 0 }); setStatusMsg('Searching YouTube & generating content…'); break
+      case 'modules_listed':
+          setModules(msg.modules || []);
+          setProgress({ done: 0, total: msg.modules?.length || 0 });
+          setStatusMsg('Searching YouTube & generating content…');
+          setPhase('course'); // ← switch to course view immediately
+          break
       case 'module_building':  setModules(p => p.map(m => m.id === msg.moduleId ? { ...m, status: 'building' } : m)); setStatusMsg(`Building: "${msg.title}"…`); break
-      case 'module_done':      setModules(p => p.map(m => m.id === msg.moduleId ? { ...m, status: 'done', videoId: msg.videoId, transcriptStatus: msg.transcriptStatus } : m)); setProgress(p => ({ ...p, done: p.done + 1 })); break
+      case 'module_done':
+  setModules(p => {
+    const updated = p.map(m => m.id === msg.moduleId
+      ? { ...m, status: 'done', videoId: msg.videoId, transcriptStatus: msg.transcriptStatus }
+      : m
+    );
+    // Auto-open first completed module if nothing is open yet
+    if (!activeModuleId) {
+      const firstDone = updated.find(m => m.status === 'done');
+      if (firstDone) {
+        setTimeout(() => openModule(firstDone), 100);
+      }
+    }
+    return updated;
+  });
+  setProgress(p => ({ ...p, done: p.done + 1 }));
+  break
       case 'module_error':     setModules(p => p.map(m => m.id === msg.moduleId ? { ...m, status: 'error' } : m)); break
       case 'generation_complete': if (msg.modules) setModules(msg.modules); setPhase('course'); sseRef.current?.close(); break
       case 'already_done':     if (msg.data?.modules) setModules(msg.data.modules); setPhase('course'); sseRef.current?.close(); break
@@ -4397,9 +4418,19 @@ function ChapterCourses({ user, prefill, onClearPrefill }) {
               <div style={{ background: 'linear-gradient(90deg,var(--accent),#8B5CF6)', width: `${pct}%`, height: '100%', borderRadius: 999, transition: 'width .5s ease' }} />
             </div>
             <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5 }}>
-              <span style={{ fontSize: 10, color: 'var(--text)' }}>{pct}% complete</span>
-              <span style={{ fontSize: 10, color: 'var(--text)' }}>{compCount}/{doneCount} done</span>
-            </div>
+  <span style={{ fontSize: 10, color: 'var(--text)' }}>{pct}% complete</span>
+  <span style={{ fontSize: 10, color: 'var(--text)' }}>{compCount}/{doneCount} done</span>
+</div>
+{modules.some(m => m.status === 'building' || m.status === 'pending') && (
+  <div style={{ 
+    fontSize: 11, color: '#F59E0B', display: 'flex', 
+    alignItems: 'center', gap: 5, marginTop: 6,
+    padding: '5px 8px', background: 'rgba(245,158,11,.08)',
+    borderRadius: 6, border: '1px solid rgba(245,158,11,.15)'
+  }}>
+    <Spinner size={9}/> Preparing remaining modules…
+  </div>
+)}
           </div>
           <div style={{ flex: 1, overflowY: 'auto', padding: '8px' }}>
             {modules.map((mod, idx) => {
@@ -4409,7 +4440,7 @@ function ChapterCourses({ user, prefill, onClearPrefill }) {
               const isActive = activeModuleId === mod.id
               return (
                 <div key={mod.id} onClick={() => done && openModule(mod)}
-                  style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 10px', borderRadius: 10, cursor: done ? 'pointer' : 'default', border: `1px solid ${isActive ? 'var(--accent-border)' : 'transparent'}`, background: isActive ? 'var(--accent-bg)' : 'transparent', opacity: !done && !building ? .5 : 1, marginBottom: 2, transition: 'all .15s' }}
+                    style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 10px', borderRadius: 10, cursor: done ? 'pointer' : 'default', border: `1px solid ${isActive ? 'var(--accent-border)' : 'transparent'}`, background: isActive ? 'var(--accent-bg)' : 'transparent', opacity: !done && !building ? .5 : 1, marginBottom: 2, transition: 'all .15s' }}
                   onMouseEnter={e => { if (done && !isActive) e.currentTarget.style.background = 'rgba(255,255,255,.04)' }}
                   onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}>
                   <div style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, marginTop: 1, background: comp ? 'rgba(34,197,94,.2)' : isActive ? 'rgba(99,102,241,.2)' : building ? 'rgba(245,158,11,.15)' : 'rgba(255,255,255,.06)', color: comp ? '#34d399' : isActive ? 'var(--accent)' : building ? '#fbbf24' : '#374151' }}>
