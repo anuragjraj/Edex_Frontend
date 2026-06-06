@@ -341,14 +341,13 @@ async function downloadNotesAsPDF(content, title) {
     doc.setFontSize(size)
     doc.setFont('helvetica', bold && italic ? 'bolditalic' : bold ? 'bold' : italic ? 'italic' : 'normal')
     doc.setTextColor(...color)
-
-    const lines = doc.splitTextToSize(text, MAX_W - indent)
-    for (const line of lines) {
-      newPageIfNeeded(size * 0.4 + 2)
-      doc.text(line, MARGIN + indent, y)
-      y += size * 0.38 + 1.5
-    }
-    y += gap
+  const wrapped = doc.splitTextToSize(text, MAX_W - indent)
+      for (const wline of wrapped) {
+        newPageIfNeeded(size * 0.4 + 2)
+        doc.text(wline, MARGIN + indent, y)
+        y += size * 0.38 + 1.5
+      }
+      y += gap
   }
 
   function drawHRule(color = [226, 232, 240], thickness = 0.3) {
@@ -398,7 +397,7 @@ async function downloadNotesAsPDF(content, title) {
   doc.rect(MARGIN, y, MAX_W, 0.8, 'F')
   y += 5
 
-  writeLine(mainTitle, { size: 22, bold: true, color: [26, 26, 46], gap: 3 })
+  writeLine(mainTitle.replace(/[^\x00-\x7F]/g, ''), { size: 22, bold: true, color: [26, 26, 46], gap: 3 })
   if (subTitle) writeLine(`${subTitle} · CBSE 2024-25`, { size: 10, color: [100, 116, 139], gap: 8 })
 
   drawHRule([55, 48, 163], 0.8)
@@ -408,7 +407,8 @@ async function downloadNotesAsPDF(content, title) {
   const lines = (content || '').split('\n')
 
   for (const raw of lines) {
-    const line = raw.trimEnd()
+    // Strip emojis and non-latin characters that jsPDF can't render
+    const line = raw.trimEnd().replace(/[\u{1F300}-\u{1FFFF}]/gu, '').replace(/[\u2600-\u27FF]/g, '')
 
     if (line === '' || line === '---' || line.startsWith('═══')) {
       if (line.startsWith('---') || line.startsWith('═══')) {
@@ -469,7 +469,7 @@ async function downloadNotesAsPDF(content, title) {
     }
 
     // Exam tip callout
-    if (line.startsWith('📝')) {
+    if (line.startsWith('📝') || line.includes('Exam tip') || line.includes('exam tip')) {
       newPageIfNeeded(10)
       doc.setFillColor(239, 246, 255)  // #eff6ff
       const tipLines = doc.splitTextToSize(line, MAX_W - 6)
