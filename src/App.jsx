@@ -1866,13 +1866,13 @@ function Dashboard({ user, onNavigate }) {
     {icon:'🎯',label:'Take a Quiz',tab:'quiz',color:'#F59E0B'},
     {icon:'🃏',label:'Flashcards',tab:'flashcards',color:'#EF4444'},
     // HIDDEN FOR NOW — uncomment to re-enable:
-    // { icon: '🕘', label: 'My History', tab: 'history', color: '#6366F1' },
-    // {icon:'📣',label:'Study Feed',tab:'feed',color:'#6366F1'},
-    // {icon:'📚',label:'Chapter Courses',tab:'courses',color:'#8B5CF6'},
-    // {icon:'🤔',label:'Ask a Doubt',tab:'doubt',color:'#818CF8'},
-    // ...(user.type==='school'?[{icon:'📝',label:'Assignments',tab:'assignments',color:'#F59E0B'}]:[]),
-    // ...(user.role==='student'?[{icon:'📋',label:'Exam Cheat Sheet',tab:'cheatsheet',color:'#F97316'}]:[{icon:'🎓',label:'Lesson Planner',tab:'lessonplan',color:'#7C3AED'}]),
-    // {icon:'🔍',label:'Find People',tab:'search',color:'#06b6d4'},
+    { icon: '🕘', label: 'My History', tab: 'history', color: '#6366F1' },
+    {icon:'📣',label:'Study Feed',tab:'feed',color:'#6366F1'},
+    {icon:'📚',label:'Chapter Courses',tab:'courses',color:'#8B5CF6'},
+    {icon:'🤔',label:'Ask a Doubt',tab:'doubt',color:'#818CF8'},
+    ...(user.type==='school'?[{icon:'📝',label:'Assignments',tab:'assignments',color:'#F59E0B'}]:[]),
+    ...(user.role==='student'?[{icon:'📋',label:'Exam Cheat Sheet',tab:'cheatsheet',color:'#F97316'}]:[{icon:'🎓',label:'Lesson Planner',tab:'lessonplan',color:'#7C3AED'}]),
+    {icon:'🔍',label:'Find People',tab:'search',color:'#06b6d4'},
   ]
   return (
     <div style={{ padding:24, width:'100%', boxSizing:'border-box', fontFamily:"'Nunito',sans-serif", animation:'slideUp .25s ease-out' }}>
@@ -5340,18 +5340,18 @@ export default function App() {
     // { id: 'paper',       icon: '📄', label: 'Question Paper',  color: '#A855F7' },
     { id: 'quiz',        icon: '🎯', label: 'Quiz',            color: '#F59E0B' },
     { id: 'flashcards',  icon: '🃏', label: 'Flashcards',      color: '#EF4444' },
-    // { id: 'doubt',       icon: '🤔', label: 'Doubt Solver',    color: '#818CF8' },
-    // { id: 'search',      icon: '🔍', label: 'Search',          color: '#06b6d4' },
-    // { id: 'messages',    icon: '💬', label: 'Messages',        color: '#10B981' },
-    // { id: 'video',       icon: '🎬', label: 'Video Learning',  color: '#06b6d4' },
-    // ...(isStudent ? [{ id: 'cheatsheet', icon: '📋', label: 'Cheat Sheet',   color: '#F97316' }] : []),
-    // ...(isTeacher ? [{ id: 'lessonplan', icon: '🎓', label: 'Lesson Planner', color: '#7C3AED' }] : []),
-    // ...(isSchool ? [
-    //   { id: 'assignments', icon: '📝', label: 'Assignments', color: '#F59E0B' },
-    //   { id: 'notices',     icon: '📢', label: 'Notices',     color: '#F97316' },
-    //   { id: 'timetable',   icon: '📅', label: 'Timetable',   color: '#06b6d4' },
-    // ] : []),
-    // ...(isTeacher && isSchool ? [{ id: 'school', icon: '🏫', label: 'Analytics', color: '#A855F7' }] : []),
+    { id: 'doubt',       icon: '🤔', label: 'Doubt Solver',    color: '#818CF8' },
+    { id: 'search',      icon: '🔍', label: 'Search',          color: '#06b6d4' },
+    { id: 'messages',    icon: '💬', label: 'Messages',        color: '#10B981' },
+    { id: 'video',       icon: '🎬', label: 'Video Learning',  color: '#06b6d4' },
+    ...(isStudent ? [{ id: 'cheatsheet', icon: '📋', label: 'Cheat Sheet',   color: '#F97316' }] : []),
+    ...(isTeacher ? [{ id: 'lessonplan', icon: '🎓', label: 'Lesson Planner', color: '#7C3AED' }] : []),
+    ...(isSchool ? [
+      { id: 'assignments', icon: '📝', label: 'Assignments', color: '#F59E0B' },
+      { id: 'notices',     icon: '📢', label: 'Notices',     color: '#F97316' },
+      { id: 'timetable',   icon: '📅', label: 'Timetable',   color: '#06b6d4' },
+    ] : []),
+    ...(isTeacher && isSchool ? [{ id: 'school', icon: '🏫', label: 'Analytics', color: '#A855F7' }] : []),
     { id: 'feed',        icon: '📣', label: 'Study Feed',      color: '#6366F1' },
     { id: 'history',     icon: '🕘', label: 'History',         color: '#6366F1' }
   ]
