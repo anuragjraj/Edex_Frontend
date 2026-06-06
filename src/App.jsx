@@ -341,13 +341,13 @@ async function downloadNotesAsPDF(content, title) {
     doc.setFontSize(size)
     doc.setFont('helvetica', bold && italic ? 'bolditalic' : bold ? 'bold' : italic ? 'italic' : 'normal')
     doc.setTextColor(...color)
-  const wrapped = doc.splitTextToSize(text, MAX_W - indent)
-      for (const wline of wrapped) {
-        newPageIfNeeded(size * 0.4 + 2)
-        doc.text(wline, MARGIN + indent, y)
-        y += size * 0.38 + 1.5
-      }
-      y += gap
+  const wrapped = doc.splitTextToSize(text, MAX_W - indent - 2)
+    for (const wline of wrapped) {
+      newPageIfNeeded(size * 0.45 + 2)
+      doc.text(wline, MARGIN + indent, y)
+      y += size * 0.42 + 1.2
+    }
+    y += gap
   }
 
   function drawHRule(color = [226, 232, 240], thickness = 0.3) {
@@ -408,7 +408,11 @@ async function downloadNotesAsPDF(content, title) {
 
   for (const raw of lines) {
     // Strip emojis and non-latin characters that jsPDF can't render
-    const line = raw.trimEnd().replace(/[\u{1F300}-\u{1FFFF}]/gu, '').replace(/[\u2600-\u27FF]/g, '')
+    const line = raw.trimEnd()
+      .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')
+      .replace(/[\u2600-\u27FF]/g, '')
+      .replace(/[\u{FE00}-\u{FEFF}]/gu, '')
+      .replace(/[^\x09\x0A\x0D\x20-\x7E\xA0-\xFF]/g, '')
 
     if (line === '' || line === '---' || line.startsWith('═══')) {
       if (line.startsWith('---') || line.startsWith('═══')) {
@@ -487,7 +491,7 @@ async function downloadNotesAsPDF(content, title) {
     }
 
     // Regular paragraph (with inline bold support)
-    writeBoldLine(line, { size: 11, color: [55, 65, 81], gap: 4 })
+    if (line.trim()) writeBoldLine(line, { size: 11, color: [55, 65, 81], gap: 4 })
   }
 
   // ── Footer on each page ─────────────────────────────────────
