@@ -5546,7 +5546,7 @@ export default function App() {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column', fontFamily: "'Nunito', sans-serif" }}>
+    <div style={{ height: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column', fontFamily: "'Nunito', sans-serif", overflow: 'hidden' }}>
 
       {/* ── Top header ───────────────────────────────────────── */}
       <header style={{ borderBottom: '1px solid var(--border)', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 58, position: 'sticky', top: 0, zIndex: 100, background: 'rgba(5,5,14,.95)', backdropFilter: 'blur(20px)', boxShadow: '0 2px 20px rgba(0,0,0,.3)' }}>
@@ -5605,7 +5605,7 @@ export default function App() {
         </nav>
 
         {/* ── Main content ─────────────────────────────────────── */}
-        <main style={{ flex: 1, overflowY: 'auto', minWidth: 0 }}>
+        <main style={{ flex: 1, overflowY: 'hidden', minWidth: 0, height: 'calc(100vh - 58px)', overflow: 'hidden' }}>
           <div style={{ padding: '16px 24px 0', paddingBottom: 0 }}>
             {/* FREE TRIAL COUNTDOWN HIDDEN FOR NOW — uncomment to re-enable:
             <FreeTierCountdown
