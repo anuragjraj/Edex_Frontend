@@ -4241,31 +4241,36 @@ function ChapterCourses({ user, prefill, onClearPrefill }) {
 
   // ── Generate ──────────────────────────────────────────────
   async function generateCourse() {
-    if (!chapter) return
-    setErr(''); setPhase('generating'); setModules([]); setProgress({ done: 0, total: 0 })
-    setStatusMsg(`Designing modules for "${chapter}"…`)
-    try {
-      const { courseKey: key, existing } = await api.post('/api/chapter-courses/generate', {
-        subject: subj, cls, chapter,
-      })
-      setCourseKey(key)
-      if (existing) {
+  if (!chapter) return
+  setErr(''); setPhase('generating'); setModules([]); setProgress({ done: 0, total: 0 })
+  setStatusMsg(`Designing modules for "${chapter}"…`)
+  try {
+    const { courseKey: key, existing, resuming } = await api.post('/api/chapter-courses/generate', {
+      subject: subj, cls, chapter,
+    })
+    setCourseKey(key)
+
+    if (existing) {
+      // ✅ FIX 1: always load and display cached modules first, BEFORE connecting SSE
       const cached = await api.get(`/api/chapter-courses/list/${key}?t=${Date.now()}`)
       if (cached?.modules) {
         setModules(cached.modules)
-        setProgress({ done: cached.modules.filter(m => m.status === 'done').length, total: cached.modules.length })
-        setPhase('course')
-        // If course is incomplete, connect SSE to receive remaining modules
         const doneCount = cached.modules.filter(m => m.status === 'done').length
-        if (doneCount < cached.modules.length) {
+        setProgress({ done: doneCount, total: cached.modules.length })
+        setPhase('course')  // ✅ show course UI immediately, not blank generating screen
+
+        // If backend is still building remaining modules, listen for updates
+        if (resuming) {
           connectSSE(key)
+        }
+        return
+      }
     }
-    return
-  }
+
+    // Fresh generation — connect SSE and wait for modules_listed event
+    connectSSE(key)
+  } catch (e) { setErr(e.message); setPhase('select') }
 }
-connectSSE(key)
-    } catch (e) { setErr(e.message); setPhase('select') }
-  }
 
   function connectSSE(key) {
   const token = localStorage.getItem('bs_token')
@@ -4295,7 +4300,12 @@ connectSSE(key)
       setStatusMsg(msg.message)
       break
     case 'modules_listed':
-      setModules(msg.modules || [])
+      // Only reset module list if we're in generating phase (fresh build)
+      // If already in course phase (resume), merge instead of replace
+      setModules(prev => {
+        if (prev.length > 0) return prev  // ✅ already have modules, don't wipe them
+        return msg.modules || []
+      })
       setProgress({ done: 0, total: msg.modules?.length || 0 })
       setStatusMsg('Searching YouTube & generating content…')
       setPhase('course')
