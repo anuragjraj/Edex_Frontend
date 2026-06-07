@@ -1979,11 +1979,12 @@ function SocialFeed({ user }) {
       maxWidth: 680,
       margin: '0 auto',
       height: '100%',
+      minHeight: 0,          // ← this is the critical addition
       display: 'flex',
       flexDirection: 'column',
       fontFamily: "'Nunito', sans-serif",
       boxSizing: 'border-box',
-      overflow: 'hidden',        /* outer container never scrolls */
+      overflow: 'hidden',       /* outer container never scrolls */
     }}>
  
       {/* ── Fixed top area: header + composer ── */}
@@ -5605,8 +5606,8 @@ export default function App() {
         </nav>
 
         {/* ── Main content ─────────────────────────────────────── */}
-        <main style={{ flex: 1, overflowY: 'hidden', minWidth: 0, height: 'calc(100vh - 58px)', overflow: 'hidden' }}>
-          <div style={{ padding: '16px 24px 0', paddingBottom: 0 }}>
+        <main style={{ flex: 1, minWidth: 0, height: 'calc(100vh - 58px)', overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ flexShrink: 0, padding: '16px 24px 0', paddingBottom: 0 }}>
             {/* FREE TRIAL COUNTDOWN HIDDEN FOR NOW — uncomment to re-enable:
             <FreeTierCountdown
               user={user}
@@ -5615,8 +5616,10 @@ export default function App() {
             />
             */}
           </div>
-          {renderPage()}
-        </main>
+  <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+    {renderPage()}
+  </div>
+</main>
 
       </div>
 
