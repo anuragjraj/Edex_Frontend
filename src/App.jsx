@@ -1978,7 +1978,7 @@ function SocialFeed({ user }) {
       width: '100%',
       maxWidth: 680,
       margin: '0 auto',
-      height: 'calc(100vh - 58px)',
+      height: '100%',
       display: 'flex',
       flexDirection: 'column',
       fontFamily: "'Nunito', sans-serif",
@@ -1987,7 +1987,7 @@ function SocialFeed({ user }) {
     }}>
  
       {/* ── Fixed top area: header + composer ── */}
-      <div style={{ flexShrink: 0, padding: '24px 24px 0' }}>
+      <div style={{ flexShrink: 0, padding: '0 24px 0' }}>
         <PageHeader icon="📣" title="Study Feed" subtitle="Share achievements, ask questions, post study stories" color="#6366F1"/>
  
         {!composing ? (
