@@ -375,18 +375,39 @@ async function downloadNotesAsPDF(content, title) {
       return
     }
 
-    // Mixed bold — measure and write segment by segment on same line
+    // Mixed bold — break into words and lay out left-to-right WITH wrapping
     const { size = 11, color = [55, 65, 81], indent = 0, gap = 4 } = baseOpts
     doc.setFontSize(size)
-    newPageIfNeeded(size * 0.4 + 2)
-    let cx = MARGIN + indent
+    const maxW = MAX_W - indent
+    const spaceW = doc.getTextWidth(' ')
+
+    const words = []
     for (const part of parts) {
-      doc.setFont('helvetica', part.bold ? 'bold' : 'normal')
-      doc.setTextColor(...(part.bold ? [26, 26, 46] : color))
-      doc.text(part.t, cx, y)
-      cx += doc.getTextWidth(part.t)
+      const segs = part.t.split(/(\s+)/)
+      for (const s of segs) {
+        if (s === '') continue
+        if (/^\s+$/.test(s)) words.push({ space: true })
+        else words.push({ t: s, bold: part.bold })
+      }
     }
-    y += size * 0.38 + 1.5 + gap
+
+    let cx = MARGIN + indent
+    newPageIfNeeded(size * 0.45 + 2)
+
+    for (const w of words) {
+      if (w.space) { cx += spaceW; continue }
+      doc.setFont('helvetica', w.bold ? 'bold' : 'normal')
+      const wWidth = doc.getTextWidth(w.t)
+      if (cx + wWidth > MARGIN + indent + maxW) {
+        y += size * 0.42 + 1.2
+        newPageIfNeeded(size * 0.45 + 2)
+        cx = MARGIN + indent
+      }
+      doc.setTextColor(...(w.bold ? [26, 26, 46] : color))
+      doc.text(w.t, cx, y)
+      cx += wWidth
+    }
+    y += size * 0.42 + 1.2 + gap
   }
 
   // ── Document header ─────────────────────────────────────────
@@ -3369,7 +3390,7 @@ FINAL REMINDER: You must write AT LEAST 3500 words. Every section above must be 
     try{
       // ── Check DB cache first — if someone already generated this, reuse it ──
       const list = await api.get('/api/user/notes').catch(()=>[])
-      const cached = list.find(n => n.subject===subject && n.chapter===finalChapter && n.style===style_)
+      const cached = list.find(n => n.subject===subject && n.chapter===finalChapter)
       if (cached) {
         const full = await api.get(`/api/user/notes/${cached.id}`)
         setResult(full.content); setSaved(true); setLoading(false); return
