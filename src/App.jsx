@@ -4289,6 +4289,7 @@ function ChapterCourses({ user, prefill, onClearPrefill }) {
   useEffect(() => {
     if (!prefill?.chapter) return
     if (prefill.subject) setSubj(prefill.subject)
+    if (prefill.cls) setCls(prefill.cls)
     setChapter(prefill.chapter)
     autoGenRef.current = true
     onClearPrefill?.()
@@ -5368,9 +5369,17 @@ function HistoryPage({ onNavigate }) {
     ), [sessions])
 
   const openItem = useCallback(item => {
+    if (item.tool === 'courses') {
+      onNavigate?.('courses', {
+        subject: item.subject || '',
+        chapter: item.chapter || (item.chapters || [])[0] || '',
+        cls: item.metadata?.cls,
+      })
+      return
+    }
     const sess = findSessionForActivity(item)
-    setSelected({ item, session:sess })
-  }, [])
+    setSelected({ item, session: sess })
+  }, [onNavigate])
 
   const tools = ['all', ...Object.keys(TOOL_META_H)]
 
@@ -5599,7 +5608,7 @@ export default function App() {
     if (tab === 'feed')       return <SocialFeed user={user} />
     if (tab === 'search')     return <SearchPage currentUser={user} onViewProfile={id => { setViewProfileId(id); setTab('profile') }} />
     if (tab === 'messages')   return <MessagingPage currentUser={user} startWithUserId={msgUserId} />
-    if (tab === 'history')    return <HistoryPage  />
+    if (tab === 'history')    return <HistoryPage onNavigate={(t, pf) => { if (pf) setPrefill(pf); setTab(t) }} />
     if (tab === 'doubt')      return <DoubtSolver    user={user} prefill={prefill} onClearPrefill={clearPrefill} />
     if (tab === 'notes')      return <NotesMaker      user={user} prefill={prefill} onClearPrefill={clearPrefill} />
     if (tab === 'courses')    return <ChapterCourses  user={user} prefill={prefill} onClearPrefill={clearPrefill} />
