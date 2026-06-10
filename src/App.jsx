@@ -4279,10 +4279,7 @@ function ChapterCourses({ user, prefill, onClearPrefill }) {
   const [progress, setProgress] = useState({ done: 0, total: 0 })
   const [statusMsg, setStatusMsg] = useState('')
   const [err, setErr] = useState('')
-  const [completedIds, setCompletedIds] = useState(() => {
-    try { return new Set(JSON.parse(localStorage.getItem('bs_completed_modules') || '[]')) }
-    catch { return new Set() }
-  })
+  const [completedIds, setCompletedIds] = useState(new Set())
 
   const chs       = getChapters(subj, cls)
   const sseRef    = useRef(null)
@@ -4305,18 +4302,26 @@ function ChapterCourses({ user, prefill, onClearPrefill }) {
 
   useEffect(() => () => sseRef.current?.close(), [])
 
+  useEffect(() => {
+    if (!courseKey) return
+    api.get(`/api/chapter-courses/progress/${courseKey}`)
+      .then(ids => setCompletedIds(new Set(ids)))
+      .catch(() => setCompletedIds(new Set()))
+  }, [courseKey])
+
   // ── When subject/class changes, reset chapter selection ──
   const handleSubjChange = v => { setSubj(v); setChapter('') }
   const handleClsChange  = v => { setCls(v);  setChapter('') }
 
   function markComplete(id) {
-    setCompletedIds(prev => {
-      const next = new Set([...prev, `${courseKey}-${id}`])
-      localStorage.setItem('bs_completed_modules', JSON.stringify([...next]))
-      return next
-    })
+    setCompletedIds(prev => new Set([...prev, id]))
+    api.post('/api/chapter-courses/progress', { courseKey, moduleId: id }).catch(() => {})
   }
-  const isComplete = id => completedIds.has(`${courseKey}-${id}`)
+  function unmarkComplete(id) {
+    setCompletedIds(prev => { const next = new Set(prev); next.delete(id); return next })
+    api.del(`/api/chapter-courses/progress/${courseKey}/${id}`).catch(() => {})
+  }
+  const isComplete = id => completedIds.has(id)
 
   // ── Generate ──────────────────────────────────────────────
   async function generateCourse() {
@@ -4600,6 +4605,7 @@ useEffect(() => {
               courseKey={courseKey}
               isComplete={isComplete(activeModuleId)}
               onComplete={() => markComplete(activeModuleId)}
+              onUncomplete={() => unmarkComplete(activeModuleId)}
               onPrev={() => { const idx = modules.findIndex(m => m.id === activeModuleId); if (idx > 0) openModule(modules[idx - 1]) }}
               onNext={() => { const idx = modules.findIndex(m => m.id === activeModuleId); const next = modules.slice(idx + 1).find(m => m.status === 'done'); if (next) openModule(next) }}
               hasPrev={modules.findIndex(m => m.id === activeModuleId) > 0}
@@ -4700,7 +4706,7 @@ function StatusDot({ status }) {
 // ══════════════════════════════════════════════════════════════
 //  MODULE VIEW — Video player + Notes/Q&A/Quiz tabs
 // ══════════════════════════════════════════════════════════════
-function ModuleView({ mod, moduleData, subject, cls, chapter, courseKey, isComplete, onComplete, onPrev, onNext, hasPrev, hasNext }) {
+function ModuleView({ mod, moduleData, subject, cls, chapter, courseKey, isComplete, onComplete, onUncomplete, onPrev, onNext, hasPrev, hasNext }) {
   const [tab,    setTab]    = useState('video')
   const [qAns,   setQAns]   = useState({})
   const [qDone,  setQDone]  = useState(false)
@@ -4740,7 +4746,15 @@ function ModuleView({ mod, moduleData, subject, cls, chapter, courseKey, isCompl
           <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 15, color: 'var(--text-h)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mod?.title}</div>
           <div style={{ fontSize: 11, color: 'var(--text)', marginTop: 1 }}>{subject} · {cls} · {chapter}</div>
         </div>
-        {isComplete && <span style={{ background: 'var(--accent-bg)', color: 'var(--accent)', borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>✓ Done</span>}
+        {isComplete && (
+          <button
+            onClick={onUncomplete}
+            title="Click to mark as not completed"
+            style={{ background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid var(--accent-border)', borderRadius: 20, padding: '2px 10px', fontSize: 11, fontWeight: 700, flexShrink: 0, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}
+          >
+            ✓ Done · Undo
+          </button>
+        )}
         <div style={{ display: 'flex', gap: 6, flexShrink: 0 }}>
           <GhostBtn small onClick={onPrev} disabled={!hasPrev}>← Prev</GhostBtn>
           <GhostBtn small onClick={onNext} disabled={!hasNext}>Next →</GhostBtn>
