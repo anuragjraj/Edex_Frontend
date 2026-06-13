@@ -3077,10 +3077,16 @@ RULES:
     const withUser = [...messages, userMsg]
     setMessages(withUser); setInput(''); setErr(''); setLoading(true)
     try {
-      const r = await api.post('/api/ai/doubt', { messages: withUser, system: SYSTEM, subject })
+      // Drop the intro greeting (and any leading assistant msgs) so the API's
+      // first message is a user message, and send the running chain for context.
+      const history = withUser.filter((m, i) => !(i === 0 && m.role === 'assistant'))
+      const trimmed = history.slice(-16)
+      const r = await api.post('/api/ai/doubt', { messages: trimmed, system: SYSTEM, subject })
       const finalMessages = [...withUser, { role: 'assistant', content: r.content }]
       setMessages(finalMessages)
-      saveSessionContent({ tool: 'doubt', subject, chapter, classLevel: cls, content: finalMessages })
+      // Save without the greeting so History replay shows only the real Q&A.
+      const saveable = finalMessages.filter((m, i) => !(i === 0 && m.role === 'assistant'))
+      try { saveSessionContent({ tool: 'doubt', subject, chapter, classLevel: cls, content: saveable }) } catch {}
     } catch (e) {
       if (e.status === 402) setErr('Free trial ended. Please subscribe.')
       else setErr(e.message)
