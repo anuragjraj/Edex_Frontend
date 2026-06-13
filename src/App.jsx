@@ -3909,9 +3909,17 @@ function QuizGenerator({ user, prefill, onClearPrefill }) {
 
   async function generate() {
     if (!topic.trim()) return alert('Please select or enter a chapter/topic')
-    const PROMPT = `Generate a high-quality ${num}-question MCQ quiz on "${topic}" in ${subject} ${cls}. Difficulty: ${diff}. CBSE-standard exam-style questions.
-Return ONLY valid JSON (no markdown):
-{"title":"${topic} Quiz","questions":[{"q":"Question text?","options":["Option A","Option B","Option C","Option D"],"answer":0,"explanation":"Why this option is correct"}]}`
+    const PROMPT = `You are a CBSE examiner creating a ${num}-question multiple-choice quiz on "${topic}" in ${subject} for ${cls}. Difficulty: ${diff}.
+
+RULES — follow every one:
+1. For any question involving calculation, work the full solution out silently BEFORE writing the options. The "answer" index MUST point to the option that your worked solution actually produces. Never mark an option correct unless your own calculation gives that exact value.
+2. Make sure exactly ONE option is correct and it is present in the options list. The other three must be plausible but wrong.
+3. "explanation" must be the FINAL clean reasoning only — 1 to 3 sentences. Do NOT show trial-and-error, do NOT write "wait", "let me recalculate", "rechecking", or revise yourself mid-explanation. State the method and the result directly.
+4. "answer" is the 0-based index (0,1,2,3) of the correct option.
+5. Output VALID JSON ONLY — no markdown, no text before or after.
+
+Format:
+{"title":"${topic} Quiz","questions":[{"q":"Question text?","options":["A","B","C","D"],"answer":0,"explanation":"Concise correct reasoning."}]}`
     setErr(''); setLoading(true); setQuiz(null); 
     try {
       const r = await api.post('/api/ai/quiz', { messages: [{ role: 'user', content: PROMPT }], subject, chapter: topic })
