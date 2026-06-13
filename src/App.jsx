@@ -3413,7 +3413,7 @@ FINAL REMINDER: You must write AT LEAST 3500 words. Every section above must be 
     loadSavedContent('notes', prefill.subject, prefill.chapter, []).then(content => {
       if (content) { setResult(content); setSaved(true) }
     })
-  }, [])
+  }, [prefill])
 
   async function generate() {
     if(!finalChapter) return; setErr(''); setLoading(true); setSaved(false)
@@ -3978,7 +3978,7 @@ function QuizGenerator({ user, prefill, onClearPrefill }) {
     if (prefill.subject) setSubject(prefill.subject)
     if (prefill.chapter) setChapter(prefill.chapter)
     onClearPrefill?.()
-  }, [])
+  }, [prefill])
 
   async function generate() {
     if (!topic.trim()) return alert('Please select or enter a chapter/topic')
@@ -4172,7 +4172,7 @@ function FlashCards({ user, prefill, onClearPrefill }) {
     if (prefill.subject) setSubject(prefill.subject)
     if (prefill.chapter) setChapter(prefill.chapter)
     onClearPrefill?.()
-  }, [])
+  }, [prefill])
 
   async function generate() {
     if (!topic.trim()) return alert('Please select or enter a chapter/topic')
@@ -4347,7 +4347,7 @@ function ChapterCourses({ user, prefill, onClearPrefill }) {
     setChapter(prefill.chapter)
     autoGenRef.current = true
     onClearPrefill?.()
-  }, [])
+  }, [prefill])
 
   useEffect(() => {
     if (!autoGenRef.current || !chapter) return
@@ -5663,15 +5663,10 @@ export default function App() {
     if (tab === 'search')     return <SearchPage currentUser={user} onViewProfile={id => { setViewProfileId(id); setTab('profile') }} />
     if (tab === 'messages')   return <MessagingPage currentUser={user} startWithUserId={msgUserId} />
     if (tab === 'history')    return <HistoryPage onNavigate={(t, pf) => { if (pf) setPrefill(pf); setTab(t) }} />
-    if (tab === 'doubt')      return <DoubtSolver    user={user} prefill={prefill} onClearPrefill={clearPrefill} />
-    if (tab === 'notes')      return <NotesMaker      user={user} prefill={prefill} onClearPrefill={clearPrefill} />
-    if (tab === 'courses')    return <ChapterCourses  user={user} prefill={prefill} onClearPrefill={clearPrefill} />
     if (tab === 'video')      return <VideoLearn user={user} />
     if (tab === 'cheatsheet') return <CheatSheetMaker user={user} prefill={prefill} onClearPrefill={clearPrefill} />
     if (tab === 'paper')      return <QPMaker         user={user} prefill={prefill} onClearPrefill={clearPrefill} />
     if (tab === 'lessonplan') return <LessonPlanner   user={user} prefill={prefill} onClearPrefill={clearPrefill} />
-    if (tab === 'quiz')       return <QuizGenerator   user={user} prefill={prefill} onClearPrefill={clearPrefill} />
-    if (tab === 'flashcards') return <FlashCards      user={user} prefill={prefill} onClearPrefill={clearPrefill} />
     if (tab === 'assignments') return <AssignmentsPage user={user} />
     if (tab === 'notices')    return <NoticesPage user={user} />
     if (tab === 'timetable')  return <TimetablePage user={user} />
@@ -5749,7 +5744,17 @@ export default function App() {
             />
             */}
           </div>
-          {renderPage()}
+
+          {/* Tool tabs stay mounted — generation keeps running and progress
+              is preserved when you switch tabs (only reset via their own New button) */}
+          <div style={{ display: tab === 'doubt'      ? 'block' : 'none', height: '100%' }}><DoubtSolver    user={user} prefill={tab === 'doubt'      ? prefill : null} onClearPrefill={clearPrefill} /></div>
+          <div style={{ display: tab === 'notes'      ? 'block' : 'none', height: '100%' }}><NotesMaker     user={user} prefill={tab === 'notes'      ? prefill : null} onClearPrefill={clearPrefill} /></div>
+          <div style={{ display: tab === 'quiz'       ? 'block' : 'none', height: '100%' }}><QuizGenerator  user={user} prefill={tab === 'quiz'       ? prefill : null} onClearPrefill={clearPrefill} /></div>
+          <div style={{ display: tab === 'flashcards' ? 'block' : 'none', height: '100%' }}><FlashCards     user={user} prefill={tab === 'flashcards' ? prefill : null} onClearPrefill={clearPrefill} /></div>
+          <div style={{ display: tab === 'courses'    ? 'block' : 'none', height: '100%' }}><ChapterCourses user={user} prefill={tab === 'courses'    ? prefill : null} onClearPrefill={clearPrefill} /></div>
+
+          {/* Everything else renders only when its tab is active */}
+          {!['doubt','notes','quiz','flashcards','courses'].includes(tab) && renderPage()}
         </main>
 
       </div>
