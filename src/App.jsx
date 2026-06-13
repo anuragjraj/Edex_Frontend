@@ -3058,16 +3058,29 @@ function DoubtSolver({ user, prefill, onClearPrefill }) {
   }, [])
 
   const chapterContext = chapter ? ` specifically the chapter "${chapter}"` : ''
-  const SYSTEM = `You are an expert CBSE teacher specializing in ${subject}${chapterContext} for ${cls}. Help students understand concepts clearly with step-by-step explanations. Use simple language and relatable examples. Use **bold** for key terms. Be encouraging and thorough. If the question is about a different chapter, still answer helpfully but note the actual chapter it belongs to.`
+  const SYSTEM = `You are an expert CBSE/NCERT teacher for ${subject}${chapterContext} (${cls}). Answer strictly within the NCERT syllabus and the way CBSE expects answers in board exams.
+
+RULES:
+- Be precise and to the point. No greetings, no filler, no "great question". Get straight to the explanation.
+- Use NCERT terminology, definitions, and notation exactly as in the textbook. If the textbook gives a standard definition, state it the standard way first, then explain in simple words.
+- For numerical/derivation questions: show clean step-by-step working — Given → Formula → Substitution → Result with correct units. Do NOT show self-correction or rambling; write only the final clean steps.
+- For theory questions: answer in the mark-appropriate length a CBSE examiner expects (1-mark = one line, 3-mark = 3-4 key points, 5-mark = full structured answer).
+- Bold only the key term on first use. Use short headings or numbered points where it aids clarity.
+- Where relevant, add one line "📝 Exam tip:" pointing out what CBSE commonly asks or where students lose marks.
+- Stay on the ${cls} level — do not bring in concepts beyond this class's NCERT scope.
+- If the question belongs to a different chapter, answer it correctly but note the actual chapter in one short line.
+- If a question is outside the syllabus or unclear, say so briefly and ask one focused clarifying question.`
 
   async function send() {
     if (!input.trim()) return
     const userMsg = { role: 'user', content: input.trim() }
-    setMessages(m => [...m, userMsg]); setInput(''); setErr(''); setLoading(true)
+    const withUser = [...messages, userMsg]
+    setMessages(withUser); setInput(''); setErr(''); setLoading(true)
     try {
-      const r = await api.post('/api/ai/doubt', { messages: [...messages, userMsg], system: SYSTEM, subject })
-      setMessages(m => [...m, { role: 'assistant', content: r.content }])
-      saveSessionContent({ tool:'doubt', subject, chapter, classLevel:cls, content:newMessages })
+      const r = await api.post('/api/ai/doubt', { messages: withUser, system: SYSTEM, subject })
+      const finalMessages = [...withUser, { role: 'assistant', content: r.content }]
+      setMessages(finalMessages)
+      saveSessionContent({ tool: 'doubt', subject, chapter, classLevel: cls, content: finalMessages })
     } catch (e) {
       if (e.status === 402) setErr('Free trial ended. Please subscribe.')
       else setErr(e.message)
