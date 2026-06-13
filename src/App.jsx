@@ -3036,6 +3036,53 @@ async function loadSavedContent(tool, subject, chapter, chapters) {
 // ══════════════════════════════════════════════════════════════
 //  DOUBT SOLVER
 // ══════════════════════════════════════════════════════════════
+
+function formatDoubtMessage(md = '') {
+  const esc = s => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+  const inline = s => esc(s).replace(/\*\*(.*?)\*\*/g, '<strong style="color:#c7d2fe;font-weight:800">$1</strong>')
+
+  const lines = md.split('\n')
+  let html = '', i = 0
+  while (i < lines.length) {
+    const line = lines[i].trim()
+
+    // Markdown table → render each row as "Term: value"
+    if (line.startsWith('|') && lines[i + 1] && /^\|[\s|:-]+\|?$/.test(lines[i + 1].trim())) {
+      i += 2
+      while (i < lines.length && lines[i].trim().startsWith('|')) {
+        const cells = lines[i].split('|').map(c => c.trim()).filter(Boolean)
+        const term = cells[0] || '', def = cells.slice(1).join(' — ')
+        html += `<div style="margin:4px 0;padding:7px 11px;background:rgba(99,102,241,.07);border-radius:8px;border:1px solid rgba(99,102,241,.15)"><strong style="color:#a5b4fc">${esc(term)}:</strong> ${esc(def)}</div>`
+        i++
+      }
+      continue
+    }
+    if (/^#{1,4}\s/.test(line)) {
+      html += `<div style="font-weight:800;color:#c7d2fe;font-size:14.5px;margin:14px 0 6px;font-family:'Sora',sans-serif">${inline(line.replace(/^#{1,4}\s/, ''))}</div>`
+      i++; continue
+    }
+    if (/^(---|═══)/.test(line)) { html += `<hr style="border:none;border-top:1px solid var(--border);margin:12px 0"/>`; i++; continue }
+    if (/^[-•]\s/.test(line)) {
+      html += `<div style="display:flex;gap:8px;margin:3px 0"><span style="color:#818cf8;flex-shrink:0">•</span><span>${inline(line.replace(/^[-•]\s/, ''))}</span></div>`
+      i++; continue
+    }
+    if (/^\d+\.\s/.test(line)) {
+      const n = line.match(/^\d+/)[0]
+      html += `<div style="display:flex;gap:8px;margin:3px 0"><span style="color:#818cf8;font-weight:700;flex-shrink:0">${n}.</span><span>${inline(line.replace(/^\d+\.\s/, ''))}</span></div>`
+      i++; continue
+    }
+    if (line.startsWith('📝')) {
+      html += `<div style="margin:8px 0;padding:8px 12px;background:rgba(99,102,241,.1);border:1px solid rgba(99,102,241,.25);border-radius:8px;color:#c7d2fe;font-size:13px">${inline(line)}</div>`
+      i++; continue
+    }
+    if (line === '') { html += '<div style="height:6px"></div>'; i++; continue }
+    html += `<div style="margin:3px 0;line-height:1.7">${inline(line)}</div>`
+    i++
+  }
+  return html
+}
+
+
 function DoubtSolver({ user, prefill, onClearPrefill }) {
   const [subject,  setSubject]  = useState('Mathematics')
   const [cls,      setCls]      = useState('Class 10')
@@ -3069,7 +3116,14 @@ RULES:
 - Where relevant, add one line "📝 Exam tip:" pointing out what CBSE commonly asks or where students lose marks.
 - Stay on the ${cls} level — do not bring in concepts beyond this class's NCERT scope.
 - If the question belongs to a different chapter, answer it correctly but note the actual chapter in one short line.
-- If a question is outside the syllabus or unclear, say so briefly and ask one focused clarifying question.`
+- If a question is outside the syllabus or unclear, say so briefly and ask one focused clarifying question.
+
+FORMATTING — the chat renders limited markdown, follow exactly:
+- Use **bold** for every heading and every key term. Do NOT use markdown tables.
+- Write headings as their own bold line, e.g. **Definition of a Circle**.
+- Write term lists one per line as: **Term:** explanation — e.g. **Radius:** the distance from the centre to any point on the circle.
+- Use "- " for bullet points and "1. " for numbered steps.
+- Always put a colon after the label you are explaining. One idea per line, keep it clean and scannable.`
 
   async function send() {
     if (!input.trim()) return
@@ -3127,7 +3181,7 @@ RULES:
           <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', alignItems: 'flex-start', gap: 10 }}>
             {m.role === 'assistant' && <div style={{ width: 32, height: 32, borderRadius: 9, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 16, marginTop: 2 }}>🧠</div>}
             <div style={{ maxWidth: '78%', padding: '11px 15px', borderRadius: m.role === 'user' ? '14px 4px 14px 14px' : '4px 14px 14px 14px', fontSize: 14, lineHeight: 1.75, background: m.role === 'user' ? 'linear-gradient(135deg,#6366F1,#8B5CF6)' : 'var(--code-bg)', color: m.role === 'user' ? '#fff' : 'var(--text-h)', border: m.role === 'assistant' ? '1px solid var(--border)' : 'none' }}
-              dangerouslySetInnerHTML={{ __html: m.role === 'assistant' ? m.content.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>').replace(/\n/g, '<br>') : m.content }} />
+              dangerouslySetInnerHTML={{ __html: m.role === 'assistant' ? formatDoubtMessage(m.content) : m.content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }} />
           </div>
         ))}
         {loading && (
