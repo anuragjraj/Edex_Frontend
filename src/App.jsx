@@ -312,222 +312,183 @@ const api = {
 // ══════════════════════════════════════════════════════════════
 
 async function downloadNotesAsPDF(content, title) {
-  // jsPDF writes text directly to PDF — no canvas, never blank
   await loadScript('https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js')
-
   const { jsPDF } = window.jspdf
   const doc = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' })
 
-  const PAGE_W    = 210
-  const MARGIN    = 18
-  const MAX_W     = PAGE_W - MARGIN * 2   // 174mm usable width
-  const PAGE_H    = 297
-  const BOT_LIMIT = PAGE_H - 20           // bottom margin
+  const PAGE_W = 210, PAGE_H = 297
+  const MARGIN_X = 18, MARGIN_TOP = 20, MARGIN_BOT = 16
+  const MAX_W = PAGE_W - MARGIN_X * 2
+  const BOT_LIMIT = PAGE_H - MARGIN_BOT
+  const PT = 0.3528 // pt -> mm
+  let y = MARGIN_TOP
 
-  let y = MARGIN
+  // Strip emoji + symbols, normalize fancy punctuation to ASCII so nothing is dropped silently
+  const clean = s => (s || '')
+    .replace(/[\u2018\u2019\u201A\u201B]/g, "'")
+    .replace(/[\u201C\u201D\u201E]/g, '"')
+    .replace(/[\u2013\u2014]/g, '-')
+    .replace(/\u2026/g, '...')
+    .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')
+    .replace(/[\u2190-\u21FF\u2300-\u27BF\u2B00-\u2BFF\uFE00-\uFE0F]/g, '')
+    .replace(/[^\x09\x0A\x0D\x20-\x7E\xA0-\xFF]/g, '')
+    .replace(/\s+$/,'')
 
-  // ── helpers ─────────────────────────────────────────────────
-  function newPageIfNeeded(needed = 8) {
-    if (y + needed > BOT_LIMIT) { doc.addPage(); y = MARGIN }
+  const pageBreak = needMm => { if (y + needMm > BOT_LIMIT) { doc.addPage(); y = MARGIN_TOP } }
+
+  const rule = (color, thickness, gap = 3) => {
+    doc.setDrawColor(...color); doc.setLineWidth(thickness)
+    doc.line(MARGIN_X, y, PAGE_W - MARGIN_X, y); y += gap
   }
 
-  function writeLine(text, opts = {}) {
-    const {
-      size = 11, bold = false, italic = false,
-      color = [55, 65, 81],   // #374151
-      indent = 0, gap = 4,
-    } = opts
-
+  // Lay out styled runs [{text, bold}] with strict word-wrap + hard-break of oversized tokens
+  function writeRich(runs, {
+    family = 'helvetica', size = 11, colorN = [55,65,81], colorB = [26,26,46],
+    indent = 0, gapAfter = 3, lineFactor = 1.55,
+  } = {}) {
+    const lineStep = size * PT * lineFactor
+    const usableW = MAX_W - indent
+    const x0 = MARGIN_X + indent
     doc.setFontSize(size)
-    doc.setFont('helvetica', bold && italic ? 'bolditalic' : bold ? 'bold' : italic ? 'italic' : 'normal')
-    doc.setTextColor(...color)
-  const wrapped = doc.splitTextToSize(text, MAX_W - indent - 2)
-    for (const wline of wrapped) {
-      newPageIfNeeded(size * 0.45 + 2)
-      doc.text(wline, MARGIN + indent, y)
-      y += size * 0.42 + 1.2
-    }
-    y += gap
-  }
-
-  function drawHRule(color = [226, 232, 240], thickness = 0.3) {
-    doc.setDrawColor(...color)
-    doc.setLineWidth(thickness)
-    doc.line(MARGIN, y, PAGE_W - MARGIN, y)
-    y += 4
-  }
-
-  function writeBoldLine(text, baseOpts = {}) {
-    // Handles **bold** inline markers
-    const parts = []
-    const regex  = /\*\*(.*?)\*\*/g
-    let last = 0, m
-    while ((m = regex.exec(text)) !== null) {
-      if (m.index > last) parts.push({ t: text.slice(last, m.index), bold: false })
-      parts.push({ t: m[1], bold: true })
-      last = m.index + m[0].length
-    }
-    if (last < text.length) parts.push({ t: text.slice(last), bold: false })
-
-    if (parts.length <= 1 || parts.every(p => !p.bold)) {
-      // No bold — just write normally
-      writeLine(text.replace(/\*\*(.*?)\*\*/g, '$1'), baseOpts)
-      return
-    }
-
-    // Mixed bold — break into words and lay out left-to-right WITH wrapping
-    const { size = 11, color = [55, 65, 81], indent = 0, gap = 4 } = baseOpts
-    doc.setFontSize(size)
-    const maxW = MAX_W - indent
+    doc.setFont(family, 'normal')
     const spaceW = doc.getTextWidth(' ')
 
-    const words = []
-    for (const part of parts) {
-      const segs = part.t.split(/(\s+)/)
-      for (const s of segs) {
-        if (s === '') continue
-        if (/^\s+$/.test(s)) words.push({ space: true })
-        else words.push({ t: s, bold: part.bold })
+    // tokenize into words + explicit spaces
+    const tokens = []
+    for (const run of runs) {
+      for (const p of run.text.split(/(\s+)/)) {
+        if (p === '') continue
+        if (/^\s+$/.test(p)) tokens.push({ space: true })
+        else tokens.push({ text: p, bold: run.bold })
       }
     }
 
-    let cx = MARGIN + indent
-    newPageIfNeeded(size * 0.45 + 2)
-
-    for (const w of words) {
-      if (w.space) { cx += spaceW; continue }
-      doc.setFont('helvetica', w.bold ? 'bold' : 'normal')
-      const wWidth = doc.getTextWidth(w.t)
-      if (cx + wWidth > MARGIN + indent + maxW) {
-        y += size * 0.42 + 1.2
-        newPageIfNeeded(size * 0.45 + 2)
-        cx = MARGIN + indent
+    // hard-break any token wider than the line
+    const fit = []
+    for (const t of tokens) {
+      if (t.space) { fit.push(t); continue }
+      doc.setFont(family, t.bold ? 'bold' : 'normal')
+      if (doc.getTextWidth(t.text) <= usableW) { fit.push(t); continue }
+      let cur = ''
+      for (const ch of t.text) {
+        if (cur && doc.getTextWidth(cur + ch) > usableW) { fit.push({ text: cur, bold: t.bold, brk: true }); cur = ch }
+        else cur += ch
       }
-      doc.setTextColor(...(w.bold ? [26, 26, 46] : color))
-      doc.text(w.t, cx, y)
-      cx += wWidth
+      if (cur) fit.push({ text: cur, bold: t.bold })
     }
-    y += size * 0.42 + 1.2 + gap
+
+    let cx = x0, lineStart = true
+    pageBreak(lineStep)
+    const newline = () => { y += lineStep; pageBreak(lineStep); cx = x0; lineStart = true }
+
+    for (const t of fit) {
+      if (t.space) { if (!lineStart) cx += spaceW; continue }
+      doc.setFont(family, t.bold ? 'bold' : 'normal')
+      const w = doc.getTextWidth(t.text)
+      if (!lineStart && cx + w > x0 + usableW) newline()
+      doc.setTextColor(...(t.bold ? colorB : colorN))
+      doc.text(t.text, cx, y)
+      cx += w; lineStart = false
+      if (t.brk) newline()
+    }
+    y += lineStep + gapAfter
   }
 
-  // ── Document header ─────────────────────────────────────────
-  const mainTitle  = title.split('—')[0]?.trim() || title
-  const subTitle   = title.split('—')[1]?.trim() || ''
+  const parseBold = text => {
+    const runs = []; const re = /\*\*(.*?)\*\*/g; let last = 0, m
+    while ((m = re.exec(text)) !== null) {
+      if (m.index > last) runs.push({ text: text.slice(last, m.index), bold: false })
+      runs.push({ text: m[1], bold: true }); last = m.index + m[0].length
+    }
+    if (last < text.length) runs.push({ text: text.slice(last), bold: false })
+    return runs.length ? runs : [{ text, bold: false }]
+  }
 
-  doc.setFillColor(55, 48, 163)  // #3730a3
-  doc.rect(MARGIN, y, MAX_W, 0.8, 'F')
-  y += 5
+  // ── Header ──
+  const mainTitle = clean((title.split('—')[0] || title).replace(/\s*Notes\s*$/i, '').trim())
+  const subTitle  = clean((title.split('—')[1] || '').trim())
 
-  writeLine(mainTitle.replace(/[^\x00-\x7F]/g, ''), { size: 22, bold: true, color: [26, 26, 46], gap: 3 })
-  if (subTitle) writeLine(`${subTitle} · CBSE 2024-25`, { size: 10, color: [100, 116, 139], gap: 8 })
+  writeRich([{ text: mainTitle, bold: true }], { family: 'times', size: 22, colorB: [26,26,46], lineFactor: 1.2, gapAfter: 2 })
 
-  drawHRule([55, 48, 163], 0.8)
-  y += 2
+  doc.setFontSize(9.5)
+  let mx = MARGIN_X
+  if (subTitle) { doc.setFont('helvetica','bold'); doc.setTextColor(55,48,163); doc.text(subTitle, mx, y); mx += doc.getTextWidth(subTitle) }
+  doc.setFont('helvetica','normal'); doc.setTextColor(100,116,139)
+  doc.text((subTitle ? '   ·   ' : '') + 'CBSE 2024-25', mx, y)
+  y += 9.5 * PT * 1.2 + 5
+  rule([55,48,163], 0.8, 5)
 
-  // ── Parse and write content ─────────────────────────────────
-  const lines = (content || '').split('\n')
-
-  for (const raw of lines) {
-    // Strip emojis and non-latin characters that jsPDF can't render
+  // ── Body ──
+  for (const raw of (content || '').split('\n')) {
     const line = raw.trimEnd()
-      .replace(/[\u{1F000}-\u{1FFFF}]/gu, '')
-      .replace(/[\u2600-\u27FF]/g, '')
-      .replace(/[\u{FE00}-\u{FEFF}]/gu, '')
-      .replace(/[^\x09\x0A\x0D\x20-\x7E\xA0-\xFF]/g, '')
+    const txt = clean(line.replace(/^#{1,4}\s|^[-•]\s|^\d+\.\s/, ''))
 
-    if (line === '' || line === '---' || line.startsWith('═══')) {
-      if (line.startsWith('---') || line.startsWith('═══')) {
-        drawHRule(); continue
-      }
-      y += 2; continue
-    }
+    if (line === '') { y += 3; continue }
+    if (/^(---|═══)/.test(line)) { y += 2; rule([226,232,240], 0.3, 4); continue }
 
-    // H1
     if (line.startsWith('# ')) {
-      y += 3
-      newPageIfNeeded(14)
-      writeLine(line.slice(2), { size: 16, bold: true, color: [26, 26, 46], gap: 2 })
-      drawHRule([232, 230, 255], 0.4)
-      continue
+      y += 4; pageBreak(16)
+      writeRich([{ text: clean(line.slice(2)), bold: true }], { family: 'times', size: 16, colorB: [26,26,46], lineFactor: 1.25, gapAfter: 1.5 })
+      rule([232,230,255], 0.4, 4); continue
     }
-
-    // H2
     if (line.startsWith('## ')) {
-      y += 2
-      newPageIfNeeded(12)
-      writeLine(line.slice(3), { size: 13, bold: true, color: [55, 48, 163], gap: 3 })
-      continue
+      y += 3; pageBreak(12)
+      writeRich([{ text: clean(line.slice(3)), bold: true }], { family: 'times', size: 13, colorB: [55,48,163], lineFactor: 1.25, gapAfter: 3 }); continue
     }
-
-    // H3
     if (line.startsWith('### ') || line.startsWith('#### ')) {
-      const depth = line.startsWith('#### ') ? 4 : 3
-      y += 1
-      writeLine(line.slice(depth + 1), { size: 11.5, bold: true, color: [30, 41, 59], gap: 2 })
-      continue
+      const t = clean(line.replace(/^#{3,4}\s/, ''))
+      y += 1.5; pageBreak(10)
+      const step = 11.5 * PT * 1.2
+      doc.setDrawColor(129,140,248); doc.setLineWidth(0.9)
+      doc.line(MARGIN_X + 0.6, y - 3.4, MARGIN_X + 0.6, y + 1)
+      writeRich([{ text: t, bold: true }], { family: 'helvetica', size: 11.5, colorB: [30,41,59], indent: 4, lineFactor: 1.2, gapAfter: 2 }); continue
     }
 
-    // Bullet
     if (line.startsWith('- ') || line.startsWith('• ')) {
-      doc.setFontSize(11)
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(129, 140, 248)  // #818cf8
-      newPageIfNeeded(7)
-      doc.text('•', MARGIN + 2, y)
-      doc.setFont('helvetica', 'normal')
-      doc.setTextColor(55, 65, 81)
-      const txt   = line.slice(2)
-      const wrapped = doc.splitTextToSize(txt, MAX_W - 8)
-      for (let i = 0; i < wrapped.length; i++) {
-        newPageIfNeeded(6)
-        doc.text(wrapped[i], MARGIN + 7, y)
-        y += 5.5
-      }
-      y += 1
-      continue
+      pageBreak(7)
+      doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(129,140,248)
+      doc.text('•', MARGIN_X + 1.5, y)
+      writeRich(parseBold(txt), { size: 11, indent: 6.5, gapAfter: 1.5 }); continue
+    }
+    if (/^\d+\.\s/.test(line)) {
+      const num = (line.match(/^\d+/)[0]) + '.'
+      pageBreak(7)
+      doc.setFontSize(11); doc.setFont('helvetica','bold'); doc.setTextColor(129,140,248)
+      doc.text(num, MARGIN_X + 1.5, y)
+      writeRich(parseBold(txt), { size: 11, indent: 7.5, gapAfter: 1.5 }); continue
     }
 
-    // Numbered list
-    if (/^\d+\./.test(line)) {
-      writeLine(line, { indent: 5, gap: 3 })
-      continue
+    // Exam-tip callout box
+    if (raw.startsWith('📝') || /exam tip/i.test(line)) {
+      const tip = txt.replace(/\*\*/g, '')
+      doc.setFont('helvetica','bold'); doc.setFontSize(10)
+      const innerW = MAX_W - 8
+      const wrapped = doc.splitTextToSize(tip, innerW)
+      const step = 10 * PT * 1.4
+      const boxH = wrapped.length * step + 4
+      pageBreak(boxH + 2)
+      doc.setFillColor(239,246,255); doc.setDrawColor(191,219,254); doc.setLineWidth(0.3)
+      doc.roundedRect(MARGIN_X, y, MAX_W, boxH, 2, 2, 'FD')
+      doc.setTextColor(29,78,216)
+      let ty = y + step
+      for (const wl of wrapped) { doc.text(wl, MARGIN_X + 4, ty); ty += step }
+      y += boxH + 3; continue
     }
 
-    // Exam tip callout
-    if (line.startsWith('📝') || line.includes('Exam tip') || line.includes('exam tip')) {
-      newPageIfNeeded(10)
-      doc.setFillColor(239, 246, 255)  // #eff6ff
-      const tipLines = doc.splitTextToSize(line, MAX_W - 6)
-      const boxH = tipLines.length * 5 + 4
-      doc.rect(MARGIN, y - 3, MAX_W, boxH, 'F')
-      doc.setFontSize(10)
-      doc.setFont('helvetica', 'bold')
-      doc.setTextColor(29, 78, 216)  // #1d4ed8
-      for (const tl of tipLines) {
-        doc.text(tl, MARGIN + 3, y)
-        y += 5
-      }
-      y += 3
-      continue
-    }
-
-    // Regular paragraph (with inline bold support)
-    if (line.trim()) writeBoldLine(line, { size: 11, color: [55, 65, 81], gap: 4 })
+    // Paragraph
+    if (txt) writeRich(parseBold(txt), { size: 11, lineFactor: 1.55, gapAfter: 3 })
   }
 
-  // ── Footer on each page ─────────────────────────────────────
-  const totalPages = doc.internal.getNumberOfPages()
-  for (let i = 1; i <= totalPages; i++) {
+  // Light footer / page numbers (doesn't touch body alignment)
+  const total = doc.internal.getNumberOfPages()
+  for (let i = 1; i <= total; i++) {
     doc.setPage(i)
-    doc.setFontSize(8.5)
-    doc.setFont('helvetica', 'normal')
-    doc.setTextColor(148, 163, 184)  // #94a3b8
-    doc.text('BrainSpark AI · CBSE Notes', MARGIN, PAGE_H - 8)
-    doc.text(`Page ${i} of ${totalPages}`, PAGE_W - MARGIN - 18, PAGE_H - 8)
+    doc.setFontSize(8.5); doc.setFont('helvetica','normal'); doc.setTextColor(148,163,184)
+    doc.text('BrainSpark AI · CBSE Notes', MARGIN_X, PAGE_H - 8)
+    doc.text(`Page ${i} of ${total}`, PAGE_W - MARGIN_X, PAGE_H - 8, { align: 'right' })
   }
 
-  const filename = `${title.replace(/ — |—/g, '-').replace(/[\s/\\:*?"<>|]+/g, '-')}.pdf`
-  doc.save(filename)
+  doc.save(`${title.replace(/ — |—/g, '-').replace(/[\s/\\:*?"<>|]+/g, '-')}.pdf`)
 }
 
 
@@ -3211,16 +3172,12 @@ function NotesDocument({ content, title, onDownload }) {
             <div style={{ width:10, height:10, borderRadius:'50%', background:'#22c55e' }}/>
             <span style={{ fontSize:12, color:'#94a3b8', marginLeft:6, fontFamily:"'Source Sans 3',sans-serif" }}>{title}</span>
           </div>
-          <div style={{ display:'flex', gap:8 }}>
-            <button onClick={()=>downloadNotesAsPDF(content, title)}
-              style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 16px', borderRadius:8, border:'1px solid #d1d5db', background:'#ffffff', color:'#374151', fontSize:13, fontWeight:600, cursor:'pointer', fontFamily:"'Source Sans 3',sans-serif", boxShadow:'0 1px 3px rgba(0,0,0,.08)' }}>
-              ⬇ Download PDF
-            </button>
-            <button onClick={()=>printContent(content, title)}
-              style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 16px', borderRadius:8, border:'none', background:'#3730a3', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:"'Source Sans 3',sans-serif" }}>
-              🖨 Print / Save PDF
-            </button>
-          </div>
+        <div style={{ display:'flex', gap:8 }}>
+  <button onClick={()=>downloadNotesAsPDF(content, title)}
+    style={{ display:'flex', alignItems:'center', gap:6, padding:'7px 16px', borderRadius:8, border:'none', background:'#3730a3', color:'#fff', fontSize:13, fontWeight:700, cursor:'pointer', fontFamily:"'Source Sans 3',sans-serif" }}>
+    ⬇ Download PDF
+  </button>
+</div>
         </div>
 
         {/* The white document paper */}
