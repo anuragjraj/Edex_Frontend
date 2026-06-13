@@ -3912,14 +3912,15 @@ function QuizGenerator({ user, prefill, onClearPrefill }) {
     const PROMPT = `You are a CBSE examiner creating a ${num}-question multiple-choice quiz on "${topic}" in ${subject} for ${cls}. Difficulty: ${diff}.
 
 RULES — follow every one:
-1. For any question involving calculation, work the full solution out silently BEFORE writing the options. The "answer" index MUST point to the option that your worked solution actually produces. Never mark an option correct unless your own calculation gives that exact value.
-2. Make sure exactly ONE option is correct and it is present in the options list. The other three must be plausible but wrong.
-3. "explanation" must be the FINAL clean reasoning only — 1 to 3 sentences. Do NOT show trial-and-error, do NOT write "wait", "let me recalculate", "rechecking", or revise yourself mid-explanation. State the method and the result directly.
-4. "answer" is the 0-based index (0,1,2,3) of the correct option.
-5. Output VALID JSON ONLY — no markdown, no text before or after.
+1. Solve each question completely in your head BEFORE writing anything. Decide the single correct answer first.
+2. Write ONLY the final, polished explanation. State the method and result directly in 1-2 sentences.
+3. NEVER show your working process. FORBIDDEN words/phrases anywhere in "explanation": "wait", "let me", "recalculate", "rechecking", "actually", "however", "revising", "correcting", "hmm", "but checking", "option 0", "option 1", "answer should be", "let me reconsider". If you catch yourself writing these, delete the whole explanation and write a fresh clean one.
+4. "answer" is the 0-based index (0,1,2,3) of the correct option. It MUST match your solved result exactly.
+5. Exactly ONE option is correct; the other three are plausible but wrong.
+6. Output VALID JSON ONLY — no markdown, no text before or after.
 
 Format:
-{"title":"${topic} Quiz","questions":[{"q":"Question text?","options":["A","B","C","D"],"answer":0,"explanation":"Concise correct reasoning."}]}`
+{"title":"${topic} Quiz","questions":[{"q":"Question text?","options":["A","B","C","D"],"answer":0,"explanation":"The discriminant b²-4ac determines the nature of roots; here it equals 16, so roots are real and distinct."}]}`
     setErr(''); setLoading(true); setQuiz(null); 
     try {
       const r = await api.post('/api/ai/quiz', { messages: [{ role: 'user', content: PROMPT }], subject, chapter: topic })
@@ -3927,10 +3928,15 @@ Format:
       const parsed = JSON.parse(raw.replace(/```[\w]*\n?/gi, '').trim())
 
       // Strip any self-correcting ramble from explanations (small-model safety net)
-      const BAD = /\b(wait|let me recalculate|rechecking|re-?examining|actually checking|however,? the answer|assuming a typo)\b/i
+      const BAD = /\b(wait|let me|recalculat|recheck|recheckin|actually|however|revising|correcting|reconsider|hmm|option [0-9]|answer should be|but checking)\b/i
       parsed.questions = (parsed.questions || []).map(q => {
         if (q.explanation && BAD.test(q.explanation)) {
-          q.explanation = q.explanation.split(/(?<=\.)\s/)[0] || 'See the correct option above.'
+          const clean = q.explanation
+            .split(/(?<=[.!?])\s+/)
+            .filter(s => !BAD.test(s))
+            .join(' ')
+            .trim()
+          q.explanation = clean || 'See the correct option marked above.'
         }
         return q
       })
