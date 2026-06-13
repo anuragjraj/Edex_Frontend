@@ -3925,6 +3925,16 @@ Format:
       const r = await api.post('/api/ai/quiz', { messages: [{ role: 'user', content: PROMPT }], subject, chapter: topic })
       const raw = typeof r.content === 'string' ? r.content : r.content[0]?.text || ''
       const parsed = JSON.parse(raw.replace(/```[\w]*\n?/gi, '').trim())
+
+      // Strip any self-correcting ramble from explanations (small-model safety net)
+      const BAD = /\b(wait|let me recalculate|rechecking|re-?examining|actually checking|however,? the answer|assuming a typo)\b/i
+      parsed.questions = (parsed.questions || []).map(q => {
+        if (q.explanation && BAD.test(q.explanation)) {
+          q.explanation = q.explanation.split(/(?<=\.)\s/)[0] || 'See the correct option above.'
+        }
+        return q
+      })
+
       setQuiz(parsed)
       saveSessionContent({ tool:'quiz', subject, chapter:topic, classLevel:cls, content:parsed })
       setAnswers({}); setSubmitted(false)
