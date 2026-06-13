@@ -2237,7 +2237,6 @@ function ProfilePage({ userId, currentUser, onMessage, onBack }) {
       {/* ── Banner ──────────────────────────────────────────── */}
       <div style={{ borderRadius:14, overflow:'hidden', marginBottom:0, position:'relative', height:130, background: prof.banner_url ? `url(${prof.banner_url}) center/cover` : 'linear-gradient(135deg,#4338ca,#6366F1,#8B5CF6)' }}/>
 
-      {/* ── Avatar row ──────────────────────────────────────── */}
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginTop:-40, paddingInline:20, marginBottom:20, position:'relative', zIndex:2 }}>
           {user?.name?.[0]?.toUpperCase() || '?'}
         </div>
