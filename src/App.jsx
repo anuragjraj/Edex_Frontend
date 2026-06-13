@@ -2207,7 +2207,7 @@ function ProfilePage({ userId, currentUser, onMessage, onBack }) {
     setEditMode(false)
     api.get(`/api/profiles/${targetId}`)
       .then(d => { setData(d); setForm(d.profile || {}); setLoading(false) })
-      .catch(() => setLoading(false))
+      .catch(e => { setErr(e.message); setLoading(false) })
   }, [targetId])
 
   const save = async () => {
@@ -2222,7 +2222,7 @@ function ProfilePage({ userId, currentUser, onMessage, onBack }) {
   }
 
   if (loading) return <PageSpinner />
-  if (!data)   return <div style={{ padding:40, textAlign:'center', color:'var(--text)' }}>Profile not found</div>
+  if (!data)   return <div style={{ padding:40, textAlign:'center', color:'var(--text)' }}>{err || 'Profile not found'}</div>
 
   const { user, profile: prof, stats, rank } = data
 
