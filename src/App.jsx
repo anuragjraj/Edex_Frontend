@@ -1860,10 +1860,10 @@ function SubscriptionPage({ user, onSuccess, onBack }) {
 
       {/* Single subscribe button acts on the selected plan */}
       <div style={{ maxWidth:700, margin:'0 auto' }}>
-        <PrimaryBtn onClick={()=>subscribe(selectedId)} disabled={loading||!selectedId} style={{ width:'100%', justifyContent:'center', fontSize:15 }}>
-          {loading ? <><Spinner/> Processing…</> : `Continue with ${plans.find(p=>p.id===selectedId)?.label||''} — ${plans.find(p=>p.id===selectedId)?.price||''}`}
-        </PrimaryBtn>
-      </div>
+  <PrimaryBtn onClick={()=>subscribe(selectedId)} disabled={loading||!selectedId} gradient="linear-gradient(135deg,#4f46e5,#8B5CF6)" style={{ width:'100%', justifyContent:'center', fontSize:15 }}>
+    {loading ? <><Spinner/> Processing…</> : `Continue with ${plans.find(p=>p.id===selectedId)?.label||''} — ${plans.find(p=>p.id===selectedId)?.price||''}`}
+  </PrimaryBtn>
+</div>
       <ErrMsg msg={err}/>
     </div>
   )
