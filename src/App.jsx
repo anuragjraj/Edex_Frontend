@@ -1836,9 +1836,12 @@ function SubscriptionPage({ user, onSuccess, onBack }) {
 //  DASHBOARD
 // ══════════════════════════════════════════════════════════════
 function Dashboard({ user, onNavigate }) {
-  const [stats,setStats]=useState(null); const [achs,setAchs]=useState([]); const [loading,setLoading]=useState(true)
-  useEffect(()=>{ Promise.all([api.get('/api/user/stats'),api.get('/api/user/achievements')]).then(([s,a])=>{setStats(s);setAchs(a)}).catch(()=>{}).finally(()=>setLoading(false)) },[])
-  if(loading) return <PageSpinner/>
+  const [stats,setStats]=useState(()=>{ try{ return JSON.parse(localStorage.getItem('bs_dash_stats')) }catch{ return null } })
+  const [achs,setAchs]=useState(()=>{ try{ return JSON.parse(localStorage.getItem('bs_dash_achs'))||[] }catch{ return [] } })
+  useEffect(()=>{
+    api.get('/api/user/stats').then(s=>{ setStats(s); try{localStorage.setItem('bs_dash_stats',JSON.stringify(s))}catch{} }).catch(()=>{})
+    api.get('/api/user/achievements').then(a=>{ setAchs(a); try{localStorage.setItem('bs_dash_achs',JSON.stringify(a))}catch{} }).catch(()=>{})
+  },[])
   const xp=stats?.stats?.total_xp||0; const level=getLevel(xp); const nextLevel=getNextLevel(xp)
   const pct=nextLevel?Math.round(((xp-level.min)/(nextLevel.min-level.min))*100):100
   const streak=stats?.stats?.current_streak||0; const unlocked=achs.filter(a=>a.unlocked).slice(0,3)
@@ -2060,7 +2063,7 @@ function SocialFeed({ user }) {
               </div>
             </div>
             {post.body && <p style={{ fontSize: 13.5, color: 'var(--text-h)', lineHeight: 1.72, marginBottom: post.media_url ? 8 : 10 }}>{post.body}</p>}
-            {post.media_url && post.media_type === 'image' && <img src={post.media_url} style={{ width: '100%', borderRadius: 10, marginBottom: 10, maxHeight: 300, objectFit: 'cover' }} alt="" />}
+            {post.media_url && post.media_type === 'image' && <img src={post.media_url} style={{ width: '100%', borderRadius: 10, marginBottom: 10, maxHeight: 500, objectFit: 'contain', background: 'var(--code-bg)' }} alt="" />}
             {(post.tags || []).length > 0 && (
               <div style={{ display: 'flex', gap: 5, flexWrap: 'wrap', marginBottom: 10 }}>
                 {post.tags.map((t, i) => <span key={i} style={{ fontSize: 11.5, color: 'var(--accent)', background: 'var(--accent-bg)', padding: '2px 8px', borderRadius: 20, border: '1px solid var(--accent-border)' }}>#{t}</span>)}
