@@ -28,10 +28,10 @@ function useFonts() {
       style.id = 'brainspark-styles'
       style.textContent = `
         :root {
-          --bg: #05050e; --bg2: #0b0b1e; --text: #64748b; --text-h: #e2e8f0;
-          --border: rgba(255,255,255,.08); --accent: #6366F1;
-          --accent-bg: rgba(99,102,241,.12); --accent-border: rgba(99,102,241,.22);
-          --code-bg: rgba(255,255,255,.04); --social-bg: rgba(255,255,255,.04);
+          --bg: #f4f4f0; --bg2: #ffffff; --text: #64748b; --text-h: #1e293b;
+          --border: rgba(15,23,42,.10); --accent: #4f46e5;
+          --accent-bg: rgba(79,70,229,.08); --accent-border: rgba(79,70,229,.20);
+          --code-bg: rgba(15,23,42,.035); --social-bg: rgba(15,23,42,.035);
         }
         * { box-sizing: border-box; }
         body { margin: 0; background: var(--bg); color: var(--text-h); }
@@ -1177,8 +1177,8 @@ function BSSelect({ value, onChange, options, style = {} }) {
         padding: '10px 14px',
         borderRadius: '10px',
         border: `1.5px solid ${focused ? 'var(--accent)' : 'var(--border)'}`,
-        background: '#0f0f23',           // ← solid dark, never transparent
-        color: '#e2e8f0',                // ← always light text
+        background: '#ffffff',
+        color: '#1e293b',                // ← always light text
         fontSize: '14px',
         fontFamily: "'Nunito', sans-serif",
         appearance: 'auto',
@@ -1192,7 +1192,7 @@ function BSSelect({ value, onChange, options, style = {} }) {
         <option
           key={o.value ?? o}
           value={o.value ?? o}
-          style={{ background: '#0f0f23', color: '#e2e8f0' }}   // ← fixes option visibility
+          style={{ background: '#ffffff', color: '#1e293b' }}   // ← fixes option visibility
         >
           {o.label ?? o}
         </option>
@@ -1559,7 +1559,7 @@ function FreeTierCountdown({ user, onSubscribe, onExpired }) {
 // ══════════════════════════════════════════════════════════════
 function MobileTopNav({ tabs, activeTab, onTabChange }) {
   return (
-    <div className="mobile-top-nav" style={{ position:'sticky', top:58, zIndex:90, background:'rgba(5,5,14,.97)', backdropFilter:'blur(20px)', borderBottom:'1px solid var(--border)', padding:'4px 8px', display:'flex', gap:2, overflowX:'auto', scrollbarWidth:'none', WebkitOverflowScrolling:'touch' }}>
+    <div className="mobile-top-nav" style={{ position:'sticky', top:58, zIndex:90, background:'rgba(255,255,255,.95)', backdropFilter:'blur(20px)', borderBottom:'1px solid var(--border)', padding:'4px 8px', display:'flex', gap:2, overflowX:'auto', scrollbarWidth:'none', WebkitOverflowScrolling:'touch' }}>
       {tabs.map(t=>(
         <button key={t.id} onClick={()=>onTabChange(t.id)}
           style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:2, padding:'5px 8px', borderRadius:9, border:'none', cursor:'pointer', background:activeTab===t.id?`${t.color}22`:'transparent', color:activeTab===t.id?t.color:'#64748b', fontFamily:"'Nunito', sans-serif", fontWeight:700, fontSize:8.5, minWidth:46, flexShrink:0, transition:'all .15s', borderBottom:activeTab===t.id?`2px solid ${t.color}`:'2px solid transparent' }}>
@@ -5704,7 +5704,7 @@ export default function App() {
     <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column', fontFamily: "'Nunito', sans-serif" }}>
 
       {/* ── Top header ───────────────────────────────────────── */}
-      <header style={{ borderBottom: '1px solid var(--border)', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 58, position: 'sticky', top: 0, zIndex: 100, background: 'rgba(5,5,14,.95)', backdropFilter: 'blur(20px)', boxShadow: '0 2px 20px rgba(0,0,0,.3)' }}>
+      <header style={{ borderBottom: '1px solid var(--border)', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 58, position: 'sticky', top: 0, zIndex: 100,background: 'rgba(255,255,255,.92)', backdropFilter: 'blur(20px)', boxShadow: '0 1px 12px rgba(15,23,42,.06)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={() => setTab('dashboard')}>
           <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🧠</div>
           <span style={{ fontFamily: "'Sora', sans-serif", fontWeight: 900, fontSize: 17, color: 'var(--text-h)' }}>
@@ -5739,7 +5739,7 @@ export default function App() {
       <div style={{ display: 'flex', flex: 1 }}>
 
         {/* ── Desktop sidebar ──────────────────────────────────── */}
-        <nav className="desktop-sidebar" style={{ width: 210, borderRight: '1px solid var(--border)', padding: '12px 8px', background: 'rgba(5,5,14,.8)', flexShrink: 0, position: 'sticky', top: 58, height: 'calc(100vh - 58px)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <nav className="desktop-sidebar" style={{ width: 210, borderRight: '1px solid var(--border)', padding: '12px 8px', background: 'rgba(255,255,255,.7)', flexShrink: 0, position: 'sticky', top: 58, height: 'calc(100vh - 58px)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
           {tabs.map(t => {
             const active = tab === t.id
             return (
