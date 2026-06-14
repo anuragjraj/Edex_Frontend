@@ -1666,7 +1666,7 @@ function AuthPage({ onAuth, initMode }) {
         try { setBusy(true); setErr(''); const data = await api.post('/api/auth/google',{idToken:resp.credential}); saveAuth(data); onAuth(data.user) }
         catch(e){ setErr(e.message) } finally{ setBusy(false) }
       }})
-      window.google.accounts.id.renderButton(gBtnRef.current,{ theme:'filled_black', size:'large', width:280 })
+      window.google.accounts.id.renderButton(gBtnRef.current,{ theme:'outline', size:'large', width:280 })
     }).catch(()=>{})
   },[tab])
 
