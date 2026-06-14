@@ -5518,9 +5518,9 @@ function HistoryPage({ onNavigate }) {
       </div>
 
       {/* Legend */}
-      <div style={{ display:'flex', alignItems:'center', gap:14, marginBottom:22, padding:'9px 14px', background:'rgba(255,255,255,.02)', borderRadius:10, border:'1px solid rgba(255,255,255,.05)', fontSize:12, color:'var(--text)', flexWrap:'wrap' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:5 }}><div style={{ width:7, height:7, borderRadius:'50%', background:'#6366F1', boxShadow:'0 0 6px #6366F1' }}/> Glowing dot = full session saved (tap to replay)</div>
-        <div style={{ display:'flex', alignItems:'center', gap:5 }}><div style={{ width:7, height:7, borderRadius:'50%', background:'rgba(255,255,255,.15)' }}/> No dot = metadata only (older sessions)</div>
+      <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:22, padding:'9px 14px', background:'rgba(255,255,255,.02)', borderRadius:10, border:'1px solid rgba(255,255,255,.05)', fontSize:12, color:'var(--text)', flexWrap:'wrap' }}>
+        <div style={{ display:'flex', alignItems:'center', gap:6 }}><span style={{ background:'rgba(255,255,255,.95)', color:'#6366F1', borderRadius:20, padding:'2px 9px', fontSize:10.5, fontWeight:800 }}>▶ Replay</span> = full session saved — tap to reopen it</div>
+        <div style={{ display:'flex', alignItems:'center', gap:6 }}>No badge = activity record only (older sessions)</div>
       </div>
 
       {loading && page===1 && <PageSpinner/>}
@@ -5541,7 +5541,7 @@ function HistoryPage({ onNavigate }) {
             <div style={{ height:1, flex:1, background:'var(--border)' }}/>
             <span style={{ fontSize:11, color:'#1e293b', fontWeight:700 }}>{items.length} session{items.length!==1?'s':''}</span>
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(148px,1fr))', gap:12 }}>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))', gap:16 }}>
             {items.map((item,i) => <HistoryCard key={item.id||i} item={item}/>)}
           </div>
         </div>
