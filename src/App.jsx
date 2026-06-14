@@ -34,6 +34,7 @@ function useFonts() {
           --code-bg: rgba(15,23,42,.035); --social-bg: rgba(15,23,42,.035);
         }
         * { box-sizing: border-box; }
+        html, body { overflow-x: clip; max-width: 100%; }
         body { margin: 0; background: var(--bg); color: var(--text-h); }
         @keyframes spin      { to { transform: rotate(360deg) } }
         @keyframes dotBounce { 0%,100%{opacity:.25;transform:scale(.8)} 50%{opacity:1;transform:scale(1)} }
@@ -5652,6 +5653,7 @@ function HistoryPage({ onNavigate }) {
 //  TRIAL / SUBSCRIPTION BADGE (header)
 // ══════════════════════════════════════════════════════════════
 function TrialBadge({ user, onUpgrade }) {
+  const isMobile = useIsMobile()
   const [info, setInfo] = useState(null)
   useEffect(() => {
     if (!user || user.type === 'school') return
@@ -5670,6 +5672,7 @@ function TrialBadge({ user, onUpgrade }) {
   const expiring = info.state === 'sub_expiring'
   const danger   = expired || days <= 3
   const label    = expired  ? 'Trial ended'
+                 : isMobile ? `${days}d free`
                  : expiring ? `${days} day${days!==1?'s':''} left`
                  : `${days} day${days!==1?'s':''} free left`
 
@@ -5679,7 +5682,7 @@ function TrialBadge({ user, onUpgrade }) {
         {danger ? '⚠️' : '⏱'} {label}
       </span>
       <button onClick={onUpgrade} style={{ padding:'6px 14px', borderRadius:9, border:'none', background:'linear-gradient(135deg,#4f46e5,#8B5CF6)', color:'#fff', fontWeight:800, fontSize:12.5, cursor:'pointer', fontFamily:"'Nunito',sans-serif", whiteSpace:'nowrap' }}>
-        ⚡ {(expired||expiring) ? 'Renew' : 'Go Pro'}
+        ⚡ {(expired||expiring) ? 'Renew' : (isMobile ? 'Pro' : 'Go Pro')}
       </button>
     </div>
   )
@@ -5841,13 +5844,13 @@ export default function App() {
           )}
         </div>
 
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+        <div style={{ display: 'flex', gap: isMobile ? 5 : 8, alignItems: 'center', minWidth: 0 }}>
           {!isSchool && <TrialBadge user={user} onUpgrade={() => setTab('subscription')} />}
-          <button onClick={() => setTab('achievements')} title="Achievements" style={{ width: 36, height: 36, borderRadius: 9, border: '1px solid var(--border)', background: 'var(--social-bg)', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>🏆</button>
-          <button onClick={() => { setViewProfileId(null); setTab('profile') }} title="My Profile" style={{ width: 36, height: 36, borderRadius: 9, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', cursor: 'pointer', fontSize: 14, fontWeight: 900, color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Sora', sans-serif" }}>
+          <button onClick={() => setTab('achievements')} title="Achievements" style={{ width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius: 9, border: '1px solid var(--border)', background: 'var(--social-bg)', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>🏆</button>
+          <button onClick={() => { setViewProfileId(null); setTab('profile') }} title="My Profile" style={{ width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius: 9, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', cursor: 'pointer', fontSize: 14, fontWeight: 900, color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Sora', sans-serif", flexShrink: 0 }}>
             {user.name?.[0]?.toUpperCase() || '?'}
           </button>
-          <button onClick={logout} style={{ padding: '6px 13px', borderRadius: 9, border: '1px solid var(--border)', background: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 13, fontWeight: 700, fontFamily: "'Nunito', sans-serif" }}>Sign Out</button>
+          <button onClick={logout} title="Sign Out" style={{ padding: isMobile ? '7px 10px' : '6px 13px', borderRadius: 9, border: '1px solid var(--border)', background: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 13, fontWeight: 700, fontFamily: "'Nunito', sans-serif", flexShrink: 0 }}>{isMobile ? '⏻' : 'Sign Out'}</button>
         </div>
       </header>
 
