@@ -5466,26 +5466,18 @@ function HistoryPage({ onNavigate }) {
   function HistoryCard({ item }) {
     const meta = TOOL_META_H[item.tool] || { icon:'⚡', label:item.tool, color:'#6366F1' }
     const [hov, setHov] = useState(false)
-    const chapter = item.chapter || (item.chapters||[])[0] || item.subject || 'Untitled'
-    const extra   = (item.chapters||[]).length > 1 ? `+${item.chapters.length - 1} more` : ''
-    const saved   = hasSessionFor(item)
-    const timeLabel = (() => {
-      const d = (Date.now() - new Date(item.created_at)) / 1000
-      if (d < 3600)  return `${Math.floor(d/60)}m ago`
-      if (d < 86400) return `${Math.floor(d/3600)}h ago`
-      return new Date(item.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short'})
-    })()
-
+    const chapter = item.chapter || (item.chapters||[])[0] || ''
     return (
       <div
         onClick={()=>openItem(item)}
         onMouseEnter={()=>setHov(true)}
         onMouseLeave={()=>setHov(false)}
         style={{
-          position:'relative', display:'flex', flexDirection:'column', borderRadius:16, cursor:'pointer',
-          padding:'12px 14px', minHeight:210,
+          position:'relative', width:'100%', aspectRatio:'1 / 1.1',
+          borderRadius:16, cursor:'pointer', padding:'14px 12px 12px',
+          display:'flex', flexDirection:'column', justifyContent:'space-between',
           background: hov ? `${meta.color}14` : 'rgba(255,255,255,.025)',
-          border:`1.5px solid ${hov ? meta.color+'55' : 'rgba(255,255,255,.07)'}`,
+          border: `1.5px solid ${hov ? meta.color+'55' : 'rgba(255,255,255,.07)'}`,
           transition:'all .18s ease',
           transform: hov ? 'translateY(-3px)' : 'none',
           boxShadow: hov ? `0 8px 28px ${meta.color}20` : 'none',
@@ -5493,29 +5485,18 @@ function HistoryPage({ onNavigate }) {
         }}
       >
         <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:`linear-gradient(90deg,${meta.color},transparent)`, borderRadius:'16px 16px 0 0', opacity:hov?1:0, transition:'opacity .18s' }}/>
-
-        {/* Top row: tool-type chip + replay dot */}
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-          <span style={{ display:'flex', alignItems:'center', gap:5, fontSize:10.5, fontWeight:800, color:meta.color, background:`${meta.color}18`, border:`1px solid ${meta.color}33`, borderRadius:20, padding:'3px 10px', textTransform:'uppercase', letterSpacing:'.4px' }}>
-            {meta.icon} {meta.label}
-          </span>
-          {saved && <span style={{ width:8, height:8, borderRadius:'50%', background:meta.color, boxShadow:`0 0 7px ${meta.color}` }}/>}
+        {hasSessionFor(item) && <div style={{ position:'absolute', top:9, right:9, width:7, height:7, borderRadius:'50%', background:meta.color, boxShadow:`0 0 7px ${meta.color}` }}/>}
+        <div style={{ width:42, height:42, borderRadius:11, background:`${meta.color}18`, border:`1px solid ${meta.color}33`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:21, flexShrink:0, marginBottom:7 }}>{meta.icon}</div>
+        <div style={{ flex:1, minHeight:0 }}>
+          <div style={{ fontSize:10.5, fontWeight:800, color:meta.color, textTransform:'uppercase', letterSpacing:'.5px', marginBottom:3 }}>{meta.label}</div>
+          {item.subject && <div style={{ fontSize:12.5, fontWeight:700, color:'var(--text-h)', marginBottom:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.subject}</div>}
+          {chapter && <div style={{ fontSize:11, color:'var(--text)', lineHeight:1.4, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{chapter}</div>}
         </div>
-
-        {/* Center hero: BIG centered chapter */}
-        <div style={{ flex:1, display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', textAlign:'center', padding:'14px 2px' }}>
-          <div style={{ fontFamily:"'Sora',sans-serif", fontSize:20, fontWeight:800, color:'var(--text-h)', lineHeight:1.25, marginBottom:7, display:'-webkit-box', WebkitLineClamp:3, WebkitBoxOrient:'vertical', overflow:'hidden' }}>
-            {chapter}
-          </div>
-          {item.subject && <div style={{ fontSize:12.5, color:meta.color, fontWeight:700 }}>{item.subject}</div>}
-          {extra && <div style={{ fontSize:11, color:'var(--text)', fontWeight:600, marginTop:3 }}>{extra}</div>}
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:8, paddingTop:8, borderTop:'1px solid rgba(255,255,255,.05)' }}>
+          <span style={{ fontSize:10, color:'#475569' }}>{(() => { const diff=(Date.now()-new Date(item.created_at))/1000; if(diff<3600) return `${Math.floor(diff/60)}m ago`; if(diff<86400) return `${Math.floor(diff/3600)}h ago`; return new Date(item.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short'}) })()}</span>
+          {item.xp_earned>0 && <span style={{ fontSize:10, fontWeight:800, color:'#FCD34D', background:'rgba(252,211,77,.08)', borderRadius:20, padding:'1px 7px' }}>+{item.xp_earned}</span>}
         </div>
-
-        {/* Footer: time + XP */}
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', paddingTop:10, borderTop:'1px solid rgba(255,255,255,.06)' }}>
-          <span style={{ fontSize:11.5, color:'var(--text)' }}>{timeLabel}</span>
-          {item.xp_earned>0 && <span style={{ fontSize:11, fontWeight:800, color:'#FCD34D', background:'rgba(252,211,77,.1)', borderRadius:20, padding:'2px 9px' }}>+{item.xp_earned}</span>}
-        </div>
+        <div style={{ position:'absolute', bottom:10, right:10, fontSize:13, color:meta.color, opacity:hov?1:0, transition:'opacity .15s' }}>→</div>
       </div>
     )
   }
