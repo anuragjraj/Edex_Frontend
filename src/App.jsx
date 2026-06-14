@@ -3083,11 +3083,28 @@ function formatDoubtMessage(md = '') {
 }
 
 
+// ── Persistent WhatsApp-style doubt thread (localStorage) ──
+const DOUBT_THREAD_KEY = 'bs_doubt_thread'
+const DOUBT_GREETING = { role: 'assistant', content: "👋 Hi! Ask me any doubt — I'll give you a **clear, step-by-step explanation** tailored to your CBSE syllabus. 🎯", ts: 0 }
+
+function loadDoubtThread() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(DOUBT_THREAD_KEY) || 'null')
+    if (Array.isArray(parsed) && parsed.length) return parsed
+  } catch {}
+  return null
+}
+function saveDoubtThread(msgs) {
+  try { localStorage.setItem(DOUBT_THREAD_KEY, JSON.stringify(msgs.slice(-200))) }
+  catch (e) { console.warn('[saveDoubtThread]', e.message) }
+}
+const fmtTime = ts => ts ? new Date(ts).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : ''
+
 function DoubtSolver({ user, prefill, onClearPrefill }) {
   const [subject,  setSubject]  = useState('Mathematics')
   const [cls,      setCls]      = useState('Class 10')
   const [chapter,  setChapter]  = useState('')
-  const [messages, setMessages] = useState([{ role: 'assistant', content: "👋 Hi! Ask me any doubt — I'll give you a **clear, step-by-step explanation** tailored to your CBSE syllabus. 🎯" }])
+  const [messages, setMessages] = useState(() => loadDoubtThread() || [DOUBT_GREETING])
   const [input,    setInput]    = useState('')
   const [loading,  setLoading]  = useState(false)
   const [err,      setErr]      = useState('')
@@ -3127,20 +3144,18 @@ FORMATTING — the chat renders limited markdown, follow exactly:
 
   async function send() {
     if (!input.trim()) return
-    const userMsg = { role: 'user', content: input.trim() }
+    const userMsg = { role: 'user', content: input.trim(), ts: Date.now() }
     const withUser = [...messages, userMsg]
     setMessages(withUser); setInput(''); setErr(''); setLoading(true)
+    saveDoubtThread(withUser)
     try {
-      // Drop the intro greeting (and any leading assistant msgs) so the API's
-      // first message is a user message, and send the running chain for context.
       const history = withUser.filter((m, i) => !(i === 0 && m.role === 'assistant'))
-      const trimmed = history.slice(-16)
+      let trimmed = history.slice(-16)
+      while (trimmed.length && trimmed[0].role !== 'user') trimmed = trimmed.slice(1)
       const r = await api.post('/api/ai/doubt', { messages: trimmed, system: SYSTEM, subject })
-      const finalMessages = [...withUser, { role: 'assistant', content: r.content }]
+      const finalMessages = [...withUser, { role: 'assistant', content: r.content, ts: Date.now() }]
       setMessages(finalMessages)
-      // Save without the greeting so History replay shows only the real Q&A.
-      const saveable = finalMessages.filter((m, i) => !(i === 0 && m.role === 'assistant'))
-      try { saveSessionContent({ tool: 'doubt', subject, chapter, classLevel: cls, content: saveable }) } catch {}
+      saveDoubtThread(finalMessages)
     } catch (e) {
       if (e.status === 402) setErr('Free trial ended. Please subscribe.')
       else setErr(e.message)
@@ -3148,11 +3163,21 @@ FORMATTING — the chat renders limited markdown, follow exactly:
     setLoading(false)
   }
 
+  function clearThread() {
+    if (!window.confirm('Clear all your doubt history? This cannot be undone.')) return
+    setMessages([DOUBT_GREETING])
+    try { localStorage.removeItem(DOUBT_THREAD_KEY) } catch {}
+  }
+
   return (
     <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 100px)', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
-      <PageHeader icon="🤔" title="AI Doubt Solver" subtitle="Ask anything — get clear, step-by-step CBSE explanations" color="#6366F1" />
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <PageHeader icon="🤔" title="AI Doubt Solver" subtitle="Ask anything — your full chat history is saved here" color="#6366F1" />
+        {messages.length > 1 && (
+          <GhostBtn small onClick={clearThread} style={{ flexShrink: 0, marginTop: 4 }}>🗑 Clear</GhostBtn>
+        )}
+      </div>
 
-      {/* Compact context bar */}
       <div style={{ display: 'flex', gap: 10, marginBottom: 14, flexWrap: 'wrap' }}>
         <div style={{ flex: '1 1 140px' }}>
           <BSSelect value={subject} onChange={v => { setSubject(v); setChapter('') }} options={SUBJECTS} />
@@ -3175,13 +3200,15 @@ FORMATTING — the chat renders limited markdown, follow exactly:
         </div>
       )}
 
-      {/* Chat window */}
       <div style={{ ...T.card, flex: 1, overflowY: 'auto', marginBottom: 14, minHeight: 200, display: 'flex', flexDirection: 'column', gap: 14 }}>
         {messages.map((m, i) => (
           <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start', alignItems: 'flex-start', gap: 10 }}>
             {m.role === 'assistant' && <div style={{ width: 32, height: 32, borderRadius: 9, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0, fontSize: 16, marginTop: 2 }}>🧠</div>}
-            <div style={{ maxWidth: '78%', padding: '11px 15px', borderRadius: m.role === 'user' ? '14px 4px 14px 14px' : '4px 14px 14px 14px', fontSize: 14, lineHeight: 1.75, background: m.role === 'user' ? 'linear-gradient(135deg,#6366F1,#8B5CF6)' : 'var(--code-bg)', color: m.role === 'user' ? '#fff' : 'var(--text-h)', border: m.role === 'assistant' ? '1px solid var(--border)' : 'none' }}
-              dangerouslySetInnerHTML={{ __html: m.role === 'assistant' ? formatDoubtMessage(m.content) : m.content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }} />
+            <div style={{ maxWidth: '78%' }}>
+              <div style={{ padding: '11px 15px', borderRadius: m.role === 'user' ? '14px 4px 14px 14px' : '4px 14px 14px 14px', fontSize: 14, lineHeight: 1.75, background: m.role === 'user' ? 'linear-gradient(135deg,#6366F1,#8B5CF6)' : 'var(--code-bg)', color: m.role === 'user' ? '#fff' : 'var(--text-h)', border: m.role === 'assistant' ? '1px solid var(--border)' : 'none' }}
+                dangerouslySetInnerHTML={{ __html: m.role === 'assistant' ? formatDoubtMessage(m.content) : m.content.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;') }} />
+              {m.ts ? <div style={{ fontSize: 10, color: 'var(--text)', marginTop: 3, textAlign: m.role === 'user' ? 'right' : 'left', paddingInline: 4 }}>{fmtTime(m.ts)}</div> : null}
+            </div>
           </div>
         ))}
         {loading && (
@@ -5376,7 +5403,6 @@ function ReplayDoubt({ session }) {
 // ══════════════════════════════════════════════════════════════
 function HistoryPage({ onNavigate }) {
   const TOOL_META_H = {
-    doubt:      { icon:'🤔', label:'Doubt',        color:'#818CF8' },
     notes:      { icon:'📖', label:'Notes',         color:'#10B981' },
     quiz:       { icon:'🎯', label:'Quiz',          color:'#F59E0B' },
     paper:      { icon:'📄', label:'Paper',         color:'#A855F7' },
@@ -5407,7 +5433,7 @@ function HistoryPage({ onNavigate }) {
       .finally(()=>setLoading(false))
   }, [page])
 
-  const shown   = filter==='all' ? history : history.filter(h=>h.tool===filter)
+  const shown   = (filter==='all' ? history : history.filter(h=>h.tool===filter)).filter(h=>h.tool!=='doubt')
   const grouped = shown.reduce((acc,item) => {
     const key = new Date(item.created_at).toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'})
     if (!acc[key]) acc[key] = []
