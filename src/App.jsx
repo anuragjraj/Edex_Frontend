@@ -1995,10 +1995,7 @@ function SocialFeed({ user }) {
       width: '100%',
       boxSizing: 'border-box',
       fontFamily: "'Nunito',sans-serif",
-      maxWidth: 680,
-      margin: '0 auto',
       height: 'calc(100vh - 58px)',
-      // FIX 2: removed overflowY from outer container to prevent double scroll
       display: 'flex',
       flexDirection: 'column',
     }}>
