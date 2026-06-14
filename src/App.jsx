@@ -1127,7 +1127,8 @@ function PageHeader({ icon, title, subtitle, color }) {
 function Card({ children, style={} }) { return <div style={{ ...T.card, ...style }}>{children}</div> }
 function Label({ children }) { return <div style={T.label}>{children}</div> }
 function PrimaryBtn({ children, onClick, disabled, color='var(--accent)', small, style={}, gradient }) {
-  const bg = gradient || `linear-gradient(135deg, ${color}, ${color}cc)`
+  const bg = gradient
+    || (color.startsWith('var(') ? color : `linear-gradient(135deg, ${color}, ${color}cc)`)
   return (
     <button onClick={onClick} disabled={disabled}
       style={{ background:bg, color:'#fff', padding:small?'7px 14px':'11px 22px', borderRadius:small?9:11, border:'none', fontWeight:800, fontSize:small?12.5:14.5, cursor:disabled?'not-allowed':'pointer', display:'inline-flex', alignItems:'center', gap:6, fontFamily:"'Nunito', sans-serif", opacity:disabled?.6:1, transition:'opacity .15s', ...style }}
@@ -1656,6 +1657,29 @@ function AuthPage({ onAuth, initMode }) {
   const [showPw, setShowPw] = useState(false)
   const gBtnRef = useRef(null)
   const set = (k)=>(v)=>setForm(f=>({...f,[k]:v}))
+  const [otpSent, setOtpSent]         = useState(false)
+const [otp, setOtp]                 = useState('')
+const [otpVerified, setOtpVerified] = useState(false)
+const [otpBusy, setOtpBusy]         = useState(false)
+const [otpMsg, setOtpMsg]           = useState('')
+
+// re-verify if they edit the email or switch modes
+useEffect(() => { setOtpSent(false); setOtpVerified(false); setOtp(''); setOtpMsg('') }, [form.email, mode])
+
+// e.preventDefault stops these buttons from submitting the surrounding <form>
+async function sendOtp(e) {
+  e?.preventDefault?.()
+  if (!form.email.trim()) return setErr('Enter your email first')
+  setErr(''); setOtpBusy(true); setOtpMsg('')
+  try { await api.post('/api/auth/send-otp', { email: form.email }); setOtpSent(true); setOtpMsg('Code sent — check your inbox.') }
+  catch (e) { setErr(e.message) } finally { setOtpBusy(false) }
+}
+async function verifyOtp(e) {
+  e?.preventDefault?.()
+  setErr(''); setOtpBusy(true)
+  try { await api.post('/api/auth/verify-otp', { email: form.email, code: otp }); setOtpVerified(true); setOtpMsg('Email verified ✓') }
+  catch (e) { setErr(e.message) } finally { setOtpBusy(false) }
+}
 
   useEffect(()=>{
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
@@ -1675,6 +1699,7 @@ function AuthPage({ onAuth, initMode }) {
     try {
       if (mode==='register') {
         if (!form.name.trim()) throw new Error('Name is required')
+        if (!otpVerified) throw new Error('Please verify your email first')
         if (form.password!==form.confirmPassword) throw new Error('Passwords do not match')
       }
       const data = await api.post(mode==='register'?'/api/auth/register':'/api/auth/login',{ name:form.name, email:form.email, password:form.password, role })
@@ -1731,9 +1756,9 @@ function AuthPage({ onAuth, initMode }) {
             </Field>
             {mode==='register'&&<Field label="Confirm Password"><BSInput value={form.confirmPassword} onChange={set('confirmPassword')} type="password" placeholder="Repeat password"/></Field>}
             <ErrMsg msg={err}/>
-            <PrimaryBtn style={{ width:'100%', justifyContent:'center', marginTop:4 }} disabled={busy}>
-              {busy?<><Spinner/> {mode==='register'?'Creating account...':'Signing in...'}</>:mode==='register'?'Create Account':'Sign In'}
-            </PrimaryBtn>
+            <PrimaryBtn style={{ width:'100%', justifyContent:'center', marginTop:4 }} disabled={busy || (mode === 'register' && !otpVerified)}>
+            {busy?<><Spinner/> {mode==='register'?'Creating account...':'Signing in...'}</>:mode==='register'?'Create Account':'Sign In'}
+              </PrimaryBtn>
           </form>
           {mode==='login'&&<p style={{ textAlign:'center', fontSize:12.5, color:'#64748b', marginTop:10 }}>
             <span onClick={()=>onAuth('forgot')} style={{ color:'var(--accent)', cursor:'pointer', fontWeight:700 }}>Forgot password?</span>
