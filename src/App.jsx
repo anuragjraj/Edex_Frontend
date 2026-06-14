@@ -1836,8 +1836,8 @@ function ForgotPasswordPage({ onBack }) {
 function SubscriptionPage({ user, onSuccess, onBack }) {
   const [loading,setLoading]=useState(false); const [err,setErr]=useState('')
   const plans = user?.role==='teacher'
-    ? [{id:'teacher_monthly',label:'Monthly',price:'₹120',desc:'₹120/month',months:1},{id:'teacher_yearly',label:'Annual',price:'₹1100',desc:'Save ₹340/year',months:12,popular:true}]
-    : [{id:'student_monthly',label:'Monthly',price:'₹100',desc:'₹100/month',months:1},{id:'student_yearly',label:'Annual',price:'₹900',desc:'Save ₹300/year',months:12,popular:true}]
+    ? [{id:'teacher_monthly',label:'Monthly',price:'₹300',desc:'₹300/month',months:1},{id:'teacher_yearly',label:'Annual',price:'₹3000',desc:'Save ₹3000/year',months:12,popular:true}]
+    : [{id:'student_monthly',label:'Monthly',price:'₹250',desc:'₹250/month',months:1},{id:'student_yearly',label:'Annual',price:'₹2500',desc:'Save ₹2500/year',months:12,popular:true}]
 
   // Pre-select the recommended (popular) plan, falling back to the first
   const [selectedId,setSelectedId]=useState(()=>(plans.find(p=>p.popular)||plans[0])?.id)
@@ -3165,19 +3165,22 @@ function formatDoubtMessage(md = '') {
 }
 
 
-// ── Persistent WhatsApp-style doubt thread (localStorage) ──
+// ── Persistent doubt thread (server = source of truth, localStorage = cache) ──
 const DOUBT_THREAD_KEY = 'bs_doubt_thread'
 const DOUBT_GREETING = { role: 'assistant', content: "👋 Hi! Ask me any doubt — I'll give you a **clear, step-by-step explanation** tailored to your CBSE syllabus. 🎯", ts: 0 }
 
-function loadDoubtThread() {
+function doubtCacheKey(userId) {
+  return userId ? `${DOUBT_THREAD_KEY}_${userId}` : DOUBT_THREAD_KEY
+}
+function loadDoubtThread(userId) {
   try {
-    const parsed = JSON.parse(localStorage.getItem(DOUBT_THREAD_KEY) || 'null')
+    const parsed = JSON.parse(localStorage.getItem(doubtCacheKey(userId)) || 'null')
     if (Array.isArray(parsed) && parsed.length) return parsed
   } catch {}
   return null
 }
-function saveDoubtThread(msgs) {
-  try { localStorage.setItem(DOUBT_THREAD_KEY, JSON.stringify(msgs.slice(-200))) }
+function saveDoubtThread(userId, msgs) {
+  try { localStorage.setItem(doubtCacheKey(userId), JSON.stringify(msgs.slice(-500))) }
   catch (e) { console.warn('[saveDoubtThread]', e.message) }
 }
 const fmtTime = ts => ts ? new Date(ts).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' }) : ''
@@ -3186,15 +3189,34 @@ function DoubtSolver({ user, prefill, onClearPrefill }) {
   const [subject,  setSubject]  = useState('Mathematics')
   const [cls,      setCls]      = useState('Class 10')
   const [chapter,  setChapter]  = useState('')
-  const [messages, setMessages] = useState(() => loadDoubtThread() || [DOUBT_GREETING])
+  const [messages, setMessages] = useState(() => loadDoubtThread(user?.id) || [DOUBT_GREETING])
   const [input,    setInput]    = useState('')
   const [loading,  setLoading]  = useState(false)
   const [err,      setErr]      = useState('')
   const bottomRef = useRef(null)
+  const interactedRef = useRef(false)   // don't let server hydration wipe a live exchange
 
   const chapters = getChapters(subject, cls)
 
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages])
+
+  // Load the complete saved thread from the server on mount/refresh
+  useEffect(() => {
+    let cancelled = false
+    api.get('/api/doubt/thread').then(rows => {
+      if (cancelled || interactedRef.current) return
+      if (Array.isArray(rows) && rows.length) {
+        const serverMsgs = rows.map(r => ({
+          role: r.role, content: r.content,
+          ts: r.ts ? new Date(r.ts).getTime() : 0,
+        }))
+        const full = [DOUBT_GREETING, ...serverMsgs]
+        setMessages(full)
+        saveDoubtThread(user?.id, full)
+      }
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     if (!prefill) return
@@ -3226,18 +3248,26 @@ FORMATTING — the chat renders limited markdown, follow exactly:
 
   async function send() {
     if (!input.trim()) return
+    interactedRef.current = true
     const userMsg = { role: 'user', content: input.trim(), ts: Date.now() }
     const withUser = [...messages, userMsg]
     setMessages(withUser); setInput(''); setErr(''); setLoading(true)
-    saveDoubtThread(withUser)
+    saveDoubtThread(user?.id, withUser)
     try {
       const history = withUser.filter((m, i) => !(i === 0 && m.role === 'assistant'))
       let trimmed = history.slice(-16)
       while (trimmed.length && trimmed[0].role !== 'user') trimmed = trimmed.slice(1)
       const r = await api.post('/api/ai/doubt', { messages: trimmed, system: SYSTEM, subject })
-      const finalMessages = [...withUser, { role: 'assistant', content: r.content, ts: Date.now() }]
+      const aMsg = { role: 'assistant', content: r.content, ts: Date.now() }
+      const finalMessages = [...withUser, aMsg]
       setMessages(finalMessages)
-      saveDoubtThread(finalMessages)
+      saveDoubtThread(user?.id, finalMessages)
+      api.post('/api/doubt/thread', {
+        messages: [
+          { role: 'user',      content: userMsg.content, subject, chapter, ts: userMsg.ts },
+          { role: 'assistant', content: aMsg.content,                       ts: aMsg.ts },
+        ],
+      }).catch(() => {})
     } catch (e) {
       if (e.status === 402) setErr('Free trial ended. Please subscribe.')
       else setErr(e.message)
@@ -3247,8 +3277,10 @@ FORMATTING — the chat renders limited markdown, follow exactly:
 
   function clearThread() {
     if (!window.confirm('Clear all your doubt history? This cannot be undone.')) return
+    interactedRef.current = true
     setMessages([DOUBT_GREETING])
-    try { localStorage.removeItem(DOUBT_THREAD_KEY) } catch {}
+    try { localStorage.removeItem(doubtCacheKey(user?.id)) } catch {}
+    api.del('/api/doubt/thread').catch(() => {})
   }
 
   return (
