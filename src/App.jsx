@@ -4623,7 +4623,7 @@ useEffect(() => {
     return (
       <div style={{ display: 'flex', height: 'calc(100vh - 120px)', fontFamily: "'Nunito', sans-serif", overflow: 'hidden' }}>
         {/* Sidebar */}
-        <div style={{ width: 272, flexShrink: 0, borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: 'rgba(5,5,14,.85)', overflow: 'hidden' }}>
+        <div style={{ width: 272, flexShrink: 0, borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: 'var(--bg2)', overflow: 'hidden' }}>
           <div style={{ padding: '14px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
             <GhostBtn small onClick={() => setPhase('select')} style={{ marginBottom: 10 }}>← Change Chapter</GhostBtn>
             <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: 4 }}>Course Content</div>
@@ -4656,13 +4656,13 @@ useEffect(() => {
               return (
                 <div key={mod.id} onClick={() => done && openModule(mod)}
                     style={{ display: 'flex', alignItems: 'flex-start', gap: 10, padding: '9px 10px', borderRadius: 10, cursor: done ? 'pointer' : 'default', border: `1px solid ${isActive ? 'var(--accent-border)' : 'transparent'}`, background: isActive ? 'var(--accent-bg)' : 'transparent', opacity: !done && !building ? .5 : 1, marginBottom: 2, transition: 'all .15s' }}
-                  onMouseEnter={e => { if (done && !isActive) e.currentTarget.style.background = 'rgba(255,255,255,.04)' }}
+                  onMouseEnter={e => { if (done && !isActive) e.currentTarget.style.background = 'rgba(15,23,42,.04)' }}
                   onMouseLeave={e => { if (!isActive) e.currentTarget.style.background = 'transparent' }}>
-                  <div style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, marginTop: 1, background: comp ? 'rgba(34,197,94,.2)' : isActive ? 'rgba(99,102,241,.2)' : building ? 'rgba(245,158,11,.15)' : 'rgba(255,255,255,.06)', color: comp ? '#34d399' : isActive ? 'var(--accent)' : building ? '#fbbf24' : '#374151' }}>
+                  <div style={{ width: 24, height: 24, borderRadius: '50%', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 10, fontWeight: 700, marginTop: 1, background: comp ? 'rgba(34,197,94,.2)' : isActive ? 'rgba(99,102,241,.2)' : building ? 'rgba(245,158,11,.15)' : 'var(--code-bg)', color: comp ? '#34d399' : isActive ? 'var(--accent)' : building ? '#fbbf24' : '#374151' }}>
                     {comp ? '✓' : building ? <Spinner size={9} /> : idx + 1}
                   </div>
                   <div style={{ flex: 1, minWidth: 0 }}>
-                    <div style={{ fontSize: 12.5, color: isActive ? 'var(--text-h)' : '#94a3b8', fontWeight: isActive ? 600 : 400, lineHeight: 1.35, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
+                    <div style={{ fontSize: 12.5, color: isActive ? 'var(--text-h)' : 'var(--text)', fontWeight: isActive ? 600 : 400, lineHeight: 1.35, overflow: 'hidden', textOverflow: 'ellipsis', display: '-webkit-box', WebkitLineClamp: 2, WebkitBoxOrient: 'vertical' }}>
                       {mod.emoji && <span style={{ marginRight: 4 }}>{mod.emoji}</span>}{mod.title || '…'}
                     </div>
                     <div style={{ display: 'flex', gap: 4, marginTop: 4, flexWrap: 'wrap' }}>
@@ -5477,11 +5477,11 @@ function HistoryPage({ onNavigate }) {
           position:'relative', width:'100%', aspectRatio:'1 / 1.1',
           borderRadius:16, cursor:'pointer', padding:'14px 12px 12px',
           display:'flex', flexDirection:'column', justifyContent:'space-between',
-          background: hov ? `${meta.color}14` : 'rgba(255,255,255,.025)',
-          border: `1.5px solid ${hov ? meta.color+'55' : 'rgba(255,255,255,.07)'}`,
+          background: hov ? `${meta.color}14` : 'var(--bg2)',
+          border: `1.5px solid ${hov ? meta.color+'55' : 'var(--border)'}`,
           transition:'all .18s ease',
           transform: hov ? 'translateY(-3px)' : 'none',
-          boxShadow: hov ? `0 8px 28px ${meta.color}20` : 'none',
+          boxShadow: hov ? `0 8px 28px ${meta.color}20` : '0 1px 8px rgba(15,23,42,.05)',
           fontFamily:"'Nunito',sans-serif", overflow:'hidden',
         }}
       >
@@ -5519,7 +5519,7 @@ function HistoryPage({ onNavigate }) {
       </div>
 
       {/* Legend */}
-      <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:22, padding:'9px 14px', background:'rgba(255,255,255,.02)', borderRadius:10, border:'1px solid rgba(255,255,255,.05)', fontSize:12, color:'var(--text)', flexWrap:'wrap' }}>
+      <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:22, padding:'9px 14px', background:'var(--bg2)', borderRadius:10, border:'1px solid var(--border)', fontSize:12, color:'var(--text)', flexWrap:'wrap' }}>
         <div style={{ display:'flex', alignItems:'center', gap:6 }}><span style={{ background:'rgba(255,255,255,.95)', color:'#6366F1', borderRadius:20, padding:'2px 9px', fontSize:10.5, fontWeight:800 }}>▶ Replay</span> = full session saved — tap to reopen it</div>
         <div style={{ display:'flex', alignItems:'center', gap:6 }}>No badge = activity record only (older sessions)</div>
       </div>
