@@ -282,11 +282,12 @@ const api = {
     return data
   },
   async post(path, body) {
-    const r = await fetch(`${API_URL}${path}`, { method: 'POST', headers: this.headers(), body: JSON.stringify(body) })
-    const data = await r.json()
-    if (!r.ok) throw Object.assign(new Error(data.error || 'Request failed'), { code: data.code, status: r.status })
-    return data
-  },
+  const r = await fetch(`${API_URL}${path}`, { method: 'POST', headers: this.headers(), body: JSON.stringify(body) })
+  const data = await r.json().catch(() => ({}))
+  // Slow AI tools commit a 200, then may stream an error body with _failed:true
+  if (!r.ok || data._failed) throw Object.assign(new Error(data.error || 'Request failed'), { code: data.code, status: r.status })
+  return data
+},
   async put(path, body) {
     const r = await fetch(`${API_URL}${path}`, { method: 'PUT', headers: this.headers(), body: JSON.stringify(body) })
     const data = await r.json()
