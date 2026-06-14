@@ -1846,14 +1846,14 @@ function Dashboard({ user, onNavigate }) {
   const streak=stats?.stats?.current_streak||0; const unlocked=achs.filter(a=>a.unlocked).slice(0,3)
   const hour=new Date().getHours(); const greeting=hour<12?'Good morning':hour<17?'Good afternoon':'Good evening'
   const quickStart = [
-    {icon:'📚',label:'Chapter Courses',tab:'courses',color:'#8B5CF6'},
-    {icon:'📖',label:'Generate Notes',tab:'notes',color:'#10B981'},
-    {icon:'🤔',label:'Ask a Doubt',tab:'doubt',color:'#818CF8'},
-    {icon:'🎯',label:'Take a Quiz',tab:'quiz',color:'#F59E0B'},
-    {icon:'🃏',label:'Flashcards',tab:'flashcards',color:'#EF4444'},
+    {icon:'📚',label:'Chapter Courses',tab:'courses',    color:'#8B5CF6', desc:'Video-based lessons'},
+    {icon:'📖',label:'Generate Notes', tab:'notes',      color:'#10B981', desc:'Chapter-wise notes'},
+    {icon:'🎯',label:'Take a Quiz',    tab:'quiz',       color:'#F59E0B', desc:'Timed MCQ practice'},
+    {icon:'🃏',label:'Flashcards',     tab:'flashcards', color:'#EF4444', desc:'Quick revision cards'},
+    {icon:'🤔',label:'Ask a Doubt',    tab:'doubt',      color:'#818CF8', desc:'Step-by-step answers'},
     // HIDDEN FOR NOW — uncomment to re-enable:
-    { icon: '🕘', label: 'My History', tab: 'history', color: '#6366F1' },
-    {icon:'📣',label:'Study Feed',tab:'feed',color:'#6366F1'},
+    {icon:'🕘',label:'My History',     tab:'history',    color:'#6366F1', desc:'Replay past sessions'},
+    {icon:'📣',label:'Study Feed',     tab:'feed',       color:'#6366F1', desc:'Share & ask peers'},
     // ...(user.type==='school'?[{icon:'📝',label:'Assignments',tab:'assignments',color:'#F59E0B'}]:[]),
     // ...(user.role==='student'?[{icon:'📋',label:'Exam Cheat Sheet',tab:'cheatsheet',color:'#F97316'}]:[{icon:'🎓',label:'Lesson Planner',tab:'lessonplan',color:'#7C3AED'}]),
     // {icon:'🔍',label:'Find People',tab:'search',color:'#06b6d4'},
@@ -1893,12 +1893,17 @@ function Dashboard({ user, onNavigate }) {
         <Card>
           <h3 style={{ margin:'0 0 14px', fontSize:15, fontFamily:"'Sora',sans-serif", fontWeight:800, color:'var(--text-h)' }}>⚡ Quick Start</h3>
           {quickStart.map(item=>(
-            <button key={item.tab} onClick={()=>onNavigate(item.tab)} style={{ width:'100%', display:'flex', alignItems:'center', gap:12, padding:'10px 14px', borderRadius:10, border:'1px solid var(--border)', background:'var(--code-bg)', color:'var(--text-h)', cursor:'pointer', marginBottom:9, fontSize:14, fontWeight:600, fontFamily:"'Nunito',sans-serif", transition:'all .15s' }}
-              onMouseEnter={e=>{e.currentTarget.style.background='var(--accent-bg)';e.currentTarget.style.borderColor='var(--accent)'}}
-              onMouseLeave={e=>{e.currentTarget.style.background='var(--code-bg)';e.currentTarget.style.borderColor='var(--border)'}}>
-              <span style={{ fontSize:20 }}>{item.icon}</span>{item.label}<span style={{ marginLeft:'auto', fontSize:16, color:'var(--text)' }}>→</span>
-            </button>
-          ))}
+  <button key={item.tab} onClick={()=>onNavigate(item.tab)} style={{ width:'100%', display:'flex', alignItems:'center', gap:12, padding:'10px 14px', borderRadius:10, border:'1px solid var(--border)', background:'var(--code-bg)', color:'var(--text-h)', cursor:'pointer', marginBottom:9, fontFamily:"'Nunito',sans-serif", transition:'all .15s', textAlign:'left' }}
+    onMouseEnter={e=>{e.currentTarget.style.background='var(--accent-bg)';e.currentTarget.style.borderColor='var(--accent)'}}
+    onMouseLeave={e=>{e.currentTarget.style.background='var(--code-bg)';e.currentTarget.style.borderColor='var(--border)'}}>
+    <span style={{ fontSize:20, flexShrink:0 }}>{item.icon}</span>
+    <span style={{ flex:1, minWidth:0 }}>
+      <span style={{ display:'block', fontSize:14, fontWeight:600 }}>{item.label}</span>
+      <span style={{ display:'block', fontSize:11.5, color:'var(--text)', fontWeight:500, marginTop:1 }}>{item.desc}</span>
+    </span>
+    <span style={{ fontSize:16, color:'var(--text)', flexShrink:0 }}>→</span>
+  </button>
+))}
         </Card>
         <Card>
           <h3 style={{ margin:'0 0 14px', fontSize:15, fontFamily:"'Sora',sans-serif", fontWeight:800, color:'var(--text-h)' }}>🏆 Recent Achievements</h3>
