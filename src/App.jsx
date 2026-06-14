@@ -1796,8 +1796,12 @@ function ForgotPasswordPage({ onBack }) {
 function SubscriptionPage({ user, onSuccess, onBack }) {
   const [loading,setLoading]=useState(false); const [err,setErr]=useState('')
   const plans = user?.role==='teacher'
-    ? [{id:'teacher_monthly',label:'Monthly',price:'₹180',desc:'₹180/month',months:1},{id:'teacher_yearly',label:'Annual',price:'₹1,800',desc:'Save ₹360/year',months:12,popular:true}]
-    : [{id:'student_monthly',label:'Monthly',price:'₹150',desc:'₹150/month',months:1},{id:'student_yearly',label:'Annual',price:'₹1,500',desc:'Save ₹300/year',months:12,popular:true}]
+    ? [{id:'teacher_monthly',label:'Monthly',price:'₹120',desc:'₹120/month',months:1},{id:'teacher_yearly',label:'Annual',price:'₹1100',desc:'Save ₹340/year',months:12,popular:true}]
+    : [{id:'student_monthly',label:'Monthly',price:'₹100',desc:'₹100/month',months:1},{id:'student_yearly',label:'Annual',price:'₹900',desc:'Save ₹300/year',months:12,popular:true}]
+
+  // Pre-select the recommended (popular) plan, falling back to the first
+  const [selectedId,setSelectedId]=useState(()=>(plans.find(p=>p.popular)||plans[0])?.id)
+
   async function subscribe(planType) {
     setErr('');setLoading(true)
     try {
@@ -1812,19 +1816,53 @@ function SubscriptionPage({ user, onSuccess, onBack }) {
       rzp.open()
     } catch(e){setErr(e.message)} finally{setLoading(false)}
   }
+
   return (
     <div style={{ padding:24, fontFamily:"'Nunito',sans-serif" }}>
       {onBack&&<GhostBtn small onClick={onBack} style={{ marginBottom:20 }}>← Back</GhostBtn>}
       <div style={{ textAlign:'center', marginBottom:32 }}><div style={{ fontSize:48, marginBottom:8 }}>💎</div><h2 style={{ fontFamily:"'Sora',sans-serif", fontWeight:900, color:'var(--text-h)', margin:'0 0 6px' }}>Upgrade BrainSpark AI</h2><p style={{ color:'var(--text)', fontSize:14 }}>Unlimited access to all AI tools</p></div>
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(240px,1fr))', gap:16, marginBottom:24, maxWidth:700, margin:'0 auto 24px' }}>
-        {plans.map(p=>(
-          <div key={p.id} style={{ ...T.card, position:'relative', borderColor:p.popular?'var(--accent)':'var(--border)', borderWidth:p.popular?2:1, textAlign:'center' }}>
-            {p.popular&&<div style={{ position:'absolute', top:-13, left:'50%', transform:'translateX(-50%)', background:'var(--accent)', color:'#fff', borderRadius:20, padding:'3px 14px', fontSize:11, fontWeight:800 }}>BEST VALUE</div>}
-            <div style={{ fontSize:30, fontWeight:900, color:'var(--accent)', marginBottom:4, fontFamily:"'Sora',sans-serif" }}>{p.price}</div>
-            <div style={{ fontSize:13, color:'var(--text)', marginBottom:16 }}>{p.desc}</div>
-            <PrimaryBtn onClick={()=>subscribe(p.id)} disabled={loading} style={{ width:'100%', justifyContent:'center' }}>{loading?<><Spinner/> ...</>:`Get ${p.label}`}</PrimaryBtn>
-          </div>
-        ))}
+        {plans.map(p=>{
+          const selected = selectedId===p.id
+          return (
+            <div key={p.id}
+              onClick={()=>setSelectedId(p.id)}
+              role="button" tabIndex={0}
+              onKeyDown={e=>{ if(e.key==='Enter'||e.key===' '){ e.preventDefault(); setSelectedId(p.id) } }}
+              style={{
+                ...T.card, position:'relative', textAlign:'center', cursor:'pointer',
+                borderColor: selected ? 'var(--accent)' : 'var(--border)',
+                borderWidth: selected ? 2 : 1,
+                background: selected ? 'var(--accent-bg)' : 'var(--bg2)',
+                boxShadow: selected ? '0 0 0 4px var(--accent-bg), 0 8px 24px rgba(99,102,241,.18)' : '0 2px 12px rgba(0,0,0,.12)',
+                transform: selected ? 'translateY(-2px)' : 'none',
+                transition: 'all .18s ease',
+              }}
+              onMouseEnter={e=>{ if(!selected) e.currentTarget.style.borderColor='var(--accent-border)' }}
+              onMouseLeave={e=>{ if(!selected) e.currentTarget.style.borderColor='var(--border)' }}
+            >
+              {p.popular&&<div style={{ position:'absolute', top:-13, left:'50%', transform:'translateX(-50%)', background:'var(--accent)', color:'#fff', borderRadius:20, padding:'3px 14px', fontSize:11, fontWeight:800 }}>BEST VALUE</div>}
+
+              {/* selection indicator */}
+              <div style={{ position:'absolute', top:12, right:12, width:20, height:20, borderRadius:'50%', border:`2px solid ${selected?'var(--accent)':'var(--border)'}`, background:selected?'var(--accent)':'transparent', display:'flex', alignItems:'center', justifyContent:'center', transition:'all .15s' }}>
+                {selected && <span style={{ color:'#fff', fontSize:11, fontWeight:900, lineHeight:1 }}>✓</span>}
+              </div>
+
+              <div style={{ fontSize:30, fontWeight:900, color:'var(--accent)', marginBottom:4, fontFamily:"'Sora',sans-serif" }}>{p.price}</div>
+              <div style={{ fontSize:13, color:'var(--text)', marginBottom:16 }}>{p.desc}</div>
+              <div style={{ fontSize:12.5, fontWeight:700, color:selected?'var(--accent)':'var(--text)' }}>
+                {selected ? '✓ Selected' : 'Tap to select'}
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      {/* Single subscribe button acts on the selected plan */}
+      <div style={{ maxWidth:700, margin:'0 auto' }}>
+        <PrimaryBtn onClick={()=>subscribe(selectedId)} disabled={loading||!selectedId} style={{ width:'100%', justifyContent:'center', fontSize:15 }}>
+          {loading ? <><Spinner/> Processing…</> : `Continue with ${plans.find(p=>p.id===selectedId)?.label||''} — ${plans.find(p=>p.id===selectedId)?.price||''}`}
+        </PrimaryBtn>
       </div>
       <ErrMsg msg={err}/>
     </div>
