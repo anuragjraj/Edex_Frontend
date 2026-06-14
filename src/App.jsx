@@ -1655,31 +1655,13 @@ function AuthPage({ onAuth, initMode }) {
   const [err,    setErr]    = useState('')
   const [busy,   setBusy]   = useState(false)
   const [showPw, setShowPw] = useState(false)
+  const [regStep, setRegStep] = useState('form')   // 'form' = enter details, 'otp' = enter code
+  const [otp,     setOtp]     = useState('')
   const gBtnRef = useRef(null)
   const set = (k)=>(v)=>setForm(f=>({...f,[k]:v}))
-  const [otpSent, setOtpSent]         = useState(false)
-const [otp, setOtp]                 = useState('')
-const [otpVerified, setOtpVerified] = useState(false)
-const [otpBusy, setOtpBusy]         = useState(false)
-const [otpMsg, setOtpMsg]           = useState('')
 
-// re-verify if they edit the email or switch modes
-useEffect(() => { setOtpSent(false); setOtpVerified(false); setOtp(''); setOtpMsg('') }, [form.email, mode])
-
-// e.preventDefault stops these buttons from submitting the surrounding <form>
-async function sendOtp(e) {
-  e?.preventDefault?.()
-  if (!form.email.trim()) return setErr('Enter your email first')
-  setErr(''); setOtpBusy(true); setOtpMsg('')
-  try { await api.post('/api/auth/send-otp', { email: form.email }); setOtpSent(true); setOtpMsg('Code sent — check your inbox.') }
-  catch (e) { setErr(e.message) } finally { setOtpBusy(false) }
-}
-async function verifyOtp(e) {
-  e?.preventDefault?.()
-  setErr(''); setOtpBusy(true)
-  try { await api.post('/api/auth/verify-otp', { email: form.email, code: otp }); setOtpVerified(true); setOtpMsg('Email verified ✓') }
-  catch (e) { setErr(e.message) } finally { setOtpBusy(false) }
-}
+  // Reset the register step whenever they switch login/register or personal/school
+  useEffect(() => { setRegStep('form'); setOtp(''); setErr('') }, [mode, tab])
 
   useEffect(()=>{
     const clientId = import.meta.env.VITE_GOOGLE_CLIENT_ID
@@ -1697,12 +1679,26 @@ async function verifyOtp(e) {
   async function handlePersonal(e) {
     e.preventDefault(); setErr(''); setBusy(true)
     try {
-      if (mode==='register') {
-        if (!form.name.trim()) throw new Error('Name is required')
-        if (!otpVerified) throw new Error('Please verify your email first')
-        if (form.password!==form.confirmPassword) throw new Error('Passwords do not match')
+      // ── Login: unchanged ──
+      if (mode === 'login') {
+        const data = await api.post('/api/auth/login', { email: form.email, password: form.password, role })
+        saveAuth(data); onAuth(data.user); return
       }
-      const data = await api.post(mode==='register'?'/api/auth/register':'/api/auth/login',{ name:form.name, email:form.email, password:form.password, role })
+
+      // ── Register step 1: validate details, then send the code ──
+      if (regStep === 'form') {
+        if (!form.name.trim())                      throw new Error('Name is required')
+        if (form.password.length < 8)               throw new Error('Password must be at least 8 characters')
+        if (form.password !== form.confirmPassword) throw new Error('Passwords do not match')
+        await api.post('/api/auth/send-otp', { email: form.email })
+        setRegStep('otp')   // reveal the code box
+        return
+      }
+
+      // ── Register step 2: verify code, then create the account ──
+      if (otp.trim().length < 4) throw new Error('Enter the code sent to your email')
+      await api.post('/api/auth/verify-otp', { email: form.email, code: otp })
+      const data = await api.post('/api/auth/register', { name: form.name, email: form.email, password: form.password, role })
       saveAuth(data); onAuth(data.user)
     } catch(e){ setErr(e.message) } finally{ setBusy(false) }
   }
@@ -1720,6 +1716,8 @@ async function verifyOtp(e) {
     localStorage.setItem('bs_session', data.sessionToken)
     localStorage.setItem('bs_user',    JSON.stringify(data.user))
   }
+
+  const onOtpStep = mode === 'register' && regStep === 'otp'
 
   return (
     <div style={{ minHeight:'100vh', background:'linear-gradient(135deg,#eef2ff,#f4f4f0)', display:'flex', alignItems:'center', justifyContent:'center', padding:20, fontFamily:"'Nunito',sans-serif" }}>
@@ -1746,19 +1744,35 @@ async function verifyOtp(e) {
             ))}
           </div>
           <form onSubmit={handlePersonal} style={{ display:'flex', flexDirection:'column', gap:12 }}>
-            {mode==='register'&&<Field label="Full Name"><BSInput value={form.name} onChange={set('name')} placeholder="Your full name"/></Field>}
-            <Field label="Email Address"><BSInput value={form.email} onChange={set('email')} type="email" placeholder="your@email.com"/></Field>
+            {mode==='register'&&<Field label="Full Name"><BSInput value={form.name} onChange={set('name')} placeholder="Your full name" disabled={onOtpStep}/></Field>}
+            <Field label="Email Address"><BSInput value={form.email} onChange={set('email')} type="email" placeholder="your@email.com" disabled={onOtpStep}/></Field>
             <Field label="Password">
               <div style={{ position:'relative' }}>
-                <BSInput value={form.password} onChange={set('password')} type={showPw?'text':'password'} placeholder="Password" style={{ paddingRight:40 }}/>
+                <BSInput value={form.password} onChange={set('password')} type={showPw?'text':'password'} placeholder="Password" style={{ paddingRight:40 }} disabled={onOtpStep}/>
                 <span onClick={()=>setShowPw(p=>!p)} style={{ position:'absolute', right:12, top:'50%', transform:'translateY(-50%)', cursor:'pointer', color:'#64748b', userSelect:'none' }}>{showPw?'🙈':'👁'}</span>
               </div>
             </Field>
-            {mode==='register'&&<Field label="Confirm Password"><BSInput value={form.confirmPassword} onChange={set('confirmPassword')} type="password" placeholder="Repeat password"/></Field>}
+            {mode==='register'&&<Field label="Confirm Password"><BSInput value={form.confirmPassword} onChange={set('confirmPassword')} type="password" placeholder="Repeat password" disabled={onOtpStep}/></Field>}
+
+            {onOtpStep && (
+              <Field label="Verification Code">
+                <BSInput value={otp} onChange={setOtp} placeholder="6-digit code from your email"/>
+                <div style={{ fontSize:12, color:'#64748b', marginTop:6 }}>
+                  Sent to {form.email}.{' '}
+                  <span onClick={async()=>{ setErr(''); try{ await api.post('/api/auth/send-otp',{email:form.email}) }catch(e){ setErr(e.message) } }}
+                    style={{ color:'var(--accent)', cursor:'pointer', fontWeight:700 }}>Resend</span>
+                  {' · '}
+                  <span onClick={()=>{ setRegStep('form'); setOtp('') }} style={{ color:'var(--accent)', cursor:'pointer', fontWeight:700 }}>Edit details</span>
+                </div>
+              </Field>
+            )}
+
             <ErrMsg msg={err}/>
-            <PrimaryBtn style={{ width:'100%', justifyContent:'center', marginTop:4 }} disabled={busy || (mode === 'register' && !otpVerified)}>
-            {busy?<><Spinner/> {mode==='register'?'Creating account...':'Signing in...'}</>:mode==='register'?'Create Account':'Sign In'}
-              </PrimaryBtn>
+            <PrimaryBtn style={{ width:'100%', justifyContent:'center', marginTop:4 }} disabled={busy}>
+              {busy
+                ? <><Spinner/> {mode==='register' ? (onOtpStep ? 'Creating account...' : 'Sending code...') : 'Signing in...'}</>
+                : mode==='register' ? (onOtpStep ? 'Verify & Create Account' : 'Create Account') : 'Sign In'}
+            </PrimaryBtn>
           </form>
           {mode==='login'&&<p style={{ textAlign:'center', fontSize:12.5, color:'#64748b', marginTop:10 }}>
             <span onClick={()=>onAuth('forgot')} style={{ color:'var(--accent)', cursor:'pointer', fontWeight:700 }}>Forgot password?</span>
@@ -1767,7 +1781,7 @@ async function verifyOtp(e) {
             <div style={{ flex:1, height:1, background:'rgba(255,255,255,.08)' }}/><span style={{ fontSize:12, color:'#64748b', fontWeight:600 }}>OR</span><div style={{ flex:1, height:1, background:'rgba(255,255,255,.08)' }}/>
           </div>
           <div ref={gBtnRef} style={{ display:'flex', justifyContent:'center', marginBottom:10 }}/>
-          <p style={{ textAlign:'center', fontSize:11.5, color:'#64748b', marginTop:8 }}>⏱ Free trial: 10 minutes · then ₹{role==='teacher'?'180':'150'}/month</p>
+          <p style={{ textAlign:'center', fontSize:11.5, color:'#64748b', marginTop:8 }}>⏱ 60-day free trial · then ₹{role==='teacher'?'100':'100'}/month</p>
         </>}
         {tab==='school'&&(
           <form onSubmit={handleSchool} style={{ display:'flex', flexDirection:'column', gap:12 }}>
