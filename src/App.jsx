@@ -3443,21 +3443,25 @@ FINAL REMINDER: You must write AT LEAST 3500 words. Every section above must be 
     })
   }, [prefill])
 
+  // Shared cache key — everyone who picks this same subject+class+chapter+style shares one note
+  const notesCacheKey = () => {
+    const safe = s => String(s || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase().slice(0, 24)
+    return `bsnotes-${safe(subject)}-${safe(cls)}-${safe(finalChapter)}-${safe(style_)}`
+  }
+
   async function generate() {
     if(!finalChapter) return; setErr(''); setLoading(true); setSaved(false)
     try{
-      // ── Check DB cache first — if someone already generated this, reuse it ──
-      const list = await api.get('/api/user/notes').catch(()=>[])
-      const cached = list.find(n => n.subject===subject && n.chapter===finalChapter)
-      if (cached) {
-        const full = await api.get(`/api/user/notes/${cached.id}`)
-        setResult(full.content); setSaved(true); setLoading(false); return
+      // ── Check the SHARED cache first — if ANY user already made this, reuse it ──
+      const shared = await api.get(`/api/shared-notes/${notesCacheKey()}`).catch(()=>null)
+      if (shared?.content) {
+        setResult(shared.content); setLoading(false); return
       }
-      // ── Not cached — generate fresh ──
+      // ── Not cached anywhere — generate fresh ──
       const r=await api.post('/api/ai/notes',{messages:[{role:'user',content:buildPrompt()}],subject,chapter:finalChapter})
       setResult(r.content)
-      // Auto-save to DB so next user gets it from cache
-      try { await api.post('/api/user/notes',{subject,classLevel:cls,chapter:finalChapter,style:style_,content:r.content}); setSaved(true) } catch{}
+      // Save to the SHARED cache so the next person (anyone) gets it instantly
+      try { await api.post('/api/shared-notes',{subject,classLevel:cls,chapter:finalChapter,style:style_,content:r.content}) } catch{}
       saveSessionContent({ tool:'notes', subject, chapter:finalChapter, classLevel:cls, content:r.content })
     }
     catch(e){ if(e.status===402){setErr('Free trial ended. Please subscribe.')}else{setErr(e.message)} }
