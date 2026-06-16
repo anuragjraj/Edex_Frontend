@@ -1836,8 +1836,8 @@ function ForgotPasswordPage({ onBack }) {
 function SubscriptionPage({ user, onSuccess, onBack }) {
   const [loading,setLoading]=useState(false); const [err,setErr]=useState('')
   const plans = user?.role==='teacher'
-    ? [{id:'teacher_monthly',label:'Monthly',price:'₹300',desc:'₹300/month',months:1},{id:'teacher_yearly',label:'Annual',price:'₹2800',desc:'Save ₹800/year',months:12,popular:true}]
-    : [{id:'student_monthly',label:'Monthly',price:'₹230',desc:'₹230/month',months:1},{id:'student_yearly',label:'Annual',price:'₹2220',desc:'Save ₹620/year',months:12,popular:true}]
+    ? [{id:'teacher_monthly',label:'Monthly',price:'₹150',desc:'₹150/month',months:1},{id:'teacher_yearly',label:'Annual',price:'₹1500',desc:'Save ₹300/year',months:12,popular:true}]
+    : [{id:'student_monthly',label:'Monthly',price:'₹130',desc:'₹130/month',months:1},{id:'student_yearly',label:'Annual',price:'₹1200',desc:'Save ₹360/year',months:12,popular:true}]
 
   // Pre-select the recommended (popular) plan, falling back to the first
   const [selectedId,setSelectedId]=useState(()=>(plans.find(p=>p.popular)||plans[0])?.id)
