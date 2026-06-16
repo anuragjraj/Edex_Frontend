@@ -4467,6 +4467,7 @@ function AchievementsPage() {
 //  CHAPTER COURSES
 // ══════════════════════════════════════════════════════════════
 function ChapterCourses({ user, prefill, onClearPrefill }) {
+  const isMobile = useIsMobile()
   const [subj,     setSubj]    = useState('Mathematics')
   const [cls,      setCls]     = useState(user?.class_level || 'Class 10')
   const [chapter,  setChapter] = useState('')
@@ -4737,10 +4738,13 @@ useEffect(() => {
     const compCount = modules.filter(m => isComplete(m.id)).length
     const pct       = doneCount > 0 ? Math.round((compCount / doneCount) * 100) : 0
     const activeMod = modules.find(m => m.id === activeModuleId)
+    const showSidebar = !isMobile || !activeModuleId
+    const showContent = !isMobile || !!activeModuleId
     return (
       <div style={{ display: 'flex', height: 'calc(100vh - 120px)', fontFamily: "'Nunito', sans-serif", overflow: 'hidden' }}>
         {/* Sidebar */}
-        <div style={{ width: 272, flexShrink: 0, borderRight: '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: 'var(--bg2)', overflow: 'hidden' }}>
+        {showSidebar && (
+        <div style={{ width: isMobile ? '100%' : 272, flexShrink: 0, borderRight: isMobile ? 'none' : '1px solid var(--border)', display: 'flex', flexDirection: 'column', background: 'var(--bg2)', overflow: 'hidden' }}>
           <div style={{ padding: '14px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
             <GhostBtn small onClick={() => setPhase('select')} style={{ marginBottom: 10 }}>← Change Chapter</GhostBtn>
             <div style={{ fontSize: 10, fontWeight: 800, color: 'var(--accent)', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: 4 }}>Course Content</div>
@@ -4793,7 +4797,9 @@ useEffect(() => {
             })}
           </div>
         </div>
+        )}
         {/* Module content area */}
+        {showContent && (
         <div style={{ flex: 1, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
           {activeMod ? (
             <ModuleView
@@ -4806,6 +4812,7 @@ useEffect(() => {
               isComplete={isComplete(activeModuleId)}
               onComplete={() => markComplete(activeModuleId)}
               onUncomplete={() => unmarkComplete(activeModuleId)}
+              onBackToList={isMobile ? () => setActiveModuleId(null) : undefined}
               onPrev={() => { const idx = modules.findIndex(m => m.id === activeModuleId); if (idx > 0) openModule(modules[idx - 1]) }}
               onNext={() => { const idx = modules.findIndex(m => m.id === activeModuleId); const next = modules.slice(idx + 1).find(m => m.status === 'done'); if (next) openModule(next) }}
               hasPrev={modules.findIndex(m => m.id === activeModuleId) > 0}
@@ -4820,6 +4827,7 @@ useEffect(() => {
             </div>
           )}
         </div>
+        )}
       </div>
     )
   }
@@ -4906,7 +4914,7 @@ function StatusDot({ status }) {
 // ══════════════════════════════════════════════════════════════
 //  MODULE VIEW — Video player + Notes/Q&A/Quiz tabs
 // ══════════════════════════════════════════════════════════════
-function ModuleView({ mod, moduleData, subject, cls, chapter, courseKey, isComplete, onComplete, onUncomplete, onPrev, onNext, hasPrev, hasNext }) {
+function ModuleView({ mod, moduleData, subject, cls, chapter, courseKey, isComplete, onComplete, onUncomplete, onBackToList, onPrev, onNext, hasPrev, hasNext }) {
   const [tab,    setTab]    = useState('video')
   const [qAns,   setQAns]   = useState({})
   const [qDone,  setQDone]  = useState(false)
@@ -4941,6 +4949,10 @@ function ModuleView({ mod, moduleData, subject, cls, chapter, courseKey, isCompl
 
       {/* ── Module title bar ── */}
       <div style={{ padding: '13px 20px 11px', borderBottom: '1px solid var(--border)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10, flexWrap: 'wrap' }}>
+        {onBackToList && (
+          <button onClick={onBackToList} title="Back to modules"
+            style={{ width: 32, height: 32, borderRadius: 8, border: '1px solid var(--border)', background: 'var(--code-bg)', color: 'var(--text-h)', fontSize: 15, cursor: 'pointer', flexShrink: 0, fontFamily: "'Nunito', sans-serif" }}>←</button>
+        )}
         <span style={{ fontSize: 20 }}>{mod?.emoji}</span>
         <div style={{ flex: 1, minWidth: 0 }}>
           <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 15, color: 'var(--text-h)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{mod?.title}</div>
