@@ -1925,11 +1925,11 @@ function Dashboard({ user, onNavigate }) {
   const streak=stats?.stats?.current_streak||0; const unlocked=achs.filter(a=>a.unlocked).slice(0,3)
   const hour=new Date().getHours(); const greeting=hour<12?'Good morning':hour<17?'Good afternoon':'Good evening'
   const quickStart = [
-    {icon:'📚',label:'Chapter Courses',tab:'courses',    color:'#8B5CF6', desc:'Video-based lessons'},
+    {icon:'🤔',label:'Ask a Doubt',    tab:'doubt',      color:'#818CF8', desc:'Step-by-step answers'},
     {icon:'📖',label:'Generate Notes', tab:'notes',      color:'#10B981', desc:'Chapter-wise notes'},
     {icon:'🎯',label:'Take a Quiz',    tab:'quiz',       color:'#F59E0B', desc:'Timed MCQ practice'},
     {icon:'🃏',label:'Flashcards',     tab:'flashcards', color:'#EF4444', desc:'Quick revision cards'},
-    {icon:'🤔',label:'Ask a Doubt',    tab:'doubt',      color:'#818CF8', desc:'Step-by-step answers'},
+    {icon:'📚',label:'Youtube-Courses',tab:'courses',    color:'#8B5CF6', desc:'Video-based lessons'},
     // HIDDEN FOR NOW — uncomment to re-enable:
     {icon:'🕘',label:'My History',     tab:'history',    color:'#6366F1', desc:'Replay past sessions'},
     {icon:'📣',label:'Study Feed',     tab:'feed',       color:'#6366F1', desc:'Share & ask peers'},
@@ -5806,12 +5806,12 @@ export default function App() {
 
   const tabs = [
     { id: 'dashboard',   icon: '🏠', label: 'Dashboard',      color: '#6366F1' },
-    { id: 'courses',     icon: '📚', label: 'Chapter Courses', color: '#8B5CF6' },
+    { id: 'doubt',       icon: '🤔', label: 'Doubt Solver',    color: '#818CF8' },
     { id: 'notes',       icon: '📖', label: 'Notes',           color: '#10B981' },
     // { id: 'paper',       icon: '📄', label: 'Question Paper',  color: '#A855F7' },
     { id: 'quiz',        icon: '🎯', label: 'Quiz',            color: '#F59E0B' },
     { id: 'flashcards',  icon: '🃏', label: 'Flashcards',      color: '#EF4444' },
-    { id: 'doubt',       icon: '🤔', label: 'Doubt Solver',    color: '#818CF8' },
+    { id: 'courses',     icon: '📚', label: 'Youtube Courses', color: '#8B5CF6' },
     // { id: 'search',      icon: '🔍', label: 'Search',          color: '#06b6d4' },
     // { id: 'messages',    icon: '💬', label: 'Messages',        color: '#10B981' },
     // { id: 'video',       icon: '🎬', label: 'Video Learning',  color: '#06b6d4' },
