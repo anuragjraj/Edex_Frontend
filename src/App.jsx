@@ -3597,6 +3597,14 @@ FINAL REMINDER: You must write AT LEAST 3500 words. Every section above must be 
         {!chapter&&<Field label="Or enter chapter name manually"><BSInput value={customCh} onChange={setCustomCh} placeholder="e.g. Gravitation, Mughal Empire"/></Field>}
         <Field label="Notes Style"><BSSelect value={style_} onChange={setStyle_} options={['Detailed','Concise','Bullet Points','Q&A Format','Mind Map Style']}/></Field>
         <PrimaryBtn onClick={generate} disabled={loading||(!chapter&&!customCh)} color="#10B981">{loading?<><Spinner/> Generating notes...</>:'📖 Generate Comprehensive Notes'}</PrimaryBtn>
+        {loading && (
+          <div style={{ marginTop:12, padding:'10px 14px', borderRadius:10, background:'rgba(16,185,129,.08)', border:'1px solid rgba(16,185,129,.25)', display:'flex', alignItems:'center', gap:10, fontFamily:"'Nunito', sans-serif" }}>
+            <Spinner size={16}/>
+            <span style={{ fontSize:13, color:'#10B981', fontWeight:700 }}>
+              ⏳ Please wait 30–40 seconds — we're writing comprehensive, exam-ready notes for you. Don't close or switch tabs.
+            </span>
+          </div>
+        )}
       </Card>
       <ErrMsg msg={err}/>
       {result&&<>
