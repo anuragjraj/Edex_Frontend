@@ -1447,8 +1447,8 @@ function ContentBox({ content, onDownload, downloadName, label='Generated Conten
           if(line.startsWith('# '))   return <h2 key={i} style={{ color:'var(--accent)', borderBottom:'2px solid var(--accent-border)', paddingBottom:6, margin:'16px 0 8px', fontFamily:"'Sora', sans-serif" }}>{line.slice(2)}</h2>
           if(line.startsWith('## '))  return <h3 key={i} style={{ color:'var(--text-h)', margin:'14px 0 6px', fontFamily:"'Sora', sans-serif" }}>{line.slice(3)}</h3>
           if(line.startsWith('### ')) return <h4 key={i} style={{ color:'var(--text-h)', margin:'10px 0 4px', fontFamily:"'Sora', sans-serif" }}>{line.slice(4)}</h4>
-          if(line.startsWith('- ')||line.startsWith('• ')) return <div key={i} style={{ paddingLeft:16, marginBottom:2, color:'var(--text-h)' }}>• {line.slice(2)}</div>
-          if(/^\d+\./.test(line)) return <div key={i} style={{ paddingLeft:16, marginBottom:2, color:'var(--text-h)' }}>{line}</div>
+          if(line.startsWith('- ')||line.startsWith('• ')) return <div key={i} style={{ paddingLeft:16, marginBottom:2, color:'var(--text-h)' }} dangerouslySetInnerHTML={{ __html:'• '+line.slice(2).replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>') }}/>
+          if(/^\d+\./.test(line)) return <div key={i} style={{ paddingLeft:16, marginBottom:2, color:'var(--text-h)' }} dangerouslySetInnerHTML={{ __html:line.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>') }}/>
           if(line.startsWith('---')||line.startsWith('═══')) return <hr key={i} style={{ border:'none', borderTop:'1px solid var(--border)', margin:'12px 0' }}/>
           const bold = line.replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>')
           return <p key={i} style={{ margin:'3px 0', color:'var(--text-h)' }} dangerouslySetInnerHTML={{ __html:bold }}/>
@@ -3349,6 +3349,8 @@ FORMATTING — the chat renders limited markdown, follow exactly:
 
 function NotesDocument({ content, title, onDownload }) {
   const lines = (content || '').split('\n')
+  const mdBold = s =>
+    (s || '').replace(/\*\*(.*?)\*\*/g, '<strong style="font-weight:700;color:#1a1a2e">$1</strong>')
 
   const rendered = lines.map((line, i) => {
     if (line.startsWith('# '))
@@ -3358,13 +3360,13 @@ function NotesDocument({ content, title, onDownload }) {
     if (line.startsWith('### '))
       return <h4 key={i} style={{ fontSize:15, fontWeight:700, color:'#1e293b', margin:'18px 0 6px', paddingLeft:12, borderLeft:'3px solid #818cf8' }}>{line.slice(4)}</h4>
     if (line.startsWith('- ') || line.startsWith('• '))
-      return <div key={i} style={{ display:'flex', gap:10, marginBottom:5, paddingLeft:8 }}><span style={{ color:'#818cf8', flexShrink:0, fontWeight:800, marginTop:1 }}>•</span><span style={{ color:'#374151', fontSize:14.5, lineHeight:1.75 }}>{line.slice(2)}</span></div>
+      return <div key={i} style={{ display:'flex', gap:10, marginBottom:5, paddingLeft:8 }}><span style={{ color:'#818cf8', flexShrink:0, fontWeight:800, marginTop:1 }}>•</span><span style={{ color:'#374151', fontSize:14.5, lineHeight:1.75 }} dangerouslySetInnerHTML={{ __html: mdBold(line.slice(2)) }}/></div>
     if (/^\d+\./.test(line))
-      return <div key={i} style={{ display:'flex', gap:10, marginBottom:5, paddingLeft:8 }}><span style={{ color:'#818cf8', flexShrink:0, fontWeight:800, minWidth:22, fontSize:13 }}>{line.match(/^\d+/)[0]}.</span><span style={{ color:'#374151', fontSize:14.5, lineHeight:1.75 }}>{line.replace(/^\d+\.\s*/,'')}</span></div>
+      return <div key={i} style={{ display:'flex', gap:10, marginBottom:5, paddingLeft:8 }}><span style={{ color:'#818cf8', flexShrink:0, fontWeight:800, minWidth:22, fontSize:13 }}>{line.match(/^\d+/)[0]}.</span><span style={{ color:'#374151', fontSize:14.5, lineHeight:1.75 }} dangerouslySetInnerHTML={{ __html: mdBold(line.replace(/^\d+\.\s*/,'')) }}/></div>
     if (line.startsWith('---') || line.startsWith('═══'))
       return <hr key={i} style={{ border:'none', borderTop:'1px solid #e2e8f0', margin:'20px 0' }}/>
     if (line.startsWith('📝'))
-      return <div key={i} style={{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:8, padding:'8px 14px', margin:'10px 0', fontSize:13.5, color:'#1d4ed8', fontWeight:600 }}>{line}</div>
+      return <div key={i} style={{ background:'#eff6ff', border:'1px solid #bfdbfe', borderRadius:8, padding:'8px 14px', margin:'10px 0', fontSize:13.5, color:'#1d4ed8', fontWeight:600 }} dangerouslySetInnerHTML={{ __html: mdBold(line) }}/>
     if (line.trim() === '')
       return <div key={i} style={{ height:8 }}/>
     const bold = line.replace(/\*\*(.*?)\*\*/g, '<strong style="color:#1a1a2e;font-weight:700">$1</strong>')
