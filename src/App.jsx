@@ -4539,7 +4539,7 @@ function ChapterCourses({ user, prefill, onClearPrefill }) {
   async function generateCourse() {
   if (!chapter) return
   setErr(''); setPhase('generating'); setModules([]); setProgress({ done: 0, total: 0 })
-  setStatusMsg(`Designing modules for "${chapter}"…`)
+  setStatusMsg(`Designing modules for "${chapter}"… Wait for 40-60 seconds while we generate your course.`)
   try {
     const { courseKey: key, existing, resuming } = await api.post('/api/chapter-courses/generate', {
       subject: subj, cls, chapter,
