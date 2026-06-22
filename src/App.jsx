@@ -1803,12 +1803,12 @@ function AuthPage({ onAuth, initMode }) {
     loadScript('https://accounts.google.com/gsi/client').then(()=>{
       if (!window.google || !gBtnRef.current) return
       window.google.accounts.id.initialize({ client_id:clientId, callback:async(resp)=>{
-        try { setBusy(true); setErr(''); const data = await api.post('/api/auth/google',{idToken:resp.credential}); saveAuth(data); onAuth(data.user) }
+        try { setBusy(true); setErr(''); const data = await api.post('/api/auth/google',{idToken:resp.credential, role}); saveAuth(data); onAuth(data.user) }
         catch(e){ setErr(e.message) } finally{ setBusy(false) }
       }})
       window.google.accounts.id.renderButton(gBtnRef.current,{ theme:'outline', size:'large', width:280 })
     }).catch(()=>{})
-  },[tab])
+  },[tab, role])
 
   async function handlePersonal(e) {
     e.preventDefault(); setErr(''); setBusy(true)
