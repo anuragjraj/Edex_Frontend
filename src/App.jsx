@@ -6317,7 +6317,6 @@ const renderTab = t => {
             <>
               {navSectionLabel('Learn')}
               {tabs.filter(t => LEARN_TAB_IDS.has(t.id)).map(renderTab)}
-              <div style={{ height: 1, background: 'var(--border)', margin: '8px 12px' }} />
               {navSectionLabel('My School')}
               {tabs.filter(t => !LEARN_TAB_IDS.has(t.id)).map(renderTab)}
             </>
