@@ -1128,6 +1128,84 @@ function PillMultiSelect({ options, selected = [], onChange, color = 'var(--acce
   )
 }
 
+function MultiSelectDropdown({ options, selected = [], onChange, placeholder = '── Select ──', max = 99, color = 'var(--accent)' }) {
+  const [open, setOpen]     = useState(false)
+  const [search, setSearch] = useState('')
+  const ref = useRef(null)
+
+  useEffect(() => {
+    const handler = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [])
+
+  const filtered = search.trim()
+    ? options.filter(o => o.toLowerCase().includes(search.toLowerCase()))
+    : options
+
+  const toggle = o => {
+    if (selected.includes(o)) onChange(selected.filter(x => x !== o))
+    else if (selected.length < max) onChange([...selected, o])
+  }
+
+  const triggerLabel = selected.length === 0 ? placeholder
+    : selected.length === 1 ? selected[0]
+    : `${selected.length} selected`
+
+  return (
+    <div ref={ref} style={{ position: 'relative' }}>
+      <button type="button" onClick={() => setOpen(o => !o)}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+          padding: '10px 14px', borderRadius: 10, border: `1.5px solid ${open ? color : 'var(--border)'}`,
+          background: '#fff', color: selected.length ? '#1e293b' : '#64748b', fontSize: 14,
+          fontFamily: "'Nunito', sans-serif", cursor: 'pointer', textAlign: 'left' }}>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{triggerLabel}</span>
+        <span style={{ marginLeft: 8, fontSize: 11, color: 'var(--text)', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}>▼</span>
+      </button>
+
+      {selected.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, marginTop: 8 }}>
+          {selected.map(o => (
+            <span key={o} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: 'var(--accent-bg)', color, border: `1px solid ${color}44`, borderRadius: 20, padding: '3px 10px', fontSize: 12, fontWeight: 700 }}>
+              {o}<span onClick={e => { e.stopPropagation(); toggle(o) }} style={{ cursor: 'pointer', fontSize: 13, fontWeight: 900, lineHeight: 1 }}>×</span>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {open && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, background: '#fff',
+          border: `1.5px solid ${color}55`, borderRadius: 12, boxShadow: '0 12px 40px rgba(15,23,42,.18)', zIndex: 500, overflow: 'hidden' }}>
+          <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 8 }}>
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search…"
+              style={{ flex: 1, padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: '#f8fafc', color: '#1e293b', fontSize: 13, fontFamily: "'Nunito', sans-serif", outline: 'none' }} />
+            <button onClick={() => onChange(options.slice(0, max))} style={{ padding: '5px 10px', borderRadius: 7, border: '1px solid var(--border)', background: 'transparent', color, fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}>All</button>
+            <button onClick={() => onChange([])} style={{ padding: '5px 10px', borderRadius: 7, border: '1px solid var(--border)', background: 'transparent', color: '#94a3b8', fontSize: 11.5, fontWeight: 700, cursor: 'pointer' }}>Clear</button>
+          </div>
+          <div style={{ maxHeight: 240, overflowY: 'auto', padding: '6px 0' }}>
+            {filtered.map(o => {
+              const checked = selected.includes(o)
+              return (
+                <div key={o} onClick={() => toggle(o)} style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '8px 14px', cursor: 'pointer', background: checked ? 'var(--accent-bg)' : 'transparent' }}>
+                  <div style={{ width: 16, height: 16, borderRadius: 4, border: `2px solid ${checked ? color : '#cbd5e1'}`, background: checked ? color : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {checked && <span style={{ color: '#fff', fontSize: 10, fontWeight: 900 }}>✓</span>}
+                  </div>
+                  <span style={{ fontSize: 13.5, color: checked ? color : '#1e293b', fontWeight: checked ? 700 : 400, fontFamily: "'Nunito', sans-serif" }}>{o}</span>
+                </div>
+              )
+            })}
+            {filtered.length === 0 && <div style={{ padding: 14, textAlign: 'center', fontSize: 13, color: '#64748b' }}>No matches</div>}
+          </div>
+          <div style={{ padding: '8px 14px', borderTop: '1px solid var(--border)', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <span style={{ fontSize: 12, color: '#64748b' }}>{selected.length} selected</span>
+            <button onClick={() => setOpen(false)} style={{ padding: '5px 16px', borderRadius: 8, border: 'none', background: color, color: '#fff', fontSize: 12.5, fontWeight: 700, cursor: 'pointer' }}>Done ✓</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function Avatar({ name, url, size = 44, fontSize }) {
   if (url) return (
     <img src={url} alt="" style={{
@@ -2530,22 +2608,22 @@ function ProfilePage({ userId, currentUser, onMessage, onBack }) {
           <div style={{ marginBottom: 14 }}>
             <Label>Subjects taught</Label>
             {editMode
-              ? <PillMultiSelect options={SUBJECTS} selected={form.teaches_subjects || []} onChange={v => setF('teaches_subjects', v)} />
-              : <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {(prof.teaches_subjects || []).map(s => <span key={s} style={pillRO}>{s}</span>)}
-                  {!(prof.teaches_subjects || []).length && <span style={emptyRO}>No subjects listed</span>}
-                </div>}
+  ? <MultiSelectDropdown options={SUBJECTS} selected={form.teaches_subjects || []} onChange={v => setF('teaches_subjects', v)} placeholder="── Select subjects ──" />
+  : <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+      {(prof.teaches_subjects || []).map(s => <span key={s} style={pillRO}>{s}</span>)}
+      {!(prof.teaches_subjects || []).length && <span style={emptyRO}>No subjects listed</span>}
+    </div>}
           </div>
 
           {/* Classes taught */}
           <div style={{ marginBottom: 14 }}>
             <Label>Classes taught</Label>
             {editMode
-              ? <PillMultiSelect options={CLASSES} selected={form.teaches_classes || []} onChange={v => setF('teaches_classes', v)} color="#10B981" />
-              : <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
-                  {(prof.teaches_classes || []).map(c => <span key={c} style={{ ...pillRO, background: 'rgba(16,185,129,.1)', color: '#6ee7b7', borderColor: 'rgba(16,185,129,.25)' }}>{c}</span>)}
-                  {!(prof.teaches_classes || []).length && <span style={emptyRO}>No classes listed</span>}
-                </div>}
+  ? <MultiSelectDropdown options={CLASSES} selected={form.teaches_classes || []} onChange={v => setF('teaches_classes', v)} placeholder="── Select classes ──" color="#10B981" />
+  : <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+      {(prof.teaches_classes || []).map(c => <span key={c} style={{ ...pillRO, background: 'rgba(16,185,129,.1)', color: '#6ee7b7', borderColor: 'rgba(16,185,129,.25)' }}>{c}</span>)}
+      {!(prof.teaches_classes || []).length && <span style={emptyRO}>No classes listed</span>}
+    </div>}
           </div>
 
           {/* Favourite chapter */}
