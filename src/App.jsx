@@ -6168,6 +6168,34 @@ useEffect(() => {
   // { id: 'feed',       icon: '📣', label: 'Study Feed',       color: '#6366F1' },
 // ]
 
+// Learn zone = solo study tools; everything else falls into the "My School" zone
+const LEARN_TAB_IDS = new Set(['dashboard', 'doubt', 'notes', 'quiz', 'flashcards', 'courses'])
+
+const navSectionLabel = text => (
+  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px 4px' }}>
+    <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.7px', textTransform: 'uppercase', color: 'var(--text)', whiteSpace: 'nowrap' }}>{text}</span>
+    <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+  </div>
+)
+
+const renderTab = t => {
+  const active = tab === t.id
+  return (
+    <button key={t.id} onClick={() => setTab(t.id)}
+      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: "'Nunito', sans-serif", background: active ? `linear-gradient(135deg,${t.color},${t.color}bb)` : 'transparent', color: active ? '#fff' : 'var(--text-h)', fontWeight: active ? 800 : 600, fontSize: 13.5, textAlign: 'left', transition: 'all .15s' }}
+      onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,.05)' }}
+      onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}>
+      <span style={{ fontSize: 16 }}>{t.icon}</span>
+      {t.id === 'messages' && unreadCount > 0 && (
+        <span style={{ marginLeft: 'auto', minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9, background: '#ef4444', color: '#fff', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+          {unreadCount > 9 ? '9+' : unreadCount}
+        </span>
+      )}
+      {t.label}
+    </button>
+  )
+}
+
   const renderPage = () => {
     if (tab === 'subscription') return (
       <SubscriptionPage
@@ -6285,23 +6313,17 @@ useEffect(() => {
 
         {/* ── Desktop sidebar ──────────────────────────────────── */}
         <nav className="desktop-sidebar" style={{ width: 210, borderRight: '1px solid var(--border)', padding: '12px 8px', background: 'rgba(255,255,255,.7)', flexShrink: 0, position: 'sticky', top: 58, height: 'calc(100vh - 58px)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
-          {tabs.map(t => {
-            const active = tab === t.id
-            return (
-              <button key={t.id} onClick={() => setTab(t.id)}
-                style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: "'Nunito', sans-serif", background: active ? `linear-gradient(135deg,${t.color},${t.color}bb)` : 'transparent', color: active ? '#fff' : 'var(--text-h)', fontWeight: active ? 800 : 600, fontSize: 13.5, textAlign: 'left', transition: 'all .15s' }}
-                onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,.05)' }}
-                onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}>
-                <span style={{ fontSize: 16 }}>{t.icon}</span>
-                {t.id === 'messages' && unreadCount > 0 && (
-                  <span style={{ marginLeft: 'auto', minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9, background: '#ef4444', color: '#fff', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    {unreadCount > 9 ? '9+' : unreadCount}
-                  </span>
-                )}
-                {t.label}
-              </button>
-            )
-          })}
+          {isSchool ? (
+            <>
+              {navSectionLabel('Learn')}
+              {tabs.filter(t => LEARN_TAB_IDS.has(t.id)).map(renderTab)}
+              <div style={{ height: 1, background: 'var(--border)', margin: '8px 12px' }} />
+              {navSectionLabel('My School')}
+              {tabs.filter(t => !LEARN_TAB_IDS.has(t.id)).map(renderTab)}
+            </>
+          ) : (
+            tabs.map(renderTab)
+          )}
           <div style={{ height: 1, background: 'var(--border)', margin: '6px 0' }} />
           <button onClick={() => setTab('achievements')}
             style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: "'Nunito', sans-serif", background: tab === 'achievements' ? 'linear-gradient(135deg,#F59E0B,#FBBF24)' : 'transparent', color: tab === 'achievements' ? '#fff' : 'var(--text-h)', fontWeight: 600, fontSize: 13.5, textAlign: 'left', transition: 'all .15s' }}>
