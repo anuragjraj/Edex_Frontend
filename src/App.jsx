@@ -5988,6 +5988,7 @@ export default function App() {
   const [trialExpired, setTrialExpired] = useState(false)
   const [prefill, setPrefill]         = useState(null)
   const [unreadCount, setUnreadCount] = useState(0)
+  const [menuOpen, setMenuOpen] = useState(false)
 
 const fetchUnread = useCallback(() => {
   api.get('/api/messages/unread-count').then(d => setUnreadCount(d.count || 0)).catch(() => {})
@@ -6139,10 +6140,11 @@ useEffect(() => {
           )}
         </div>
 
-        <div style={{ display: 'flex', gap: isMobile ? 5 : 8, alignItems: 'center', minWidth: 0 }}>
-          {!isSchool && <TrialBadge user={user} onUpgrade={() => setTab('subscription')} />}
-            <button onClick={() => setTab('messages')} title="Messages"
-            style={{ position: 'relative', width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius: 9, border: '1px solid var(--border)', background: 'var(--social-bg)', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+        <div style={{ display: 'flex', gap: isMobile ? 6 : 8, alignItems: 'center', minWidth: 0 }}>
+
+          {/* Messages — visible on both sizes */}
+          <button onClick={() => setTab('messages')} title="Messages"
+            style={{ position: 'relative', width: isMobile ? 34 : 36, height: isMobile ? 34 : 36, borderRadius: 9, border: '1px solid var(--border)', background: 'var(--social-bg)', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
             💬
             {unreadCount > 0 && (
               <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 17, height: 17, padding: '0 4px', borderRadius: 9, background: '#ef4444', color: '#fff', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--bg)' }}>
@@ -6150,13 +6152,51 @@ useEffect(() => {
               </span>
             )}
           </button>
-          <button onClick={() => setTab('achievements')} title="Achievements" style={{ width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius: 9, border: '1px solid var(--border)', background: 'var(--social-bg)', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>🏆</button>
-          <button onClick={() => { setViewProfileId(null); setTab('profile') }} title="My Profile" style={{ width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius: 9, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', cursor: 'pointer', fontSize: 14, fontWeight: 900, color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Sora', sans-serif", flexShrink: 0 }}>
-            {user.avatar_url
-              ? <img src={user.avatar_url} alt="" style={{ width: '100%', height: '100%', borderRadius: 9, objectFit: 'cover' }} />
-              : (user.name?.[0]?.toUpperCase() || '?')}
-          </button>
-          <button onClick={logout} title="Sign Out" style={{ padding: isMobile ? '7px 10px' : '6px 13px', borderRadius: 9, border: '1px solid var(--border)', background: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 13, fontWeight: 700, fontFamily: "'Nunito', sans-serif", flexShrink: 0 }}>{isMobile ? '⏻' : 'Sign Out'}</button>
+
+          {/* ── DESKTOP: original layout, unchanged ── */}
+          {!isMobile && <>
+            {!isSchool && <TrialBadge user={user} onUpgrade={() => setTab('subscription')} />}
+            <button onClick={() => setTab('achievements')} title="Achievements" style={{ width: 36, height: 36, borderRadius: 9, border: '1px solid var(--border)', background: 'var(--social-bg)', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>🏆</button>
+            <button onClick={() => { setViewProfileId(null); setTab('profile') }} title="My Profile" style={{ width: 36, height: 36, borderRadius: 9, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', cursor: 'pointer', fontSize: 14, fontWeight: 900, color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Sora', sans-serif", flexShrink: 0, overflow: 'hidden' }}>
+              {user.avatar_url
+                ? <img src={user.avatar_url} alt="" style={{ width: '100%', height: '100%', borderRadius: 9, objectFit: 'cover' }} />
+                : (user.name?.[0]?.toUpperCase() || '?')}
+            </button>
+            <button onClick={logout} title="Sign Out" style={{ padding: '6px 13px', borderRadius: 9, border: '1px solid var(--border)', background: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 13, fontWeight: 700, fontFamily: "'Nunito', sans-serif", flexShrink: 0 }}>Sign Out</button>
+          </>}
+
+          {/* ── MOBILE ONLY: avatar dropdown holds the rest ── */}
+          {isMobile && (
+            <div style={{ position: 'relative' }}>
+              <button onClick={() => setMenuOpen(o => !o)} title="Menu"
+                style={{ width: 34, height: 34, borderRadius: 9, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', cursor: 'pointer', fontSize: 14, fontWeight: 900, color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Sora', sans-serif", flexShrink: 0, overflow: 'hidden' }}>
+                {user.avatar_url
+                  ? <img src={user.avatar_url} alt="" style={{ width: '100%', height: '100%', borderRadius: 9, objectFit: 'cover' }} />
+                  : (user.name?.[0]?.toUpperCase() || '?')}
+              </button>
+              {menuOpen && (
+                <>
+                  <div onClick={() => setMenuOpen(false)} style={{ position: 'fixed', inset: 0, zIndex: 200 }} />
+                  <div style={{ position: 'absolute', top: 'calc(100% + 8px)', right: 0, zIndex: 201, minWidth: 190, background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, boxShadow: '0 12px 40px rgba(15,23,42,.18)', overflow: 'hidden', padding: 6 }}>
+                    <div style={{ padding: '8px 12px 10px', borderBottom: '1px solid var(--border)', marginBottom: 4 }}>
+                      <div style={{ fontWeight: 800, fontSize: 13.5, color: 'var(--text-h)', fontFamily: "'Sora',sans-serif" }}>{user.name}</div>
+                      <div style={{ fontSize: 11.5, color: 'var(--text)' }}>{user.role}{user.class_level ? ` · ${user.class_level}` : ''}</div>
+                    </div>
+                    {[
+                      ['👤 My Profile',   () => { setViewProfileId(null); setTab('profile') }],
+                      ['🏆 Achievements', () => setTab('achievements')],
+                      ...(!isSchool ? [['⚡ Upgrade', () => setTab('subscription')]] : []),
+                    ].map(([label, fn]) => (
+                      <button key={label} onClick={() => { setMenuOpen(false); fn() }}
+                        style={{ width: '100%', textAlign: 'left', padding: '9px 12px', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--text-h)', fontSize: 13.5, fontWeight: 600, cursor: 'pointer', fontFamily: "'Nunito',sans-serif" }}>{label}</button>
+                    ))}
+                    <button onClick={() => { setMenuOpen(false); logout() }}
+                      style={{ width: '100%', textAlign: 'left', padding: '9px 12px', borderRadius: 8, border: 'none', borderTop: '1px solid var(--border)', background: 'transparent', color: '#ef4444', fontSize: 13.5, fontWeight: 700, cursor: 'pointer', fontFamily: "'Nunito',sans-serif", marginTop: 4 }}>⏻ Sign Out</button>
+                  </div>
+                </>
+              )}
+            </div>
+          )}
         </div>
       </header>
 
