@@ -6169,7 +6169,7 @@ useEffect(() => {
 // ]
 
 // Learn zone = solo study tools; everything else falls into the "My School" zone
-const LEARN_TAB_IDS = new Set(['dashboard', 'doubt', 'notes', 'quiz', 'flashcards', 'courses'])
+const LEARN_TAB_IDS = new Set(['dashboard', 'doubt', 'notes', 'quiz', 'flashcards', 'courses', 'history'])
 
 const navSectionLabel = text => (
   <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px 4px' }}>
