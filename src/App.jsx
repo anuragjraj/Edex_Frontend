@@ -1101,6 +1101,56 @@ const timeAgo = t => {
   return `${Math.floor(d / 86400)}d ago`
 }
 
+function canMessageUser(me, target) {
+  if (!me || !target || me.id === target.id) return false
+  // Students may never message other students.
+  if (me.role === 'student' && target.role === 'student') return false
+  return true
+}
+
+function PillMultiSelect({ options, selected = [], onChange, color = 'var(--accent)' }) {
+  const toggle = o =>
+    selected.includes(o) ? onChange(selected.filter(x => x !== o)) : onChange([...selected, o])
+  return (
+    <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+      {options.map(o => {
+        const sel = selected.includes(o)
+        return (
+          <span key={o} onClick={() => toggle(o)} style={{
+            padding: '5px 12px', borderRadius: 20, fontSize: 12.5, cursor: 'pointer',
+            fontWeight: 700, fontFamily: "'Nunito', sans-serif", userSelect: 'none',
+            background: sel ? color : 'var(--accent-bg)', color: sel ? '#fff' : 'var(--accent)',
+            border: `1px solid ${sel ? color : 'var(--accent-border)'}`, transition: 'all .15s',
+          }}>{o}</span>
+        )
+      })}
+    </div>
+  )
+}
+
+function Avatar({ name, url, size = 44, fontSize }) {
+  if (url) return (
+    <img src={url} alt="" style={{
+      width: size, height: size, borderRadius: '50%', objectFit: 'cover',
+      flexShrink: 0, border: '2px solid var(--bg)',
+    }} />
+  )
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%',
+      background: 'linear-gradient(135deg,#6366F1,#8B5CF6)',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      color: '#fff', fontWeight: 900, fontFamily: "'Sora',sans-serif",
+      fontSize: fontSize || Math.round(size * 0.4), flexShrink: 0,
+    }}>{name?.[0]?.toUpperCase() || '?'}</div>
+  )
+}
+
+const pillRO     = { background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid var(--accent-border)', borderRadius: 20, padding: '4px 12px', fontSize: 12.5, fontWeight: 700 }
+const pillNeutral= { background: 'var(--code-bg)', border: '1px solid var(--border)', borderRadius: 20, padding: '2px 10px', fontSize: 12, color: 'var(--text-h)', fontWeight: 600 }
+const valueRO    = { color: 'var(--text-h)', fontSize: 14, margin: 0, fontWeight: 600 }
+const emptyRO    = { color: 'var(--text)', fontSize: 13, margin: 0, fontStyle: 'italic' }
+
 // ══════════════════════════════════════════════════════════════
 //  DESIGN TOKENS
 // ══════════════════════════════════════════════════════════════
@@ -1561,13 +1611,17 @@ function FreeTierCountdown({ user, onSubscribe, onExpired }) {
 // ══════════════════════════════════════════════════════════════
 //  MOBILE TOP NAV
 // ══════════════════════════════════════════════════════════════
-function MobileTopNav({ tabs, activeTab, onTabChange }) {
+function MobileTopNav({ tabs, activeTab, onTabChange, unreadCount = 0 }) {
   return (
-    <div className="mobile-top-nav" style={{ position:'sticky', top:58, zIndex:90, background:'rgba(255,255,255,.95)', backdropFilter:'blur(20px)', borderBottom:'1px solid var(--border)', padding:'4px 8px', display:'flex', gap:2, overflowX:'auto', scrollbarWidth:'none', WebkitOverflowScrolling:'touch' }}>
-      {tabs.map(t=>(
-        <button key={t.id} onClick={()=>onTabChange(t.id)}
-          style={{ display:'flex', flexDirection:'column', alignItems:'center', gap:2, padding:'5px 8px', borderRadius:9, border:'none', cursor:'pointer', background:activeTab===t.id?`${t.color}22`:'transparent', color:activeTab===t.id?t.color:'#64748b', fontFamily:"'Nunito', sans-serif", fontWeight:700, fontSize:8.5, minWidth:46, flexShrink:0, transition:'all .15s', borderBottom:activeTab===t.id?`2px solid ${t.color}`:'2px solid transparent' }}>
-          <span style={{ fontSize:17 }}>{t.icon}</span>
+    <div className="mobile-top-nav" style={{ position: 'sticky', top: 58, zIndex: 90, background: 'rgba(255,255,255,.95)', backdropFilter: 'blur(20px)', borderBottom: '1px solid var(--border)', padding: '4px 8px', display: 'flex', gap: 2, overflowX: 'auto', scrollbarWidth: 'none', WebkitOverflowScrolling: 'touch' }}>
+      {tabs.map(t => (
+        <button key={t.id} onClick={() => onTabChange(t.id)} style={{ position: 'relative', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, padding: '5px 8px', borderRadius: 9, border: 'none', cursor: 'pointer', background: activeTab === t.id ? `${t.color}22` : 'transparent', color: activeTab === t.id ? t.color : '#64748b', fontFamily: "'Nunito',sans-serif", fontWeight: 700, fontSize: 8.5, minWidth: 46, flexShrink: 0, transition: 'all .15s', borderBottom: activeTab === t.id ? `2px solid ${t.color}` : '2px solid transparent' }}>
+          <span style={{ fontSize: 17, position: 'relative' }}>
+            {t.icon}
+            {t.id === 'messages' && unreadCount > 0 && (
+              <span style={{ position: 'absolute', top: -4, right: -8, minWidth: 14, height: 14, padding: '0 3px', borderRadius: 7, background: '#ef4444', color: '#fff', fontSize: 8, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>{unreadCount > 9 ? '9+' : unreadCount}</span>
+            )}
+          </span>
           {t.label.split(' ')[0]}
         </button>
       ))}
@@ -2193,39 +2247,123 @@ function SocialFeed({ user }) {
 // ══════════════════════════════════════════════════════════════
 //  SEARCH PAGE
 // ══════════════════════════════════════════════════════════════
-function SearchPage({ currentUser, onViewProfile }) {
-  const [q,setQ]=useState(''); const [results,setResults]=useState([]); const [loading,setLoading]=useState(false)
-  useEffect(()=>{
-    if(q.length<2){ setResults([]); return }
+function SearchPage({ currentUser, onViewProfile, onMessage }) {
+  const isStudent = currentUser?.role === 'student'
+
+  const [q,       setQ]       = useState('')
+  const [role,    setRole]    = useState(isStudent ? 'teacher' : 'all') // students look for teachers by default
+  const [subject, setSubject] = useState('')
+  const [cls,     setCls]     = useState('')
+  const [results, setResults] = useState([])
+  const [loading, setLoading] = useState(false)
+
+  // Fetch whenever any filter changes. With role=teacher and no name, this
+  // lists ALL teachers ranked by XP (per your requirement).
+  useEffect(() => {
+    const anyFilter = q.trim().length >= 1 || subject || cls || role !== 'all'
+    if (!anyFilter) { setResults([]); return }
     setLoading(true)
-    const t = setTimeout(()=>{
-      api.get(`/api/search?q=${encodeURIComponent(q)}`).then(d=>{setResults(d);setLoading(false)}).catch(()=>setLoading(false))
+    const t = setTimeout(() => {
+      const params = new URLSearchParams()
+      if (q.trim()) params.set('q', q.trim())
+      if (role !== 'all') params.set('role', role)
+      if (subject) params.set('subject', subject)
+      if (cls)     params.set('classLevel', cls)
+      api.get(`/api/search?${params.toString()}`)
+        .then(d => { setResults(d); setLoading(false) })
+        .catch(() => setLoading(false))
     }, 300)
-    return ()=>clearTimeout(t)
-  },[q])
+    return () => clearTimeout(t)
+  }, [q, role, subject, cls])
+
+  const roleTabs = [['teacher', '👨‍🏫 Teachers'], ['student', '🎒 Students'], ['all', 'Everyone']]
+
   return (
-    <div style={{ padding:24, maxWidth:640, margin:'0 auto', fontFamily:"'Nunito',sans-serif" }}>
-      <PageHeader icon="🔍" title="Find People" subtitle="Search for students and teachers" color="#06b6d4"/>
-      <div style={{ position:'relative', marginBottom:20 }}>
-        <input value={q} onChange={e=>setQ(e.target.value)} placeholder="Search by name..." style={{ ...T.input, paddingLeft:44, fontSize:15 }}/>
-        <span style={{ position:'absolute', left:14, top:'50%', transform:'translateY(-50%)', fontSize:18, opacity:.5 }}>🔍</span>
-      </div>
-      {loading&&<div style={{ textAlign:'center', padding:20, color:'var(--text)' }}>Searching...</div>}
-      <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
-        {results.map(u=>(
-          <div key={u.id} onClick={()=>onViewProfile?.(u.id)} style={{ display:'flex', alignItems:'center', gap:14, padding:'14px 16px', background:'var(--bg2)', borderRadius:12, border:'1px solid var(--border)', cursor:'pointer', transition:'border-color .2s' }}
-            onMouseEnter={e=>e.currentTarget.style.borderColor='var(--accent)'}
-            onMouseLeave={e=>e.currentTarget.style.borderColor='var(--border)'}>
-            <div style={{ width:44, height:44, borderRadius:'50%', background:'linear-gradient(135deg,#6366F1,#8B5CF6)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18, fontWeight:900, color:'#fff', flexShrink:0 }}>{u.name?.[0]?.toUpperCase()}</div>
-            <div style={{ flex:1 }}>
-              <div style={{ fontWeight:700, color:'var(--text-h)', fontSize:14 }}>{u.name}</div>
-              <div style={{ fontSize:12, color:'var(--text)' }}>{u.role} {u.class_level?`· ${u.class_level}`:''} {u.subject_specialization?`· ${u.subject_specialization}`:''}</div>
-            </div>
-            <span style={{ fontSize:14, color:'var(--text)' }}>→</span>
-          </div>
+    <div style={{ padding: 24, maxWidth: 720, margin: '0 auto', fontFamily: "'Nunito',sans-serif" }}>
+      <PageHeader icon="🔍" title="Find People" subtitle={isStudent ? 'Find teachers by class & subject to ask your doubts' : 'Search students and teachers'} color="#06b6d4" />
+
+      {/* Role tabs */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap' }}>
+        {roleTabs.map(([r, l]) => (
+          <button key={r} onClick={() => setRole(r)} style={{
+            padding: '6px 16px', borderRadius: 20, border: 'none', fontWeight: 700, fontSize: 12.5,
+            cursor: 'pointer', fontFamily: "'Nunito',sans-serif",
+            background: role === r ? '#06b6d4' : 'var(--social-bg)', color: role === r ? '#fff' : 'var(--text-h)', transition: 'all .15s',
+          }}>{l}</button>
         ))}
       </div>
-      {q.length>=2&&results.length===0&&!loading&&<div style={{ textAlign:'center', padding:30, color:'var(--text)' }}>No users found for "{q}"</div>}
+
+      {/* Name search */}
+      <div style={{ position: 'relative', marginBottom: 12 }}>
+        <input value={q} onChange={e => setQ(e.target.value)} placeholder="Search by name (optional)..." style={{ ...T.input, paddingLeft: 44, fontSize: 15 }} />
+        <span style={{ position: 'absolute', left: 14, top: '50%', transform: 'translateY(-50%)', fontSize: 18, opacity: .5 }}>🔍</span>
+      </div>
+
+      {/* Subject + Class filters (most useful when role = Teachers) */}
+      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 10, marginBottom: 8 }}>
+        <div>
+          <Label>Subject</Label>
+          <BSSelect value={subject} onChange={setSubject} options={[{ value: '', label: 'Any subject' }, ...SUBJECTS.map(s => ({ value: s, label: s }))]} />
+        </div>
+        <div>
+          <Label>Class</Label>
+          <BSSelect value={cls} onChange={setCls} options={[{ value: '', label: 'Any class' }, ...CLASSES.map(c => ({ value: c, label: c }))]} />
+        </div>
+      </div>
+      {(subject || cls) && (
+        <div style={{ marginBottom: 16 }}>
+          <GhostBtn small onClick={() => { setSubject(''); setCls('') }}>✕ Clear filters</GhostBtn>
+        </div>
+      )}
+
+      {loading && <div style={{ textAlign: 'center', padding: 20, color: 'var(--text)' }}>Searching...</div>}
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+        {results.map((u, i) => {
+          const canMsg = canMessageUser(currentUser, u)
+          return (
+            <div key={u.id} style={{ display: 'flex', alignItems: 'center', gap: 14, padding: '14px 16px', background: 'var(--bg2)', borderRadius: 12, border: '1px solid var(--border)', transition: 'border-color .2s' }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = 'var(--accent)'}
+              onMouseLeave={e => e.currentTarget.style.borderColor = 'var(--border)'}>
+
+              {/* rank chip when ranked by XP */}
+              {role === 'teacher' && (
+                <div style={{ width: 26, textAlign: 'center', fontSize: 12, fontWeight: 800, color: i < 3 ? '#FCD34D' : 'var(--text)', flexShrink: 0 }}>
+                  {i < 3 ? ['🥇', '🥈', '🥉'][i] : `#${i + 1}`}
+                </div>
+              )}
+
+              <div onClick={() => onViewProfile?.(u.id)} style={{ cursor: 'pointer', flexShrink: 0 }}>
+                <Avatar name={u.name} url={u.avatar_url} size={44} />
+              </div>
+
+              <div onClick={() => onViewProfile?.(u.id)} style={{ flex: 1, minWidth: 0, cursor: 'pointer' }}>
+                <div style={{ fontWeight: 700, color: 'var(--text-h)', fontSize: 14 }}>{u.name}</div>
+                <div style={{ fontSize: 12, color: 'var(--text)' }}>
+                  {u.role === 'teacher' ? '👨‍🏫 Teacher' : `🎒 ${u.class_level || 'Student'}`}
+                  {' · '}⚡ {(u.total_xp || 0).toLocaleString()} XP
+                </div>
+                {/* Teacher subjects/classes preview */}
+                {u.role === 'teacher' && (u.teaches_subjects?.length || u.teaches_classes?.length) ? (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginTop: 5 }}>
+                    {(u.teaches_subjects || []).slice(0, 3).map(s => <span key={s} style={{ fontSize: 10.5, background: 'var(--accent-bg)', color: 'var(--accent)', borderRadius: 12, padding: '1px 8px', fontWeight: 700 }}>{s}</span>)}
+                    {(u.teaches_classes || []).slice(0, 2).map(c => <span key={c} style={{ fontSize: 10.5, background: 'rgba(16,185,129,.1)', color: '#6ee7b7', borderRadius: 12, padding: '1px 8px', fontWeight: 700 }}>{c}</span>)}
+                  </div>
+                ) : null}
+              </div>
+
+              {canMsg && onMessage && (
+                <PrimaryBtn small onClick={() => onMessage(u.id)} color="#06b6d4">💬 Ask</PrimaryBtn>
+              )}
+              <span onClick={() => onViewProfile?.(u.id)} style={{ fontSize: 14, color: 'var(--text)', cursor: 'pointer', flexShrink: 0 }}>→</span>
+            </div>
+          )
+        })}
+      </div>
+
+      {!loading && results.length === 0 && (q.length >= 1 || subject || cls || role !== 'all') && (
+        <div style={{ textAlign: 'center', padding: 30, color: 'var(--text)' }}>No {role === 'all' ? 'people' : role + 's'} found{subject ? ` for ${subject}` : ''}{cls ? ` in ${cls}` : ''}.</div>
+      )}
     </div>
   )
 }
@@ -2234,251 +2372,294 @@ function SearchPage({ currentUser, onViewProfile }) {
 //  PROFILE PAGE (LinkedIn-style)
 // ══════════════════════════════════════════════════════════════
 function ProfilePage({ userId, currentUser, onMessage, onBack }) {
-  const [data,      setData]      = useState(null)
-  const [loading,   setLoading]   = useState(true)
-  const [editMode,  setEditMode]  = useState(false)
-  const [form,      setForm]      = useState({})
-  const [saving,    setSaving]    = useState(false)
-  const [ok,        setOk]        = useState(false)
-  const [err,       setErr]       = useState('')
+  const [data,     setData]     = useState(null)
+  const [loading,  setLoading]  = useState(true)
+  const [editMode, setEditMode] = useState(false)
+  const [form,     setForm]     = useState({})
+  const [saving,   setSaving]   = useState(false)
+  const [ok,       setOk]       = useState(false)
+  const [err,      setErr]      = useState('')
 
-  const isOwn    = !userId || userId === currentUser?.id
-  const targetId = userId || currentUser?.id
+  const isOwn     = !userId || userId === currentUser?.id
+  const targetId  = userId || currentUser?.id
 
   useEffect(() => {
     if (!targetId) return
-    setLoading(true)
-    setEditMode(false)
+    setLoading(true); setEditMode(false)
     api.get(`/api/profiles/${targetId}`)
-      .then(d => { setData(d); setForm(d.profile || {}); setLoading(false) })
+      .then(d => {
+        setData(d)
+        setForm({ ...(d.profile || {}), class_level: d.user?.class_level || '' })
+        setLoading(false)
+      })
       .catch(e => { setErr(e.message); setLoading(false) })
   }, [targetId])
+
+  const setF = (k, v) => setForm(f => ({ ...f, [k]: v }))
 
   const save = async () => {
     setSaving(true); setOk(false); setErr('')
     try {
-      await api.put('/api/profiles/me', form)
-      setData(d => ({ ...d, profile: form }))
+      await api.put('/api/profiles/me', {
+        headline: form.headline, about: form.about, location: form.location,
+        website_url: form.website_url, skills: form.skills || [], languages: form.languages || [],
+        hobbies: form.hobbies || [], banner_url: form.banner_url,
+        teaches_subjects: form.teaches_subjects || [], teaches_classes: form.teaches_classes || [],
+        favourite_chapter: form.favourite_chapter, favourite_subject: form.favourite_subject,
+        favourite_hobby: form.favourite_hobby, institution: form.institution,
+      })
+      // Class lives on the users table — only personal users edit it (school sets it).
+      if (isOwn && currentUser?.type !== 'school') {
+        await api.put('/api/user/profile', { classLevel: form.class_level })
+      }
+      setData(d => ({
+        ...d,
+        profile: { ...d.profile, ...form },
+        user:    { ...d.user, class_level: form.class_level ?? d.user.class_level },
+      }))
       setOk(true)
-      setTimeout(() => { setEditMode(false); setOk(false) }, 1500)
+      setTimeout(() => { setEditMode(false); setOk(false) }, 1300)
     } catch (e) { setErr(e.message) }
     setSaving(false)
   }
 
+  const onAvatarUpload = async url => {
+    try { await api.put('/api/user/avatar', { avatar_url: url }); setData(d => ({ ...d, user: { ...d.user, avatar_url: url } })) }
+    catch (e) { setErr(e.message) }
+  }
+
   if (loading) return <PageSpinner />
-  if (!data)   return <div style={{ padding:40, textAlign:'center', color:'var(--text)' }}>{err || 'Profile not found'}</div>
+  if (!data)   return <div style={{ padding: 40, textAlign: 'center', color: 'var(--text)' }}>{err || 'Profile not found'}</div>
 
   const { user, profile: prof, stats, rank } = data
+  const isTeacher  = user?.role === 'teacher'
+  const schoolName = user?.schools?.name || prof.institution || (isOwn && currentUser?.schools?.name) || ''
+  const canMsg     = !isOwn && canMessageUser(currentUser, user)
+
+  // chapters for the "favourite chapter" datalist (teacher)
+  const favChapterOptions = (() => {
+    const subj = (form.teaches_subjects || [])[0]
+    const cls  = (form.teaches_classes  || [])[0]
+    return subj && cls ? getChapters(subj, cls) : []
+  })()
 
   return (
-    <div style={{ padding:24, width:'100%', boxSizing:'border-box', fontFamily:"'Nunito',sans-serif", maxWidth:780, margin:'0 auto' }}>
+    <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito',sans-serif", maxWidth: 780, margin: '0 auto' }}>
 
-      {/* ── Back button ─────────────────────────────────────── */}
-      {onBack && (
-        <GhostBtn small onClick={onBack} style={{ marginBottom:16 }}>← Back</GhostBtn>
-      )}
+      {onBack && <GhostBtn small onClick={onBack} style={{ marginBottom: 16 }}>← Back</GhostBtn>}
 
-      {/* ── Banner ──────────────────────────────────────────── */}
-      <div style={{ borderRadius:14, overflow:'hidden', marginBottom:0, position:'relative', height:130, background: prof.banner_url ? `url(${prof.banner_url}) center/cover` : 'linear-gradient(135deg,#4338ca,#6366F1,#8B5CF6)' }}/>
+      {/* ── Banner / cover photo ─────────────────────────────── */}
+      <div style={{
+        borderRadius: 14, overflow: 'hidden', position: 'relative', height: 150,
+        background: form.banner_url ? `url(${form.banner_url}) center/cover` : 'linear-gradient(135deg,#4338ca,#6366F1,#8B5CF6)',
+      }}>
+        {isOwn && editMode && (
+          <div style={{ position: 'absolute', right: 12, bottom: 12 }}>
+            <MediaUploader accept="image/*" label="📷 Change cover" small current={null}
+              onUpload={url => setF('banner_url', url)} onClear={() => setF('banner_url', null)} />
+          </div>
+        )}
+      </div>
 
-      {/* ── Avatar row ──────────────────────────────────────── */}
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-end', marginTop:-40, paddingInline:20, marginBottom:20, position:'relative', zIndex:2 }}>
-     <div style={{ width:72, height:72, borderRadius:'50%', background:'linear-gradient(135deg,#6366F1,#8B5CF6)', border:'3px solid var(--bg)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:28, fontWeight:900, color:'#fff', fontFamily:"'Sora',sans-serif", flexShrink:0 }}>
-          {user?.name?.[0]?.toUpperCase() || '?'}
+      {/* ── Avatar + actions ─────────────────────────────────── */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', marginTop: -40, paddingInline: 20, marginBottom: 20, position: 'relative', zIndex: 2 }}>
+        <div style={{ position: 'relative' }}>
+          <Avatar name={user?.name} url={user?.avatar_url} size={78} fontSize={30} />
+          {isOwn && editMode && (
+            <div style={{ position: 'absolute', bottom: -4, right: -4 }}>
+              <MediaUploader accept="image/*" label="📷" small current={null}
+                onUpload={onAvatarUpload} onClear={() => {}} />
+            </div>
+          )}
         </div>
 
-        {/* Action buttons — always visible */}
-        <div style={{ display:'flex', gap:8, paddingBottom:4 }}>
-          {!isOwn && onMessage && (
-            <PrimaryBtn small onClick={() => onMessage(user.id)}>💬 Message</PrimaryBtn>
-          )}
-          {isOwn && !editMode && (
-            <PrimaryBtn small onClick={() => setEditMode(true)}>✏️ Edit Profile</PrimaryBtn>
-          )}
-          {isOwn && editMode && (
-            <>
-              <PrimaryBtn small onClick={save} disabled={saving}>
-                {saving ? <><Spinner size={12}/> Saving...</> : '💾 Save'}
-              </PrimaryBtn>
-              <GhostBtn small onClick={() => { setEditMode(false); setForm(data.profile || {}) }}>Cancel</GhostBtn>
-            </>
-          )}
+        <div style={{ display: 'flex', gap: 8, paddingBottom: 4 }}>
+          {canMsg && onMessage && <PrimaryBtn small onClick={() => onMessage(user.id)}>💬 Message</PrimaryBtn>}
+          {!isOwn && !canMsg && currentUser?.role === 'student' && user?.role === 'student' &&
+            <span style={{ fontSize: 12, color: 'var(--text)', alignSelf: 'center' }}>🔒 Students can't message each other</span>}
+          {isOwn && !editMode && <PrimaryBtn small onClick={() => setEditMode(true)}>✏️ Edit Profile</PrimaryBtn>}
+          {isOwn && editMode && <>
+            <PrimaryBtn small onClick={save} disabled={saving}>{saving ? <><Spinner size={12} /> Saving...</> : '💾 Save'}</PrimaryBtn>
+            <GhostBtn small onClick={() => { setEditMode(false); setForm({ ...(data.profile || {}), class_level: data.user?.class_level || '' }) }}>Cancel</GhostBtn>
+          </>}
         </div>
       </div>
 
-      {/* Status messages */}
       {ok  && <SuccessMsg msg="Profile saved successfully!" />}
       {err && <ErrMsg msg={err} />}
 
-      {/* ── Name, headline, badges ──────────────────────────── */}
-      <Card style={{ marginBottom:14 }}>
-        <h2 style={{ fontFamily:"'Sora',sans-serif", fontWeight:900, color:'var(--text-h)', margin:'0 0 6px', fontSize:22 }}>
-          {user?.name}
-        </h2>
-
+      {/* ── Name + headline + badges ─────────────────────────── */}
+      <Card style={{ marginBottom: 14 }}>
+        <h2 style={{ fontFamily: "'Sora',sans-serif", fontWeight: 900, color: 'var(--text-h)', margin: '0 0 6px', fontSize: 22 }}>{user?.name}</h2>
         {editMode ? (
-          <input
-            value={form.headline || ''}
-            onChange={e => setForm(f => ({ ...f, headline: e.target.value }))}
-            placeholder="Add a headline — e.g. 'Class 10 student | Science enthusiast'"
-            style={{ ...T.input, marginBottom:10 }}
-          />
+          <input value={form.headline || ''} onChange={e => setF('headline', e.target.value)}
+            placeholder={isTeacher ? "Headline — e.g. 'Physics teacher | JEE mentor'" : "Headline — e.g. 'Class 10 student | loves coding'"}
+            style={{ ...T.input, marginBottom: 10 }} />
         ) : (
-          <p style={{ color:'var(--text)', fontSize:14, margin:'0 0 12px', lineHeight:1.5 }}>
-            {prof.headline || `${user?.role === 'teacher' ? '👨‍🏫 Teacher' : '🎒 Student'} ${user?.class_level ? `· ${user.class_level}` : ''}`}
+          <p style={{ color: 'var(--text)', fontSize: 14, margin: '0 0 12px', lineHeight: 1.5 }}>
+            {prof.headline || `${isTeacher ? '👨‍🏫 Teacher' : '🎒 Student'}${user?.class_level ? ` · ${user.class_level}` : ''}`}
           </p>
         )}
-
-        <div style={{ display:'flex', flexWrap:'wrap', gap:8 }}>
-          <span style={{ background:'var(--accent-bg)', color:'var(--accent)', border:'1px solid var(--accent-border)', borderRadius:20, padding:'3px 12px', fontSize:12, fontWeight:700 }}>
-            {user?.role === 'teacher' ? '👨‍🏫' : '🎒'} {user?.class_level || user?.role}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+          <span style={{ background: 'var(--accent-bg)', color: 'var(--accent)', border: '1px solid var(--accent-border)', borderRadius: 20, padding: '3px 12px', fontSize: 12, fontWeight: 700 }}>
+            {isTeacher ? '👨‍🏫 Teacher' : `🎒 ${user?.class_level || 'Student'}`}
           </span>
-          {rank?.rank && (
-            <span style={{ background:'rgba(245,158,11,.1)', color:'#FCD34D', border:'1px solid rgba(245,158,11,.2)', borderRadius:20, padding:'3px 12px', fontSize:12, fontWeight:700 }}>
-              🏆 Ranked #{rank.rank} of {rank.total_users?.toLocaleString()}
-            </span>
-          )}
-          <span style={{ background:'rgba(99,102,241,.1)', color:'#818CF8', border:'1px solid rgba(99,102,241,.2)', borderRadius:20, padding:'3px 12px', fontSize:12, fontWeight:700 }}>
-            ⚡ {(stats?.total_xp || 0).toLocaleString()} XP
-          </span>
-          {user?.subject_specialization && (
-            <span style={{ background:'rgba(16,185,129,.1)', color:'#6ee7b7', border:'1px solid rgba(16,185,129,.2)', borderRadius:20, padding:'3px 12px', fontSize:12, fontWeight:700 }}>
-              📚 {user.subject_specialization}
-            </span>
-          )}
+          {rank?.rank && <span style={{ background: 'rgba(245,158,11,.1)', color: '#FCD34D', border: '1px solid rgba(245,158,11,.2)', borderRadius: 20, padding: '3px 12px', fontSize: 12, fontWeight: 700 }}>🏆 Ranked #{rank.rank} of {rank.total_users?.toLocaleString()}</span>}
+          <span style={{ background: 'rgba(99,102,241,.1)', color: '#818CF8', border: '1px solid rgba(99,102,241,.2)', borderRadius: 20, padding: '3px 12px', fontSize: 12, fontWeight: 700 }}>⚡ {(stats?.total_xp || 0).toLocaleString()} XP</span>
+          {schoolName && <span style={{ background: 'rgba(16,185,129,.1)', color: '#6ee7b7', border: '1px solid rgba(16,185,129,.2)', borderRadius: 20, padding: '3px 12px', fontSize: 12, fontWeight: 700 }}>🏫 {schoolName}</span>}
         </div>
       </Card>
 
-      {/* ── Stats row ───────────────────────────────────────── */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:10, marginBottom:14 }}>
-        {[
-          ['🔥', stats?.current_streak || 0, 'Day Streak'],
-          ['🤔', stats?.doubts_solved  || 0, 'Doubts'],
-          ['🎯', stats?.quizzes_done   || 0, 'Quizzes'],
-          ['📖', stats?.notes_made     || 0, 'Notes'],
-        ].map(([e, v, l]) => (
-          <div key={l} style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:12, padding:'12px 10px', textAlign:'center' }}>
-            <div style={{ fontSize:20, marginBottom:3 }}>{e}</div>
-            <div style={{ fontFamily:"'Sora',sans-serif", fontWeight:900, fontSize:18, color:'var(--accent)' }}>{v}</div>
-            <div style={{ fontSize:10.5, color:'var(--text)' }}>{l}</div>
+      {/* ── Stats row ────────────────────────────────────────── */}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4,1fr)', gap: 10, marginBottom: 14 }}>
+        {[['🔥', stats?.current_streak || 0, 'Day Streak'], ['🤔', stats?.doubts_solved || 0, 'Doubts'], ['🎯', stats?.quizzes_done || 0, 'Quizzes'], ['📖', stats?.notes_made || 0, 'Notes']].map(([e, v, l]) => (
+          <div key={l} style={{ background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 12, padding: '12px 10px', textAlign: 'center' }}>
+            <div style={{ fontSize: 20, marginBottom: 3 }}>{e}</div>
+            <div style={{ fontFamily: "'Sora',sans-serif", fontWeight: 900, fontSize: 18, color: 'var(--accent)' }}>{v}</div>
+            <div style={{ fontSize: 10.5, color: 'var(--text)' }}>{l}</div>
           </div>
         ))}
       </div>
 
-      {/* ── About ───────────────────────────────────────────── */}
-      <Card style={{ marginBottom:14 }}>
-        <h4 style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, color:'var(--text-h)', margin:'0 0 10px', fontSize:15 }}>
-          About
-        </h4>
-        {editMode ? (
-          <textarea
-            value={form.about || ''}
-            onChange={e => setForm(f => ({ ...f, about: e.target.value }))}
-            placeholder="Tell your story — your goals, interests, favourite subjects..."
-            rows={4}
-            style={{ ...T.input, resize:'vertical' }}
-          />
-        ) : (
-          <p style={{ color: prof.about ? 'var(--text-h)' : 'var(--text)', fontSize:14, lineHeight:1.7, margin:0, fontStyle: prof.about ? 'normal' : 'italic' }}>
-            {prof.about || (isOwn ? 'Click "Edit Profile" to add your bio.' : 'No about section yet.')}
-          </p>
-        )}
+      {/* ════════ TEACHER-SPECIFIC SECTION ════════ */}
+      {isTeacher && (
+        <Card style={{ marginBottom: 14 }}>
+          <h4 style={{ fontFamily: "'Sora',sans-serif", fontWeight: 800, color: 'var(--text-h)', margin: '0 0 12px', fontSize: 15 }}>Teaching</h4>
+
+          {/* Subjects taught */}
+          <div style={{ marginBottom: 14 }}>
+            <Label>Subjects taught</Label>
+            {editMode
+              ? <PillMultiSelect options={SUBJECTS} selected={form.teaches_subjects || []} onChange={v => setF('teaches_subjects', v)} />
+              : <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {(prof.teaches_subjects || []).map(s => <span key={s} style={pillRO}>{s}</span>)}
+                  {!(prof.teaches_subjects || []).length && <span style={emptyRO}>No subjects listed</span>}
+                </div>}
+          </div>
+
+          {/* Classes taught */}
+          <div style={{ marginBottom: 14 }}>
+            <Label>Classes taught</Label>
+            {editMode
+              ? <PillMultiSelect options={CLASSES} selected={form.teaches_classes || []} onChange={v => setF('teaches_classes', v)} color="#10B981" />
+              : <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {(prof.teaches_classes || []).map(c => <span key={c} style={{ ...pillRO, background: 'rgba(16,185,129,.1)', color: '#6ee7b7', borderColor: 'rgba(16,185,129,.25)' }}>{c}</span>)}
+                  {!(prof.teaches_classes || []).length && <span style={emptyRO}>No classes listed</span>}
+                </div>}
+          </div>
+
+          {/* Favourite chapter */}
+          <div style={{ marginBottom: 14 }}>
+            <Label>Favourite chapter</Label>
+            {editMode ? <>
+              <input list="fav-chapters" value={form.favourite_chapter || ''} onChange={e => setF('favourite_chapter', e.target.value)} placeholder="e.g. Gravitation" style={{ ...T.input }} />
+              <datalist id="fav-chapters">{favChapterOptions.map(c => <option key={c} value={c} />)}</datalist>
+            </> : <p style={prof.favourite_chapter ? valueRO : emptyRO}>{prof.favourite_chapter || 'Not set'}</p>}
+          </div>
+
+          {/* Interests outside academics */}
+          <div>
+            <Label>Interests outside academics</Label>
+            {editMode
+              ? <input value={(form.hobbies || []).join(', ')} onChange={e => setF('hobbies', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} placeholder="e.g. Cricket, Gardening, Travel" style={{ ...T.input }} />
+              : <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+                  {(prof.hobbies || []).map((h, i) => <span key={i} style={pillNeutral}>{h}</span>)}
+                  {!(prof.hobbies || []).length && <span style={emptyRO}>None listed</span>}
+                </div>}
+          </div>
+        </Card>
+      )}
+
+      {/* ════════ STUDENT-SPECIFIC SECTION ════════ */}
+      {!isTeacher && (
+        <Card style={{ marginBottom: 14 }}>
+          <h4 style={{ fontFamily: "'Sora',sans-serif", fontWeight: 800, color: 'var(--text-h)', margin: '0 0 12px', fontSize: 15 }}>Student Details</h4>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 14, marginBottom: 14 }}>
+            {/* Class — editable only for personal users */}
+            <div>
+              <Label>Class studying in</Label>
+              {editMode && currentUser?.type !== 'school'
+                ? <BSSelect value={form.class_level || ''} onChange={v => setF('class_level', v)} options={[{ value: '', label: '-- Select --' }, ...CLASSES.map(c => ({ value: c, label: c }))]} />
+                : <p style={user?.class_level ? valueRO : emptyRO}>{user?.class_level || 'Not set'}</p>}
+            </div>
+            {/* School / institution */}
+            <div>
+              <Label>School</Label>
+              {editMode && currentUser?.type !== 'school'
+                ? <input value={form.institution || ''} onChange={e => setF('institution', e.target.value)} placeholder="Your school name" style={{ ...T.input }} />
+                : <p style={schoolName ? valueRO : emptyRO}>{schoolName || 'Not set'}</p>}
+            </div>
+            {/* Favourite subject */}
+            <div>
+              <Label>Favourite subject</Label>
+              {editMode
+                ? <BSSelect value={form.favourite_subject || ''} onChange={v => setF('favourite_subject', v)} options={[{ value: '', label: '-- Select --' }, ...SUBJECTS.map(s => ({ value: s, label: s }))]} />
+                : <p style={prof.favourite_subject ? valueRO : emptyRO}>{prof.favourite_subject || 'Not set'}</p>}
+            </div>
+            {/* Favourite hobby */}
+            <div>
+              <Label>Favourite hobby (outside academics)</Label>
+              {editMode
+                ? <input value={form.favourite_hobby || ''} onChange={e => setF('favourite_hobby', e.target.value)} placeholder="e.g. Football, Painting" style={{ ...T.input }} />
+                : <p style={prof.favourite_hobby ? valueRO : emptyRO}>{prof.favourite_hobby || 'Not set'}</p>}
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* ── About ────────────────────────────────────────────── */}
+      <Card style={{ marginBottom: 14 }}>
+        <h4 style={{ fontFamily: "'Sora',sans-serif", fontWeight: 800, color: 'var(--text-h)', margin: '0 0 10px', fontSize: 15 }}>About</h4>
+        {editMode
+          ? <textarea value={form.about || ''} onChange={e => setF('about', e.target.value)} placeholder={isTeacher ? 'Your teaching philosophy, experience, what students can ask you...' : 'Tell other students about you — goals, interests, favourite topics...'} rows={4} style={{ ...T.input, resize: 'vertical' }} />
+          : <p style={{ color: prof.about ? 'var(--text-h)' : 'var(--text)', fontSize: 14, lineHeight: 1.7, margin: 0, fontStyle: prof.about ? 'normal' : 'italic' }}>{prof.about || (isOwn ? 'Click "Edit Profile" to add your bio.' : 'No about section yet.')}</p>}
       </Card>
 
-      {/* ── Skills ──────────────────────────────────────────── */}
-      <Card style={{ marginBottom:14 }}>
-        <h4 style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, color:'var(--text-h)', margin:'0 0 12px', fontSize:15 }}>
-          Skills & Subjects
-        </h4>
+      {/* ── Skills & Subjects ───────────────────────────────── */}
+      <Card style={{ marginBottom: 14 }}>
+        <h4 style={{ fontFamily: "'Sora',sans-serif", fontWeight: 800, color: 'var(--text-h)', margin: '0 0 12px', fontSize: 15 }}>Skills &amp; Subjects</h4>
         {editMode && (
-          <div style={{ marginBottom:10 }}>
-            <Label>Skills (comma separated)</Label>
-            <input
-              value={(form.skills || []).join(', ')}
-              onChange={e => setForm(f => ({ ...f, skills: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))}
-              placeholder="e.g. Mathematics, Physics, Python, Problem Solving"
-              style={{ ...T.input }}
-            />
+          <div style={{ marginBottom: 10 }}>
+            <Label>Skills / strong subjects (comma separated)</Label>
+            <input value={(form.skills || []).join(', ')} onChange={e => setF('skills', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} placeholder="e.g. Mathematics, Physics, Problem Solving" style={{ ...T.input }} />
           </div>
         )}
-        <div style={{ display:'flex', flexWrap:'wrap', gap:6 }}>
-          {(prof.skills || []).map((s, i) => (
-            <span key={i} style={{ background:'var(--accent-bg)', color:'var(--accent)', border:'1px solid var(--accent-border)', borderRadius:20, padding:'4px 12px', fontSize:12.5, fontWeight:700 }}>
-              {s}
-            </span>
-          ))}
-          {(prof.skills || []).length === 0 && (
-            <span style={{ color:'var(--text)', fontSize:13, fontStyle:'italic' }}>
-              {isOwn ? 'No skills added yet — click Edit Profile to add some.' : 'No skills listed.'}
-            </span>
-          )}
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
+          {(prof.skills || []).map((s, i) => <span key={i} style={pillRO}>{s}</span>)}
+          {!(prof.skills || []).length && <span style={emptyRO}>{isOwn ? 'No skills added yet — click Edit Profile.' : 'No skills listed.'}</span>}
         </div>
       </Card>
 
-      {/* ── Location & links (edit mode only) ───────────────── */}
-      {editMode && (
-        <Card style={{ marginBottom:14 }}>
-          <h4 style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, color:'var(--text-h)', margin:'0 0 14px', fontSize:15 }}>
-            More Details
-          </h4>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:12 }}>
-            <div>
-              <Label>Location</Label>
-              <input value={form.location || ''} onChange={e => setForm(f => ({ ...f, location: e.target.value }))} placeholder="e.g. Mumbai, India" style={{ ...T.input }}/>
-            </div>
-            <div>
-              <Label>Website / Portfolio</Label>
-              <input value={form.website_url || ''} onChange={e => setForm(f => ({ ...f, website_url: e.target.value }))} placeholder="https://..." style={{ ...T.input }}/>
-            </div>
-          </div>
-          <div style={{ marginTop:12 }}>
-            <Label>Hobbies (comma separated)</Label>
-            <input value={(form.hobbies || []).join(', ')} onChange={e => setForm(f => ({ ...f, hobbies: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))} placeholder="e.g. Cricket, Drawing, Reading" style={{ ...T.input }}/>
-          </div>
-          <div style={{ marginTop:12 }}>
-            <Label>Languages (comma separated)</Label>
-            <input value={(form.languages || []).join(', ')} onChange={e => setForm(f => ({ ...f, languages: e.target.value.split(',').map(s => s.trim()).filter(Boolean) }))} placeholder="e.g. English, Hindi, Tamil" style={{ ...T.input }}/>
-          </div>
-        </Card>
-      )}
-
-      {/* ── Non-edit: show location/hobbies if present ──────── */}
-      {!editMode && (prof.location || (prof.hobbies || []).length > 0 || (prof.languages || []).length > 0) && (
-        <Card style={{ marginBottom:14 }}>
-          {prof.location && (
-            <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8, fontSize:13.5, color:'var(--text-h)' }}>
-              📍 {prof.location}
-            </div>
-          )}
+      {/* ── Languages / location (view mode, if present) ─────── */}
+      {!editMode && (prof.location || (prof.languages || []).length > 0) && (
+        <Card style={{ marginBottom: 14 }}>
+          {prof.location && <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8, fontSize: 13.5, color: 'var(--text-h)' }}>📍 {prof.location}</div>}
           {(prof.languages || []).length > 0 && (
-            <div style={{ display:'flex', gap:6, flexWrap:'wrap', marginBottom:8 }}>
-              <span style={{ fontSize:12.5, color:'var(--text)', marginRight:4 }}>🗣️</span>
-              {prof.languages.map((l, i) => (
-                <span key={i} style={{ background:'var(--code-bg)', border:'1px solid var(--border)', borderRadius:20, padding:'2px 10px', fontSize:12, color:'var(--text-h)', fontWeight:600 }}>{l}</span>
-              ))}
-            </div>
-          )}
-          {(prof.hobbies || []).length > 0 && (
-            <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
-              <span style={{ fontSize:12.5, color:'var(--text)', marginRight:4 }}>🎯</span>
-              {prof.hobbies.map((h, i) => (
-                <span key={i} style={{ background:'var(--code-bg)', border:'1px solid var(--border)', borderRadius:20, padding:'2px 10px', fontSize:12, color:'var(--text-h)', fontWeight:600 }}>{h}</span>
-              ))}
+            <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+              <span style={{ fontSize: 12.5, color: 'var(--text)', marginRight: 4 }}>🗣️</span>
+              {prof.languages.map((l, i) => <span key={i} style={pillNeutral}>{l}</span>)}
             </div>
           )}
         </Card>
       )}
 
-      {/* ── Save button at bottom (redundant but helpful UX) ── */}
       {editMode && (
-        <div style={{ display:'flex', gap:10, marginTop:4, paddingBottom:24 }}>
-          <PrimaryBtn onClick={save} disabled={saving} style={{ flex:1, justifyContent:'center' }}>
-            {saving ? <><Spinner/> Saving...</> : '💾 Save Profile'}
-          </PrimaryBtn>
-          <GhostBtn onClick={() => { setEditMode(false); setForm(data.profile || {}) }}>Cancel</GhostBtn>
+        <Card style={{ marginBottom: 14 }}>
+          <h4 style={{ fontFamily: "'Sora',sans-serif", fontWeight: 800, color: 'var(--text-h)', margin: '0 0 14px', fontSize: 15 }}>More Details</h4>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 12 }}>
+            <div><Label>Location</Label><input value={form.location || ''} onChange={e => setF('location', e.target.value)} placeholder="e.g. Mumbai, India" style={{ ...T.input }} /></div>
+            <div><Label>Languages (comma separated)</Label><input value={(form.languages || []).join(', ')} onChange={e => setF('languages', e.target.value.split(',').map(s => s.trim()).filter(Boolean))} placeholder="e.g. English, Hindi" style={{ ...T.input }} /></div>
+          </div>
+        </Card>
+      )}
+
+      {editMode && (
+        <div style={{ display: 'flex', gap: 10, marginTop: 4, paddingBottom: 24 }}>
+          <PrimaryBtn onClick={save} disabled={saving} style={{ flex: 1, justifyContent: 'center' }}>{saving ? <><Spinner /> Saving...</> : '💾 Save Profile'}</PrimaryBtn>
+          <GhostBtn onClick={() => { setEditMode(false); setForm({ ...(data.profile || {}), class_level: data.user?.class_level || '' }) }}>Cancel</GhostBtn>
         </div>
       )}
-
     </div>
   )
 }
@@ -2486,93 +2667,141 @@ function ProfilePage({ userId, currentUser, onMessage, onBack }) {
 // ══════════════════════════════════════════════════════════════
 //  MESSAGING PAGE
 // ══════════════════════════════════════════════════════════════
-function MessagingPage({ currentUser, startWithUserId }) {
-  const [convs,setConvs]=useState([]); const [active,setActive]=useState(null); const [msgs,setMsgs]=useState([]); const [input,setInput]=useState(''); const [media,setMedia]=useState(null); const [sending,setSending]=useState(false); const [loading,setLoading]=useState(true)
-  const bottomRef=useRef(null); const isMobile=useIsMobile()
+function MessagingPage({ currentUser, startWithUserId, onConversationRead }) {
+  const [convs, setConvs]     = useState([])
+  const [active, setActive]   = useState(null)
+  const [msgs, setMsgs]       = useState([])
+  const [input, setInput]     = useState('')
+  const [media, setMedia]     = useState(null)
+  const [sending, setSending] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const bottomRef = useRef(null)
+  const isMobile  = useIsMobile()
 
-  useEffect(()=>{
-    api.get('/api/conversations').then(d=>{setConvs(d);setLoading(false)}).catch(()=>setLoading(false))
-  },[])
+  const refreshConvs = () => api.get('/api/conversations').then(setConvs).catch(() => {})
 
-  useEffect(()=>{
-    if(startWithUserId){ startConversation(startWithUserId) }
-  },[startWithUserId])
+  useEffect(() => { refreshConvs().finally(() => setLoading(false)) }, [])
 
-  useEffect(()=>{
-    if(!active) return
-    api.get(`/api/conversations/${active.id}/messages`).then(setMsgs).catch(()=>{})
-  },[active])
+  useEffect(() => { if (startWithUserId) startConversation(startWithUserId) }, [startWithUserId])
 
-  useEffect(()=>{ bottomRef.current?.scrollIntoView({behavior:'smooth'}) },[msgs])
+  // Load + poll the open conversation; mark it read on open.
+  useEffect(() => {
+    if (!active) return
+    let stop = false
+    const load = () => api.get(`/api/conversations/${active.id}/messages`).then(m => { if (!stop) setMsgs(m) }).catch(() => {})
+    load()
+    markActiveRead()
+    const poll = setInterval(() => { load(); markActiveRead() }, 5000)
+    return () => { stop = true; clearInterval(poll) }
+  }, [active?.id])
 
-  const startConversation=async(receiverId)=>{
-    try{ const conv=await api.post('/api/conversations',{receiverId}); setActive(conv); api.get('/api/conversations').then(setConvs) }
-    catch(e){ alert(e.message) }
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [msgs])
+
+  function markActiveRead() {
+    if (!active) return
+    api.post(`/api/conversations/${active.id}/read`).then(() => {
+      setConvs(c => c.map(x => x.id === active.id ? { ...x, unread_count: 0 } : x))
+      onConversationRead?.()   // refresh the header badge
+    }).catch(() => {})
   }
 
-  const send=async()=>{
-    if(!input.trim()&&!media) return; setSending(true)
-    try{
-      const msg=await api.post(`/api/conversations/${active.id}/messages`,{content:input.trim(),media_url:media?.url,media_type:media?.type})
-      setMsgs(m=>[...m,msg]); setInput(''); setMedia(null)
-      setConvs(c=>c.map(x=>x.id===active.id?{...x,last_message:input.slice(0,60),last_message_at:new Date().toISOString()}:x))
-    } catch(e){ alert(e.message) }
+  const startConversation = async receiverId => {
+    try {
+      const conv = await api.post('/api/conversations', { receiverId })
+      setActive(conv)
+      refreshConvs()
+    } catch (e) {
+      // student↔student is blocked server-side → 403
+      alert(e.status === 403 ? 'Students cannot message each other.' : e.message)
+    }
+  }
+
+  const send = async () => {
+    if (!input.trim() && !media) return
+    setSending(true)
+    try {
+      const msg = await api.post(`/api/conversations/${active.id}/messages`, { content: input.trim(), media_url: media?.url, media_type: media?.type })
+      setMsgs(m => [...m, msg])
+      setInput(''); setMedia(null)
+      setConvs(c => c.map(x => x.id === active.id ? { ...x, last_message: input.slice(0, 60), last_message_at: new Date().toISOString() } : x))
+    } catch (e) { alert(e.message) }
     setSending(false)
   }
 
   return (
-    <div style={{ display:'flex', height:'calc(100vh - 120px)', fontFamily:"'Nunito',sans-serif" }}>
-      {(!isMobile||!active)&&(
-        <div style={{ width:isMobile?'100%':280, borderRight:'1px solid var(--border)', overflowY:'auto', flexShrink:0 }}>
-          <div style={{ padding:'16px 16px 10px', fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:16, color:'var(--text-h)', borderBottom:'1px solid var(--border)' }}>💬 Messages</div>
-          {loading&&<div style={{ padding:20, textAlign:'center', color:'var(--text)' }}>Loading...</div>}
-          {convs.map(c=>(
-            <div key={c.id} onClick={()=>setActive(c)} style={{ padding:'12px 16px', borderBottom:'1px solid var(--border)', cursor:'pointer', background:active?.id===c.id?'var(--accent-bg)':'transparent', transition:'background .15s' }}>
-              <div style={{ display:'flex', gap:10, alignItems:'center' }}>
-                <div style={{ width:36, height:36, borderRadius:'50%', background:'linear-gradient(135deg,#6366F1,#8B5CF6)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:15, fontWeight:900, color:'#fff', flexShrink:0 }}>{c.other?.name?.[0]||'?'}</div>
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontWeight:700, fontSize:13.5, color:'var(--text-h)' }}>{c.other?.name||'Unknown'}</div>
-                  <div style={{ fontSize:11.5, color:'var(--text)', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{c.last_message||'No messages yet'}</div>
+    <div style={{ display: 'flex', height: 'calc(100vh - 120px)', fontFamily: "'Nunito',sans-serif" }}>
+      {(!isMobile || !active) && (
+        <div style={{ width: isMobile ? '100%' : 280, borderRight: '1px solid var(--border)', overflowY: 'auto', flexShrink: 0 }}>
+          <div style={{ padding: '16px 16px 10px', fontFamily: "'Sora',sans-serif", fontWeight: 800, fontSize: 16, color: 'var(--text-h)', borderBottom: '1px solid var(--border)' }}>💬 Messages</div>
+          {loading && <div style={{ padding: 20, textAlign: 'center', color: 'var(--text)' }}>Loading...</div>}
+          {convs.map(c => (
+            <div key={c.id} onClick={() => setActive(c)} style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', cursor: 'pointer', background: active?.id === c.id ? 'var(--accent-bg)' : 'transparent', transition: 'background .15s' }}>
+              <div style={{ display: 'flex', gap: 10, alignItems: 'center' }}>
+                <Avatar name={c.other?.name} url={c.other?.avatar_url} size={36} />
+                <div style={{ flex: 1, minWidth: 0 }}>
+                  <div style={{ fontWeight: c.unread_count > 0 ? 800 : 700, fontSize: 13.5, color: 'var(--text-h)' }}>{c.other?.name || 'Unknown'}</div>
+                  <div style={{ fontSize: 11.5, color: c.unread_count > 0 ? 'var(--text-h)' : 'var(--text)', fontWeight: c.unread_count > 0 ? 700 : 400, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{c.last_message || 'No messages yet'}</div>
                 </div>
+                {c.unread_count > 0 && (
+                  <span style={{ flexShrink: 0, minWidth: 20, height: 20, padding: '0 6px', borderRadius: 10, background: 'var(--accent)', color: '#fff', fontSize: 11, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {c.unread_count > 99 ? '99+' : c.unread_count}
+                  </span>
+                )}
               </div>
             </div>
           ))}
-          {!loading&&convs.length===0&&<div style={{ padding:24, textAlign:'center', color:'var(--text)', fontSize:13 }}>No conversations yet. Visit a profile to start a chat.</div>}
+          {!loading && convs.length === 0 && <div style={{ padding: 24, textAlign: 'center', color: 'var(--text)', fontSize: 13 }}>No conversations yet. Visit a profile to start a chat.</div>}
         </div>
       )}
-      {active?(
-        <div style={{ flex:1, display:'flex', flexDirection:'column' }}>
-          <div style={{ padding:'12px 16px', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', gap:10 }}>
-            {isMobile&&<button onClick={()=>setActive(null)} style={{ background:'none', border:'none', color:'var(--text)', cursor:'pointer', fontSize:18 }}>←</button>}
-            <div style={{ width:34, height:34, borderRadius:'50%', background:'linear-gradient(135deg,#6366F1,#8B5CF6)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:14, fontWeight:900, color:'#fff' }}>{active.other?.name?.[0]||'?'}</div>
+
+      {active ? (
+        <div style={{ flex: 1, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 10 }}>
+            {isMobile && <button onClick={() => setActive(null)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 18 }}>←</button>}
+            <Avatar name={active.other?.name} url={active.other?.avatar_url} size={34} />
             <div>
-              <div style={{ fontWeight:700, color:'var(--text-h)', fontSize:15 }}>{active.other?.name||'Chat'}</div>
-              <div style={{ fontSize:11.5, color:'var(--text)' }}>{active.other?.role} {active.other?.class_level?`· ${active.other.class_level}`:''}</div>
+              <div style={{ fontWeight: 700, color: 'var(--text-h)', fontSize: 15 }}>{active.other?.name || 'Chat'}</div>
+              <div style={{ fontSize: 11.5, color: 'var(--text)' }}>{active.other?.role} {active.other?.class_level ? `· ${active.other.class_level}` : ''}</div>
             </div>
           </div>
-          <div style={{ flex:1, overflowY:'auto', padding:'16px', display:'flex', flexDirection:'column', gap:8 }}>
-            {msgs.map(m=>{
-              const isMe=m.sender_id===currentUser.id
+
+          <div style={{ flex: 1, overflowY: 'auto', padding: '16px', display: 'flex', flexDirection: 'column', gap: 8 }}>
+            {msgs.map(m => {
+              const isMe = m.sender_id === currentUser.id
               return (
-                <div key={m.id} style={{ display:'flex', justifyContent:isMe?'flex-end':'flex-start' }}>
-                  <div style={{ maxWidth:'72%', padding:'10px 14px', borderRadius:isMe?'14px 4px 14px 14px':'4px 14px 14px 14px', background:isMe?'linear-gradient(135deg,#6366F1,#8B5CF6)':'var(--bg2)', color:isMe?'#fff':'var(--text-h)', border:isMe?'none':'1px solid var(--border)', fontSize:14, lineHeight:1.6 }}>
-                    {m.media_url&&m.media_type==='image'&&<img src={m.media_url} style={{ width:'100%', borderRadius:8, marginBottom:6, maxHeight:200, objectFit:'cover' }} alt=""/>}
-                    {m.content&&<div>{m.content}</div>}
-                    <div style={{ fontSize:9.5, opacity:.6, marginTop:4, textAlign:'right' }}>{new Date(m.created_at).toLocaleTimeString('en-IN',{hour:'2-digit',minute:'2-digit'})}</div>
+                <div key={m.id} style={{ display: 'flex', justifyContent: isMe ? 'flex-end' : 'flex-start' }}>
+                  <div style={{ maxWidth: '72%', padding: '10px 14px', borderRadius: isMe ? '14px 4px 14px 14px' : '4px 14px 14px 14px', background: isMe ? 'linear-gradient(135deg,#6366F1,#8B5CF6)' : 'var(--bg2)', color: isMe ? '#fff' : 'var(--text-h)', border: isMe ? 'none' : '1px solid var(--border)', fontSize: 14, lineHeight: 1.6 }}>
+                    {m.media_url && m.media_type === 'image' && <img src={m.media_url} style={{ width: '100%', borderRadius: 8, marginBottom: 6, maxHeight: 200, objectFit: 'cover' }} alt="" />}
+                    {m.content && <div>{m.content}</div>}
+                    <div style={{ fontSize: 9.5, opacity: .7, marginTop: 4, textAlign: 'right', display: 'flex', gap: 4, justifyContent: 'flex-end', alignItems: 'center' }}>
+                      {new Date(m.created_at).toLocaleTimeString('en-IN', { hour: '2-digit', minute: '2-digit' })}
+                      {/* WhatsApp-style ticks on MY messages only */}
+                      {isMe && (
+                        m.read_at
+                          ? <span title="Seen" style={{ color: '#7dd3fc', fontWeight: 900, letterSpacing: -2 }}>✓✓</span>
+                          : <span title="Sent" style={{ color: 'rgba(255,255,255,.85)', fontWeight: 900 }}>✓</span>
+                      )}
+                    </div>
                   </div>
                 </div>
               )
             })}
-            <div ref={bottomRef}/>
+            <div ref={bottomRef} />
           </div>
-          {media?.url&&<div style={{ padding:'0 12px 6px', display:'flex', gap:6 }}><img src={media.url} style={{ height:44, borderRadius:6 }} alt=""/><button onClick={()=>setMedia(null)} style={{ background:'none', border:'none', color:'var(--text)', cursor:'pointer' }}>✕</button></div>}
-          <div style={{ padding:12, borderTop:'1px solid var(--border)', display:'flex', gap:8 }}>
-            <MediaUploader accept="image/*" label="📷" small onUpload={(url,type)=>setMedia({url,type})} onClear={()=>setMedia(null)} current={null}/>
-            <input value={input} onChange={e=>setInput(e.target.value)} onKeyDown={e=>e.key==='Enter'&&!e.shiftKey&&send()} placeholder="Type a message..." style={{ flex:1, ...T.input, fontSize:14 }}/>
-            <PrimaryBtn onClick={send} disabled={sending||(!input.trim()&&!media)} small>Send</PrimaryBtn>
+
+          {media?.url && <div style={{ padding: '0 12px 6px', display: 'flex', gap: 6 }}><img src={media.url} style={{ height: 44, borderRadius: 6 }} alt="" /><button onClick={() => setMedia(null)} style={{ background: 'none', border: 'none', color: 'var(--text)', cursor: 'pointer' }}>✕</button></div>}
+          <div style={{ padding: 12, borderTop: '1px solid var(--border)', display: 'flex', gap: 8 }}>
+            <MediaUploader accept="image/*" label="📷" small onUpload={(url, type) => setMedia({ url, type })} onClear={() => setMedia(null)} current={null} />
+            <input value={input} onChange={e => setInput(e.target.value)} onKeyDown={e => e.key === 'Enter' && !e.shiftKey && send()} placeholder="Type a message..." style={{ flex: 1, ...T.input, fontSize: 14 }} />
+            <PrimaryBtn onClick={send} disabled={sending || (!input.trim() && !media)} small>Send</PrimaryBtn>
           </div>
         </div>
-      ):(!isMobile&&<div style={{ flex:1, display:'flex', alignItems:'center', justifyContent:'center', color:'var(--text)', flexDirection:'column', gap:12 }}><div style={{ fontSize:48 }}>💬</div><div style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:16, color:'var(--text-h)' }}>Select a conversation</div></div>)}
+      ) : (!isMobile && (
+        <div style={{ flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text)', flexDirection: 'column', gap: 12 }}>
+          <div style={{ fontSize: 48 }}>💬</div>
+          <div style={{ fontFamily: "'Sora',sans-serif", fontWeight: 700, fontSize: 16, color: 'var(--text-h)' }}>Select a conversation</div>
+        </div>
+      ))}
     </div>
   )
 }
@@ -5758,7 +5987,18 @@ export default function App() {
   const [msgUserId, setMsgUserId]     = useState(null)
   const [trialExpired, setTrialExpired] = useState(false)
   const [prefill, setPrefill]         = useState(null)
+  const [unreadCount, setUnreadCount] = useState(0)
 
+const fetchUnread = useCallback(() => {
+  api.get('/api/messages/unread-count').then(d => setUnreadCount(d.count || 0)).catch(() => {})
+}, [])
+
+useEffect(() => {
+  if (!user) return
+  fetchUnread()
+  const i = setInterval(fetchUnread, 15000)
+  return () => clearInterval(i)
+}, [user, fetchUnread])
   // Refresh user on mount
   useEffect(() => {
     if (!user) return
@@ -5823,7 +6063,7 @@ export default function App() {
     { id: 'flashcards',  icon: '🃏', label: 'Flashcards',      color: '#EF4444' },
     { id: 'courses',     icon: '📚', label: 'Youtube Courses', color: '#8B5CF6' },
     { id: 'search',      icon: '🔍', label: 'Search',          color: '#06b6d4' },
-    // { id: 'messages',    icon: '💬', label: 'Messages',        color: '#10B981' },
+    { id: 'messages',    icon: '💬', label: 'Messages',        color: '#10B981' },
     // { id: 'video',       icon: '🎬', label: 'Video Learning',  color: '#06b6d4' },
     // ...(isStudent ? [{ id: 'cheatsheet', icon: '📋', label: 'Cheat Sheet',   color: '#F97316' }] : []),
     // ...(isTeacher ? [{ id: 'lessonplan', icon: '🎓', label: 'Lesson Planner', color: '#7C3AED' }] : []),
@@ -5868,8 +6108,8 @@ export default function App() {
     )
     if (tab === 'dashboard')  return <Dashboard user={user} onNavigate={setTab} />
     if (tab === 'feed')       return <SocialFeed user={user} />
-    if (tab === 'search')     return <SearchPage currentUser={user} onViewProfile={id => { setViewProfileId(id); setTab('profile') }} />
-    if (tab === 'messages')   return <MessagingPage currentUser={user} startWithUserId={msgUserId} />
+    if (tab === 'search')     return <SearchPage currentUser={user} onViewProfile={id => { setViewProfileId(id); setTab('profile') }} onMessage={id => { setMsgUserId(id); setTab('messages') }} />
+    if (tab === 'messages')   return <MessagingPage currentUser={user} startWithUserId={msgUserId} onConversationRead={fetchUnread} />
     if (tab === 'history')    return <HistoryPage onNavigate={(t, pf) => { if (pf) setPrefill(pf); setTab(t) }} />
     if (tab === 'video')      return <VideoLearn user={user} />
     if (tab === 'cheatsheet') return <CheatSheetMaker user={user} prefill={prefill} onClearPrefill={clearPrefill} />
@@ -5901,16 +6141,27 @@ export default function App() {
 
         <div style={{ display: 'flex', gap: isMobile ? 5 : 8, alignItems: 'center', minWidth: 0 }}>
           {!isSchool && <TrialBadge user={user} onUpgrade={() => setTab('subscription')} />}
+            <button onClick={() => setTab('messages')} title="Messages"
+            style={{ position: 'relative', width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius: 9, border: '1px solid var(--border)', background: 'var(--social-bg)', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+            💬
+            {unreadCount > 0 && (
+              <span style={{ position: 'absolute', top: -5, right: -5, minWidth: 17, height: 17, padding: '0 4px', borderRadius: 9, background: '#ef4444', color: '#fff', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center', border: '2px solid var(--bg)' }}>
+                {unreadCount > 9 ? '9+' : unreadCount}
+              </span>
+            )}
+          </button>
           <button onClick={() => setTab('achievements')} title="Achievements" style={{ width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius: 9, border: '1px solid var(--border)', background: 'var(--social-bg)', cursor: 'pointer', fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>🏆</button>
           <button onClick={() => { setViewProfileId(null); setTab('profile') }} title="My Profile" style={{ width: isMobile ? 32 : 36, height: isMobile ? 32 : 36, borderRadius: 9, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', cursor: 'pointer', fontSize: 14, fontWeight: 900, color: '#fff', border: 'none', display: 'flex', alignItems: 'center', justifyContent: 'center', fontFamily: "'Sora', sans-serif", flexShrink: 0 }}>
-            {user.name?.[0]?.toUpperCase() || '?'}
+            {user.avatar_url
+              ? <img src={user.avatar_url} alt="" style={{ width: '100%', height: '100%', borderRadius: 9, objectFit: 'cover' }} />
+              : (user.name?.[0]?.toUpperCase() || '?')}
           </button>
           <button onClick={logout} title="Sign Out" style={{ padding: isMobile ? '7px 10px' : '6px 13px', borderRadius: 9, border: '1px solid var(--border)', background: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 13, fontWeight: 700, fontFamily: "'Nunito', sans-serif", flexShrink: 0 }}>{isMobile ? '⏻' : 'Sign Out'}</button>
         </div>
       </header>
 
       {/* ── Mobile top nav ───────────────────────────────────── */}
-      <MobileTopNav tabs={tabs} activeTab={tab} onTabChange={setTab} />
+      <MobileTopNav tabs={tabs} activeTab={tab} onTabChange={setTab} unreadCount={unreadCount} />
 
       <div style={{ display: 'flex', flex: 1 }}>
 
@@ -5924,6 +6175,11 @@ export default function App() {
                 onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,.05)' }}
                 onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}>
                 <span style={{ fontSize: 16 }}>{t.icon}</span>
+                {t.id === 'messages' && unreadCount > 0 && (
+                  <span style={{ marginLeft: 'auto', minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9, background: '#ef4444', color: '#fff', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {unreadCount > 9 ? '9+' : unreadCount}
+                  </span>
+                )}
                 {t.label}
               </button>
             )
