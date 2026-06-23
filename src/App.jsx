@@ -3757,7 +3757,7 @@ function formatDoubtMessage(md = '') {
 
 // ── Persistent doubt thread (server = source of truth, localStorage = cache) ──
 const DOUBT_THREAD_KEY = 'bs_doubt_thread'
-const DOUBT_GREETING = { role: 'assistant', content: "👋 Hi! Ask me any doubt — I'll give you a **clear, step-by-step explanation** tailored to your CBSE syllabus. 🎯", ts: 0 }
+const DOUBT_GREETING = { role: 'assistant', content: "👋 Hi! Ask me any doubt, I'll give you a **clear, step-by-step explanation** tailored to your CBSE syllabus. 🎯", ts: 0 }
 
 function doubtCacheKey(userId) {
   return userId ? `${DOUBT_THREAD_KEY}_${userId}` : DOUBT_THREAD_KEY
