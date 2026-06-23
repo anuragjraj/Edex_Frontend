@@ -3252,79 +3252,361 @@ function NoticesPage({ user }) {
 // ══════════════════════════════════════════════════════════════
 //  TIMETABLE VIEWER
 // ══════════════════════════════════════════════════════════════
-function TimetablePage({ user }) {
-  const [timetable,setTimetable]=useState(null); const [loading,setLoading]=useState(true); const [editing,setEditing]=useState(false)
-  const [rawSchedule,setRawSchedule]=useState(''); const [saving,setSaving]=useState(false)
-  const days = ['Monday','Tuesday','Wednesday','Thursday','Friday','Saturday']
-  const COLORS = {'Mathematics':'#6366F1','Science':'#10B981','Physics':'#06b6d4','Chemistry':'#F59E0B','Biology':'#22c55e','English':'#EF4444','Hindi':'#A855F7','Social Science':'#F97316','History':'#ec4899','Geography':'#34d399','default':'#64748b'}
+// ══════════════════════════════════════════════════════════════
+//  TEACHER PICKER — multi-select from school teachers + manual add
+//  (Place this component ABOVE TimetablePage in your file)
+// ══════════════════════════════════════════════════════════════
+function TeacherPicker({ selected = [], onChange, options = [], color = '#06b6d4' }) {
+  const [open, setOpen]     = useState(false)
+  const [search, setSearch] = useState('')
+  const [manual, setManual] = useState('')
+  const ref = useRef(null)
 
-  useEffect(()=>{
-    api.get('/api/school/timetable').then(d=>{ setTimetable(d); if(d) setRawSchedule(JSON.stringify(d.schedule, null, 2)) }).catch(()=>{}).finally(()=>setLoading(false))
-  },[])
+  useEffect(() => {
+    const h = e => { if (ref.current && !ref.current.contains(e.target)) setOpen(false) }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [])
 
-  const save=async()=>{
-    setSaving(true)
-    try{
-      const schedule = JSON.parse(rawSchedule)
-      const result = await api.post('/api/school/timetable',{class_level:user.class_level,section:user.section||'A',schedule})
-      setTimetable(result); setEditing(false)
-    } catch(e){ alert('Invalid JSON or save failed: '+e.message) }
-    setSaving(false)
+  const toggle = name =>
+    selected.includes(name) ? onChange(selected.filter(n => n !== name)) : onChange([...selected, name])
+
+  const addManual = () => {
+    const n = manual.trim()
+    if (n && !selected.includes(n)) onChange([...selected, n])
+    setManual('')
   }
 
-  if(loading) return <PageSpinner/>
+  const filtered = search.trim()
+    ? options.filter(o => o.toLowerCase().includes(search.toLowerCase()))
+    : options
 
-  const schedule = timetable?.schedule?.week || []
+  const label = selected.length === 0
+    ? 'Add teacher (optional)'
+    : selected.length === 1
+    ? selected[0]
+    : `${selected.length} teachers`
 
   return (
-    <div style={{ padding:24, fontFamily:"'Nunito',sans-serif" }}>
-      <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
-        <PageHeader icon="📅" title="Timetable" subtitle={`${user.class_level||'Your class'} schedule`} color="#06b6d4"/>
-        {user.role==='teacher'&&!editing&&<PrimaryBtn onClick={()=>setEditing(true)} color="#06b6d4">✏️ Edit</PrimaryBtn>}
-      </div>
-
-      {editing&&(
-        <Card style={{ marginBottom:20 }}>
-          <h3 style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, color:'var(--text-h)', margin:'0 0 12px', fontSize:15 }}>Edit Timetable (JSON)</h3>
-          <div style={{ background:'rgba(245,158,11,.1)', border:'1px solid rgba(245,158,11,.25)', borderRadius:9, padding:'10px 14px', marginBottom:12, fontSize:12.5, color:'#FCD34D' }}>
-            Format: {"{"}"week": [{"{"}"day": "Monday", "periods": [{"{"}"period": 1, "subject": "Mathematics", "teacher": "Mr. Ramesh", "time_start": "08:00", "time_end": "08:45"{"}"}]{"}"}]{"}"}
-          </div>
-          <textarea value={rawSchedule} onChange={e=>setRawSchedule(e.target.value)} rows={12} style={{ ...T.input, resize:'vertical', fontFamily:'monospace', fontSize:12 }}/>
-          <div style={{ display:'flex', gap:10, marginTop:12 }}>
-            <PrimaryBtn onClick={save} disabled={saving} color="#06b6d4">{saving?<><Spinner/> Saving...</>:'💾 Save Timetable'}</PrimaryBtn>
-            <GhostBtn onClick={()=>setEditing(false)}>Cancel</GhostBtn>
-          </div>
-        </Card>
-      )}
-
-      {!timetable&&!editing&&(
-        <div style={{ textAlign:'center', padding:44, color:'var(--text)' }}>
-          <div style={{ fontSize:48, marginBottom:12 }}>📅</div>
-          <div style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:16, color:'var(--text-h)', marginBottom:8 }}>No timetable uploaded yet</div>
-          {user.role==='teacher'&&<PrimaryBtn onClick={()=>setEditing(true)} color="#06b6d4">Upload Timetable</PrimaryBtn>}
+    <div ref={ref} style={{ position: 'relative' }}>
+      {/* Selected pills */}
+      {selected.length > 0 && (
+        <div style={{ display: 'flex', flexWrap: 'wrap', gap: 4, marginBottom: 6 }}>
+          {selected.map(t => (
+            <span key={t} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: `${color}18`, color, border: `1px solid ${color}44`, borderRadius: 20, padding: '2px 9px', fontSize: 11.5, fontWeight: 700 }}>
+              {t}
+              <span onClick={e => { e.stopPropagation(); toggle(t) }} style={{ cursor: 'pointer', fontWeight: 900, lineHeight: 1 }}>×</span>
+            </span>
+          ))}
         </div>
       )}
 
-      {schedule.length>0&&(
-        <div style={{ overflowX:'auto' }}>
-          <div style={{ display:'grid', gridTemplateColumns:`120px repeat(${Math.max(...schedule.map(d=>d.periods?.length||0))},1fr)`, gap:6, minWidth:600 }}>
-            <div style={{ padding:'10px 12px', fontFamily:"'Sora',sans-serif", fontWeight:800, color:'var(--text)', fontSize:11, textTransform:'uppercase' }}>Day</div>
-            {Array.from({length:Math.max(...schedule.map(d=>d.periods?.length||0))},(_, i)=>(
-              <div key={i} style={{ padding:'10px 8px', textAlign:'center', fontFamily:"'Sora',sans-serif", fontWeight:800, color:'var(--text)', fontSize:11, textTransform:'uppercase' }}>Period {i+1}</div>
+      {/* Trigger */}
+      <button type="button" onClick={() => setOpen(o => !o)}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 12px', borderRadius: 9, border: `1.5px solid ${open ? color : 'var(--border)'}`, background: '#fff', color: selected.length ? '#1e293b' : '#94a3b8', fontSize: 13, fontFamily: "'Nunito', sans-serif", cursor: 'pointer', textAlign: 'left' }}>
+        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>{label}</span>
+        <span style={{ marginLeft: 6, fontSize: 10, color: 'var(--text)', transform: open ? 'rotate(180deg)' : 'none', transition: 'transform .2s' }}>▼</span>
+      </button>
+
+      {open && (
+        <div style={{ position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0, background: '#fff', border: `1.5px solid ${color}55`, borderRadius: 12, boxShadow: '0 12px 40px rgba(15,23,42,.18)', zIndex: 600, overflow: 'hidden' }}>
+          {/* Search the school teacher list */}
+          <div style={{ padding: '10px 12px', borderBottom: '1px solid var(--border)' }}>
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search school teachers…"
+              style={{ width: '100%', padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: '#f8fafc', color: '#1e293b', fontSize: 12.5, fontFamily: "'Nunito', sans-serif", outline: 'none' }} />
+          </div>
+
+          {/* List of school teachers */}
+          <div style={{ maxHeight: 180, overflowY: 'auto', padding: '4px 0' }}>
+            {options.length === 0 && <div style={{ padding: 12, textAlign: 'center', fontSize: 12, color: '#94a3b8' }}>No teachers found for this school</div>}
+            {filtered.map(o => {
+              const checked = selected.includes(o)
+              return (
+                <div key={o} onClick={() => toggle(o)} style={{ display: 'flex', alignItems: 'center', gap: 9, padding: '7px 13px', cursor: 'pointer', background: checked ? `${color}12` : 'transparent' }}>
+                  <div style={{ width: 15, height: 15, borderRadius: 4, border: `2px solid ${checked ? color : '#cbd5e1'}`, background: checked ? color : 'transparent', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {checked && <span style={{ color: '#fff', fontSize: 9, fontWeight: 900 }}>✓</span>}
+                  </div>
+                  <span style={{ fontSize: 13, color: checked ? color : '#1e293b', fontWeight: checked ? 700 : 400 }}>{o}</span>
+                </div>
+              )
+            })}
+            {options.length > 0 && filtered.length === 0 && <div style={{ padding: 12, textAlign: 'center', fontSize: 12, color: '#94a3b8' }}>No matches</div>}
+          </div>
+
+          {/* Manual add — for guest / substitute / not-listed teachers */}
+          <div style={{ padding: '10px 12px', borderTop: '1px solid var(--border)', display: 'flex', gap: 6 }}>
+            <input value={manual} onChange={e => setManual(e.target.value)} onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addManual())} placeholder="Or type a name…"
+              style={{ flex: 1, padding: '6px 10px', borderRadius: 8, border: '1px solid var(--border)', background: '#f8fafc', color: '#1e293b', fontSize: 12.5, fontFamily: "'Nunito', sans-serif", outline: 'none' }} />
+            <button onClick={addManual} disabled={!manual.trim()} style={{ padding: '6px 12px', borderRadius: 8, border: 'none', background: color, color: '#fff', fontSize: 12, fontWeight: 700, cursor: manual.trim() ? 'pointer' : 'not-allowed', opacity: manual.trim() ? 1 : .5, fontFamily: "'Nunito', sans-serif" }}>Add</button>
+          </div>
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════
+//  TIMETABLE VIEWER + VISUAL BUILDER  (replaces old TimetablePage)
+// ══════════════════════════════════════════════════════════════
+function TimetablePage({ user }) {
+  const DAYS   = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday']
+  const COLORS = { 'Mathematics':'#6366F1','Science':'#10B981','Physics':'#06b6d4','Chemistry':'#F59E0B','Biology':'#22c55e','English':'#EF4444','Hindi':'#A855F7','Social Science':'#F97316','History':'#ec4899','Geography':'#34d399','default':'#64748b' }
+  const SECTIONS = ['A', 'B', 'C', 'D', 'E', 'F']
+
+  const isTeacher = ['teacher', 'admin', 'principal'].includes(user.role)
+
+  const [classLevel, setClassLevel] = useState(user.class_level || 'Class 10')
+  const [section,    setSection]    = useState(user.section || 'A')
+  const [timetable,  setTimetable]  = useState(null)
+  const [loading,    setLoading]    = useState(true)
+  const [editing,    setEditing]    = useState(false)
+  const [saving,     setSaving]     = useState(false)
+  const [err,        setErr]        = useState('')
+  const [ok,         setOk]         = useState(false)
+  const [teacherOptions, setTeacherOptions] = useState([])
+  const [builder,    setBuilder]    = useState([])   // [{ day, periods:[{ subject, teachers:[], time_start, time_end }] }]
+
+  // ── Load existing timetable + the school's teacher list ──
+  useEffect(() => {
+    api.get('/api/school/timetable')
+      .then(d => setTimetable(d))
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [])
+
+  useEffect(() => {
+    api.get('/api/search?role=teacher')
+      .then(list => setTeacherOptions([...new Set((list || []).map(t => t.name).filter(Boolean))]))
+      .catch(() => {})
+  }, [])
+
+  // ── Time helper: add minutes to "HH:MM" ──
+  const addMin = (t, m) => {
+    if (!t) return ''
+    const [h, mm] = t.split(':').map(Number)
+    const d = new Date(2000, 0, 1, h, mm + m)
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  }
+
+  // ── Convert saved schedule → editable builder rows ──
+  const scheduleToBuilder = (week = []) => {
+    const byDay = Object.fromEntries((week || []).map(d => [d.day, d.periods || []]))
+    return DAYS.map(day => ({
+      day,
+      periods: (byDay[day] || []).map(p => ({
+        subject:    p.subject || '',
+        teachers:   p.teacher ? p.teacher.split(',').map(s => s.trim()).filter(Boolean) : [],
+        time_start: p.time_start || '',
+        time_end:   p.time_end || '',
+      })),
+    }))
+  }
+
+  // ── Default blank week: each day starts with one empty 45-min slot ──
+  const blankBuilder = () =>
+    DAYS.map(day => ({ day, periods: [{ subject: '', teachers: [], time_start: '08:00', time_end: '08:45' }] }))
+
+  function startEditing() {
+    setErr(''); setOk(false)
+    const week = timetable?.schedule?.week
+    setBuilder(week?.length ? scheduleToBuilder(week) : blankBuilder())
+    setEditing(true)
+  }
+
+  // ── Builder mutations ──
+  const updatePeriod = (di, pi, field, value) =>
+    setBuilder(b => b.map((d, i) => i !== di ? d : {
+      ...d,
+      periods: d.periods.map((p, j) => j !== pi ? p : { ...p, [field]: value }),
+    }))
+
+  const addPeriod = di =>
+    setBuilder(b => b.map((d, i) => {
+      if (i !== di) return d
+      const last  = d.periods[d.periods.length - 1]
+      const start = last?.time_end || '08:00'
+      return { ...d, periods: [...d.periods, { subject: '', teachers: [], time_start: start, time_end: addMin(start, 45) }] }
+    }))
+
+  const removePeriod = (di, pi) =>
+    setBuilder(b => b.map((d, i) => i !== di ? d : { ...d, periods: d.periods.filter((_, j) => j !== pi) }))
+
+  const copyMondayToAll = () =>
+    setBuilder(b => {
+      const mon = b[0]?.periods || []
+      return b.map((d, i) => i === 0 ? d : { ...d, periods: mon.map(p => ({ ...p, teachers: [...p.teachers] })) })
+    })
+
+  // ── Save: builder → schedule.week JSON ──
+  async function save() {
+    setErr(''); setOk(false)
+    const week = builder
+      .map(d => ({
+        day: d.day,
+        periods: d.periods
+          .filter(p => p.subject && p.time_start && p.time_end)
+          .map((p, i) => ({
+            period:     i + 1,
+            subject:    p.subject,
+            teacher:    p.teachers.join(', '),   // stays a string → viewer renders unchanged
+            time_start: p.time_start,
+            time_end:   p.time_end,
+          })),
+      }))
+      .filter(d => d.periods.length)
+
+    if (!week.length) { setErr('Add at least one period with a subject and time before saving.'); return }
+
+    setSaving(true)
+    try {
+      const result = await api.post('/api/school/timetable', { class_level: classLevel, section, schedule: { week } })
+      setTimetable(result)
+      setOk(true)
+      setEditing(false)
+      setTimeout(() => setOk(false), 1500)
+    } catch (e) { setErr(e.message) }
+    setSaving(false)
+  }
+
+  if (loading) return <PageSpinner />
+
+  const schedule = timetable?.schedule?.week || []
+  const maxP = schedule.length ? Math.max(...schedule.map(d => d.periods?.length || 0)) : 0
+
+  // ══════════════════════════════════════════════════════════
+  //  EDIT MODE — timesheet-style builder
+  // ══════════════════════════════════════════════════════════
+  if (editing) {
+    return (
+      <div style={{ padding: 24, fontFamily: "'Nunito', sans-serif", maxWidth: 920, margin: '0 auto' }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 18, flexWrap: 'wrap', gap: 10 }}>
+          <PageHeader icon="📅" title="Build Timetable" subtitle="Fill it like a weekly timesheet — pick the class, then add periods per day" color="#06b6d4" />
+          <div style={{ display: 'flex', gap: 8 }}>
+            <PrimaryBtn onClick={save} disabled={saving} color="#06b6d4">{saving ? <><Spinner /> Saving…</> : '💾 Save Timetable'}</PrimaryBtn>
+            <GhostBtn onClick={() => setEditing(false)}>Cancel</GhostBtn>
+          </div>
+        </div>
+
+        {/* Class / section selectors */}
+        <Card style={{ marginBottom: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 14 }}>
+            <Field label="Class"><BSSelect value={classLevel} onChange={setClassLevel} options={CLASSES} /></Field>
+            <Field label="Section"><BSSelect value={section} onChange={setSection} options={SECTIONS} /></Field>
+          </div>
+          <div style={{ marginTop: 6 }}>
+            <GhostBtn small onClick={copyMondayToAll}>📋 Copy Monday's periods to all days</GhostBtn>
+          </div>
+        </Card>
+
+        {ok  && <SuccessMsg msg="Timetable saved!" />}
+        {err && <ErrMsg msg={err} />}
+
+        {/* One block per day */}
+        {builder.map((day, di) => {
+          const color = '#06b6d4'
+          return (
+            <Card key={day.day} style={{ marginBottom: 14 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                <h3 style={{ margin: 0, fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 15, color: 'var(--text-h)' }}>
+                  {day.day}
+                </h3>
+                <span style={{ fontSize: 12, color: 'var(--text)', fontWeight: 600 }}>{day.periods.length} period{day.periods.length !== 1 ? 's' : ''}</span>
+              </div>
+
+              {day.periods.length === 0 && (
+                <div style={{ fontSize: 12.5, color: 'var(--text)', padding: '4px 0 10px', fontStyle: 'italic' }}>No periods yet — it's a free day, or add one below.</div>
+              )}
+
+              {/* Each period row */}
+              {day.periods.map((p, pi) => (
+                <div key={pi} style={{ display: 'grid', gridTemplateColumns: '90px 90px 1fr 1fr 32px', gap: 8, alignItems: 'start', marginBottom: 10, paddingBottom: 10, borderBottom: pi < day.periods.length - 1 ? '1px solid var(--border)' : 'none' }}>
+                  {/* Start time */}
+                  <div>
+                    <Label>From</Label>
+                    <input type="time" value={p.time_start} onChange={e => updatePeriod(di, pi, 'time_start', e.target.value)} style={{ ...T.input, padding: '8px 8px', fontSize: 13 }} />
+                  </div>
+                  {/* End time */}
+                  <div>
+                    <Label>To</Label>
+                    <input type="time" value={p.time_end} onChange={e => updatePeriod(di, pi, 'time_end', e.target.value)} style={{ ...T.input, padding: '8px 8px', fontSize: 13 }} />
+                  </div>
+                  {/* Subject */}
+                  <div>
+                    <Label>Subject</Label>
+                    <BSSelect value={p.subject} onChange={v => updatePeriod(di, pi, 'subject', v)}
+                      options={[{ value: '', label: '── Select subject ──' }, ...SUBJECTS.map(s => ({ value: s, label: s })), { value: 'Break', label: 'Break / Lunch' }, { value: 'Library', label: 'Library' }, { value: 'Games', label: 'Games / PE' }]} />
+                  </div>
+                  {/* Teacher (optional, multi-select + manual) */}
+                  <div>
+                    <Label>Teacher (optional)</Label>
+                    <TeacherPicker selected={p.teachers} onChange={v => updatePeriod(di, pi, 'teachers', v)} options={teacherOptions} />
+                  </div>
+                  {/* Delete row */}
+                  <div style={{ paddingTop: 22 }}>
+                    <button onClick={() => removePeriod(di, pi)} title="Remove period"
+                      style={{ width: 30, height: 30, borderRadius: 8, border: '1px solid #fecaca', background: '#fff5f5', color: '#ef4444', fontSize: 13, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>✕</button>
+                  </div>
+                </div>
+              ))}
+
+              <button onClick={() => addPeriod(di)}
+                style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '6px 14px', borderRadius: 9, border: '1.5px dashed #94a3b8', background: 'transparent', color: '#06b6d4', fontSize: 12.5, fontWeight: 700, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", marginTop: 4 }}>
+                + Add Period to {day.day}
+              </button>
+            </Card>
+          )
+        })}
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 4, paddingBottom: 24 }}>
+          <PrimaryBtn onClick={save} disabled={saving} color="#06b6d4" style={{ flex: 1, justifyContent: 'center' }}>{saving ? <><Spinner /> Saving…</> : '💾 Save Timetable'}</PrimaryBtn>
+          <GhostBtn onClick={() => setEditing(false)}>Cancel</GhostBtn>
+        </div>
+      </div>
+    )
+  }
+
+  // ══════════════════════════════════════════════════════════
+  //  VIEW MODE (unchanged grid)
+  // ══════════════════════════════════════════════════════════
+  return (
+    <div style={{ padding: 24, fontFamily: "'Nunito', sans-serif" }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 20, flexWrap: 'wrap', gap: 10 }}>
+        <PageHeader icon="📅" title="Timetable" subtitle={`${user.class_level || classLevel} schedule`} color="#06b6d4" />
+        {isTeacher && <PrimaryBtn onClick={startEditing} color="#06b6d4">{schedule.length ? '✏️ Edit' : '+ Create Timetable'}</PrimaryBtn>}
+      </div>
+
+      {ok && <SuccessMsg msg="Timetable saved!" />}
+
+      {!timetable && (
+        <div style={{ textAlign: 'center', padding: 44, color: 'var(--text)' }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>📅</div>
+          <div style={{ fontFamily: "'Sora', sans-serif", fontWeight: 700, fontSize: 16, color: 'var(--text-h)', marginBottom: 8 }}>No timetable yet</div>
+          {isTeacher && <PrimaryBtn onClick={startEditing} color="#06b6d4">Create Timetable</PrimaryBtn>}
+        </div>
+      )}
+
+      {schedule.length > 0 && (
+        <div style={{ overflowX: 'auto' }}>
+          <div style={{ display: 'grid', gridTemplateColumns: `120px repeat(${maxP}, 1fr)`, gap: 6, minWidth: 600 }}>
+            <div style={{ padding: '10px 12px', fontFamily: "'Sora', sans-serif", fontWeight: 800, color: 'var(--text)', fontSize: 11, textTransform: 'uppercase' }}>Day</div>
+            {Array.from({ length: maxP }, (_, i) => (
+              <div key={i} style={{ padding: '10px 8px', textAlign: 'center', fontFamily: "'Sora', sans-serif", fontWeight: 800, color: 'var(--text)', fontSize: 11, textTransform: 'uppercase' }}>Period {i + 1}</div>
             ))}
-            {schedule.map((day,di)=>(
-              <div key={di} style={{ display:'contents' }}>
-                <div style={{ padding:'10px 12px', display:'flex', alignItems:'center', fontWeight:800, color:'var(--text-h)', fontSize:13, fontFamily:"'Sora',sans-serif", background:'var(--bg2)', borderRadius:10, border:'1px solid var(--border)' }}>{day.day}</div>
-                {(day.periods||[]).map((p,pi)=>{
-                  const color = COLORS[p.subject]||COLORS.default
+            {schedule.map((day, di) => (
+              <div key={di} style={{ display: 'contents' }}>
+                <div style={{ padding: '10px 12px', display: 'flex', alignItems: 'center', fontWeight: 800, color: 'var(--text-h)', fontSize: 13, fontFamily: "'Sora', sans-serif", background: 'var(--bg2)', borderRadius: 10, border: '1px solid var(--border)' }}>{day.day}</div>
+                {(day.periods || []).map((p, pi) => {
+                  const color = COLORS[p.subject] || COLORS.default
                   return (
-                    <div key={pi} style={{ background:`${color}15`, border:`1px solid ${color}25`, borderRadius:10, padding:'10px 10px', textAlign:'center' }}>
-                      <div style={{ fontWeight:800, fontSize:12.5, color, fontFamily:"'Sora',sans-serif", marginBottom:2 }}>{p.subject}</div>
-                      <div style={{ fontSize:10.5, color:'var(--text)' }}>{p.teacher}</div>
-                      <div style={{ fontSize:10, color:'var(--text)', marginTop:2 }}>{p.time_start}–{p.time_end}</div>
+                    <div key={pi} style={{ background: `${color}15`, border: `1px solid ${color}25`, borderRadius: 10, padding: '10px 10px', textAlign: 'center' }}>
+                      <div style={{ fontWeight: 800, fontSize: 12.5, color, fontFamily: "'Sora', sans-serif", marginBottom: 2 }}>{p.subject}</div>
+                      {p.teacher && <div style={{ fontSize: 10.5, color: 'var(--text)' }}>{p.teacher}</div>}
+                      <div style={{ fontSize: 10, color: 'var(--text)', marginTop: 2 }}>{p.time_start}–{p.time_end}</div>
                     </div>
                   )
                 })}
+                {/* pad empty cells so rows align */}
+                {Array.from({ length: maxP - (day.periods?.length || 0) }, (_, k) => <div key={`pad-${k}`} />)}
               </div>
             ))}
           </div>
@@ -3543,9 +3825,11 @@ RULES:
 - For theory questions: answer in the mark-appropriate length a CBSE examiner expects (1-mark = one line, 3-mark = 3-4 key points, 5-mark = full structured answer).
 - Bold only the key term on first use. Use short headings or numbered points where it aids clarity.
 - Where relevant, add one line "📝 Exam tip:" pointing out what CBSE commonly asks or where students lose marks.
-- Stay on the ${cls} level — do not bring in concepts beyond this class's NCERT scope.
+- Stay on the ${cls} and ${subject}level — do not bring in concepts beyond this class's NCERT scope.
 - If the question belongs to a different chapter, answer it correctly but note the actual chapter in one short line.
 - If a question is outside the syllabus or unclear, say so briefly and ask one focused clarifying question.
+- Dont show any latexes as equation, equations should look like equations in textbook
+-always be supportive and polite with the user
 
 FORMATTING — the chat renders limited markdown, follow exactly:
 - Use **bold** for every heading and every key term. Do NOT use markdown tables.
@@ -3798,6 +4082,7 @@ For EVERY formula in this chapter:
 - State the conditions under which it applies
 - State when it does NOT apply
 - Give one solved numerical using each formula
+- The formulas should never look like latexes.
 
 ---
 
