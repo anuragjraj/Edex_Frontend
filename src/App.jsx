@@ -10,6 +10,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react'
+import TalkingBuddy from './TalkingBuddy'
 
 // ══════════════════════════════════════════════════════════════
 //  FONT + STYLE INJECTION
@@ -6641,8 +6642,8 @@ const renderTab = t => {
 
       </div>
 
-      {/* ── AI Buddy (school users only) ─────────────────────── */}
-      {isSchool && <AIBuddy user={user} />}
+      {/* ── AI Buddy (all users) ─────────────────────── */}
+      {user && <TalkingBuddy user={user} />}
 
     </div>
   )
