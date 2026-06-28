@@ -1,27 +1,33 @@
 /**
- * TalkingBuddy — an animated, *talking* AI study buddy for BrainSpark AI.
+ * TalkingBuddy - a 3D human avatar that talks.  (Sketchfab-friendly version)
  *
- * - Animated SVG avatar that blinks, idles, shows expressions, and moves its
- *   mouth while speaking (real voice via the browser SpeechSynthesis API).
- * - Optional voice INPUT (mic) where supported.
- * - On open, it proactively greets the user by name, reads their activity/XP/
- *   streak (your backend already injects this in getBuddyContext), tells them
- *   what to study next + how, and asks a question about their progress.
- * - Talks to your existing POST /api/buddy/chat endpoint. No new backend needed.
+ * Works with ANY rigged humanoid model (.glb OR .gltf), self-hosted in /public.
+ *  - AUTO-SCALES + RE-CENTERS the model so it's framed correctly no matter
+ *    what size/position the Sketchfab author exported it at.
+ *  - Plays the model's built-in idle animation if it has one.
+ *  - Lip-syncs via face morph targets if present; else nods the head while
+ *    speaking so it still feels alive.
+ *  - Speaks replies aloud (SpeechSynthesis) + optional mic input.
+ *  - Proactive coaching on open. Uses your existing POST /api/buddy/chat.
  *
- * USAGE (anywhere inside <App>, for ALL users):
- *     import TalkingBuddy from './TalkingBuddy'
- *     ...
- *     {user && <TalkingBuddy user={user} />}
- *
- * Optional props:
- *     apiUrl          override API base (defaults to VITE_API_URL)
- *     getAuthHeaders  () => headers   (defaults to reading bs_token/bs_session)
- *     accent          gradient start colour (default #6366F1)
- *     accent2         gradient end   colour (default #8B5CF6)
+ * REQUIRES:  npm install three @react-three/fiber @react-three/drei
+ * USAGE:     {user && <TalkingBuddy user={user} />}
  */
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
+import { Canvas, useFrame, useThree } from '@react-three/fiber'
+import { useGLTF, useAnimations, Html } from '@react-three/drei'
+import * as THREE from 'three'
+
+/* -----------------------------------------------------------------
+   MODEL SETTINGS - the only things you normally touch.
+   Put your downloaded file in /public, then point to it:
+     - single file:  '/avatar.glb'
+     - gltf folder:  '/avatar/scene.gltf'
+   ----------------------------------------------------------------- */
+const MODEL_URL = '/avatar.glb'
+const TARGET_HEIGHT = 1.7        // the model is auto-scaled to ~1.7m tall
+const MODEL_ROTATION_Y = 0       // set to 3.14159 if the avatar faces AWAY from you
 
 const DEFAULT_API =
   (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) ||
@@ -38,7 +44,6 @@ function defaultHeaders() {
   return h
 }
 
-// Strip markdown / emoji so the voice reads cleanly
 function cleanForSpeech(t = '') {
   return t
     .replace(/[#*_`>]/g, '')
@@ -48,74 +53,130 @@ function cleanForSpeech(t = '') {
     .trim()
 }
 
-// Inject the small keyframes this component needs (once)
 function injectStyles() {
-  if (typeof document === 'undefined' || document.getElementById('tb-styles')) return
+  if (typeof document === 'undefined' || document.getElementById('tb3d-styles')) return
   const s = document.createElement('style')
-  s.id = 'tb-styles'
+  s.id = 'tb3d-styles'
   s.textContent = `
-    @keyframes tbFloat   { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
-    @keyframes tbPop     { from{opacity:0;transform:scale(.85) translateY(12px)} to{opacity:1;transform:none} }
-    @keyframes tbRing    { 0%{transform:scale(1);opacity:.55} 100%{transform:scale(1.7);opacity:0} }
-    @keyframes tbDot     { 0%,100%{opacity:.25;transform:scale(.8)} 50%{opacity:1;transform:scale(1)} }
+    @keyframes tbFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-5px)} }
+    @keyframes tbPop   { from{opacity:0;transform:scale(.85) translateY(12px)} to{opacity:1;transform:none} }
+    @keyframes tbRing  { 0%{transform:scale(1);opacity:.55} 100%{transform:scale(1.7);opacity:0} }
+    @keyframes tbDot   { 0%,100%{opacity:.25;transform:scale(.8)} 50%{opacity:1;transform:scale(1)} }
+    @keyframes tbSpin  { to{transform:rotate(360deg)} }
   `
   document.head.appendChild(s)
 }
 
-// ── The animated face ───────────────────────────────────────────
-function BuddyFace({ size = 64, accent = '#6366F1', accent2 = '#8B5CF6', mood = 'idle', talking = false, blink = false, mouthOpen = false }) {
-  const eyeRy = blink ? 1.2 : 9
-  const happy = mood === 'happy'
-  const thinking = mood === 'thinking'
-  const browDy = happy ? -3 : thinking ? -1 : 0
-  const gid = 'tbg-' + Math.round(size)
+/* -- The 3D avatar -------------------------------------------------- */
+function Avatar({ url, talkingRef }) {
+  const group = useRef()
+  const { scene, animations } = useGLTF(url, true) // true = enable Draco decoder
+  const { actions, names } = useAnimations(animations, group)
 
-  let mouth
-  if (talking) {
-    mouth = <ellipse cx="50" cy="69" rx={mouthOpen ? 9 : 5} ry={mouthOpen ? 7 : 2} fill="#3a2a5e" />
-  } else if (happy) {
-    mouth = <path d="M37 64 Q50 80 63 64" fill="none" stroke="#3a2a5e" strokeWidth="3.5" strokeLinecap="round" />
-  } else {
-    mouth = <path d="M41 67 Q50 74 59 67" fill="none" stroke="#3a2a5e" strokeWidth="3" strokeLinecap="round" />
+  const meshesRef = useRef([])
+  const bonesRef = useRef({})
+  const baseRef = useRef({})
+  const jawRef = useRef(0)
+  const blinkRef = useRef({ t: 0, next: 2 + Math.random() * 3 })
+  const hasMorphsRef = useRef(false)
+  const hasAnimRef = useRef(false)
+
+  // Play a built-in idle animation if one exists
+  useEffect(() => {
+    hasAnimRef.current = names.length > 0
+    if (!names.length) return
+    const idle = names.find(n => /idle|breath|stand|pose/i.test(n)) || names[0]
+    const a = actions[idle]
+    if (a) a.reset().fadeIn(0.4).play()
+    return () => a && a.fadeOut(0.3)
+  }, [actions, names])
+
+  // Auto-scale + re-center, then find morph meshes & bones
+  useEffect(() => {
+    // 1) normalize size to ~TARGET_HEIGHT
+    let box = new THREE.Box3().setFromObject(scene)
+    const size = new THREE.Vector3(); box.getSize(size)
+    const h = size.y || 1
+    scene.scale.setScalar(TARGET_HEIGHT / h)
+    // 2) recenter on X/Z and drop feet to y=0
+    box = new THREE.Box3().setFromObject(scene)
+    const center = new THREE.Vector3(); box.getCenter(center)
+    scene.position.x -= center.x
+    scene.position.z -= center.z
+    scene.position.y -= box.min.y
+
+    // 3) catalogue morph meshes + spine/head bones
+    const meshes = []
+    const bones = {}
+    scene.traverse(o => {
+      if (o.isMesh && o.morphTargetDictionary) meshes.push(o)
+      if (o.isBone) {
+        const n = o.name.toLowerCase()
+        if (!bones.spine && (n === 'spine' || n.endsWith(':spine') || n.includes('spine2'))) bones.spine = o
+        if (!bones.head && n.includes('head')) bones.head = o
+      }
+    })
+    meshesRef.current = meshes
+    hasMorphsRef.current = meshes.length > 0
+    bonesRef.current = bones
+    baseRef.current = {
+      spineX: bones.spine ? bones.spine.rotation.x : 0,
+      headX: bones.head ? bones.head.rotation.x : 0,
+    }
+  }, [scene])
+
+  function setMorph(nameList, value) {
+    for (const mesh of meshesRef.current) {
+      for (const name of nameList) {
+        const idx = mesh.morphTargetDictionary[name]
+        if (idx !== undefined) mesh.morphTargetInfluences[idx] = value
+      }
+    }
   }
 
+  useFrame((state, delta) => {
+    const t = state.clock.elapsedTime
+    const d = Math.min(1, delta * 16)
+    const talking = talkingRef.current
+    const { spine, head } = bonesRef.current
+
+    if (hasMorphsRef.current) {
+      const target = talking ? (Math.sin(t * 11) * 0.5 + 0.5) * (0.22 + Math.random() * 0.12) : 0
+      jawRef.current += (target - jawRef.current) * d
+      setMorph(['jawOpen', 'mouthOpen', 'viseme_aa'], jawRef.current)
+      const b = blinkRef.current
+      b.t += delta
+      if (b.t > b.next) { b.t = 0; b.next = 2 + Math.random() * 3.5 }
+      const bv = b.t < 0.1 ? b.t / 0.1 : b.t < 0.2 ? 1 - (b.t - 0.1) / 0.1 : 0
+      setMorph(['eyeBlinkLeft', 'eyeBlinkRight'], bv)
+    } else if (head) {
+      head.rotation.x = baseRef.current.headX + (talking ? Math.sin(t * 9) * 0.05 : Math.sin(t * 0.8) * 0.015)
+    }
+
+    if (!hasAnimRef.current) {
+      if (spine) spine.rotation.x = baseRef.current.spineX + Math.sin(t * 1.4) * 0.02
+      scene.rotation.y = Math.sin(t * 0.4) * 0.04
+    }
+  })
+
   return (
-    <svg viewBox="0 0 100 100" width={size} height={size} style={{ display: 'block' }}>
-      <defs>
-        <linearGradient id={gid} x1="0" y1="0" x2="1" y2="1">
-          <stop offset="0%" stopColor={accent} />
-          <stop offset="100%" stopColor={accent2} />
-        </linearGradient>
-      </defs>
+    <group ref={group} rotation={[0, MODEL_ROTATION_Y, 0]}>
+      <primitive object={scene} />
+    </group>
+  )
+}
 
-      {/* headphone band + ear cups (study-buddy vibe) */}
-      <path d="M18 50 A32 32 0 0 1 82 50" fill="none" stroke="#cbd5e1" strokeWidth="5" strokeLinecap="round" />
-      <rect x="12" y="44" width="13" height="22" rx="6" fill="#94a3b8" />
-      <rect x="75" y="44" width="13" height="22" rx="6" fill="#94a3b8" />
+function Rig() {
+  const { camera } = useThree()
+  useFrame(() => camera.lookAt(0, 1.5, 0)) // aim at the face/neck
+  return null
+}
 
-      {/* face */}
-      <circle cx="50" cy="52" r="34" fill={`url(#${gid})`} />
-
-      {/* cheeks when happy */}
-      {happy && <>
-        <circle cx="33" cy="60" r="5" fill="#fb7185" opacity=".5" />
-        <circle cx="67" cy="60" r="5" fill="#fb7185" opacity=".5" />
-      </>}
-
-      {/* eyebrows */}
-      <line x1="28" y1={36 + browDy} x2="42" y2={37 + browDy} stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" opacity=".85" />
-      <line x1="58" y1={37 + browDy} x2="72" y2={36 + browDy} stroke="#ffffff" strokeWidth="2.5" strokeLinecap="round" opacity=".85" />
-
-      {/* eyes */}
-      <ellipse cx="36" cy="46" rx="7" ry={eyeRy} fill="#fff" />
-      <ellipse cx="64" cy="46" rx="7" ry={eyeRy} fill="#fff" />
-      {!blink && <>
-        <circle cx={thinking ? 38 : 36} cy={thinking ? 44 : 47} r="3.2" fill="#1e1b4b" />
-        <circle cx={thinking ? 66 : 64} cy={thinking ? 44 : 47} r="3.2" fill="#1e1b4b" />
-      </>}
-
-      {mouth}
-    </svg>
+function Loader() {
+  return (
+    <Html center>
+      <div style={{ width: 30, height: 30, border: '3px solid rgba(255,255,255,.3)', borderTopColor: '#fff', borderRadius: '50%', animation: 'tbSpin .8s linear infinite' }} />
+    </Html>
   )
 }
 
@@ -135,6 +196,7 @@ export default function TalkingBuddy({
   user,
   apiUrl = DEFAULT_API,
   getAuthHeaders = defaultHeaders,
+  modelUrl = MODEL_URL,
   accent = '#6366F1',
   accent2 = '#8B5CF6',
 }) {
@@ -145,10 +207,6 @@ export default function TalkingBuddy({
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [muted, setMuted] = useState(false)
-  const [talking, setTalking] = useState(false)
-  const [blink, setBlink] = useState(false)
-  const [mouthOpen, setMouthOpen] = useState(false)
-  const [mood, setMood] = useState('idle')
   const [listening, setListening] = useState(false)
 
   const bottomRef = useRef(null)
@@ -156,30 +214,12 @@ export default function TalkingBuddy({
   const kickedRef = useRef(false)
   const recogRef = useRef(null)
   const mutedRef = useRef(false)
+  const talkingRef = useRef(false)
 
   useEffect(() => { injectStyles() }, [])
   useEffect(() => { msgsRef.current = messages }, [messages])
   useEffect(() => { mutedRef.current = muted }, [muted])
   useEffect(() => { if (open) bottomRef.current?.scrollIntoView({ behavior: 'smooth' }) }, [messages, open, loading])
-
-  // idle blinking
-  useEffect(() => {
-    let timer
-    const loop = () => {
-      setBlink(true)
-      setTimeout(() => setBlink(false), 150)
-      timer = setTimeout(loop, 2800 + Math.random() * 2200)
-    }
-    timer = setTimeout(loop, 2000)
-    return () => clearTimeout(timer)
-  }, [])
-
-  // mouth flap while speaking
-  useEffect(() => {
-    if (!talking) { setMouthOpen(false); return }
-    const id = setInterval(() => setMouthOpen(o => !o), 100 + Math.random() * 70)
-    return () => clearInterval(id)
-  }, [talking])
 
   const speak = useCallback((text) => {
     if (mutedRef.current || !text) return
@@ -188,15 +228,15 @@ export default function TalkingBuddy({
       if (!synth) return
       synth.cancel()
       const u = new SpeechSynthesisUtterance(cleanForSpeech(text).slice(0, 600))
-      u.rate = 1.02; u.pitch = 1.07
+      u.rate = 1.02; u.pitch = 1.05
       const voices = synth.getVoices() || []
       const pick =
         voices.find(v => /samantha|jenny|aria|zira|google us english|female/i.test(v.name)) ||
         voices.find(v => (v.lang || '').toLowerCase().startsWith('en'))
       if (pick) u.voice = pick
-      u.onstart = () => setTalking(true)
-      u.onend = () => { setTalking(false); setMood('idle') }
-      u.onerror = () => setTalking(false)
+      u.onstart = () => { talkingRef.current = true }
+      u.onend = () => { talkingRef.current = false }
+      u.onerror = () => { talkingRef.current = false }
       synth.speak(u)
     } catch {}
   }, [])
@@ -205,7 +245,7 @@ export default function TalkingBuddy({
     const text = (textOverride ?? input).trim()
     if (!text || loading) return
     if (!hidden) setMessages(m => [...m, { role: 'user', content: text }])
-    setInput(''); setLoading(true); setMood('thinking')
+    setInput(''); setLoading(true)
     try {
       const r = await fetch(`${apiUrl}/api/buddy/chat`, {
         method: 'POST',
@@ -215,34 +255,31 @@ export default function TalkingBuddy({
       const data = await r.json().catch(() => ({}))
       const reply = data.content || `I'm right here, ${firstName}! Want me to suggest what to revise today?`
       setMessages(m => [...m, { role: 'assistant', content: reply }])
-      setMood('happy')
       speak(reply)
     } catch {
-      const fb = `Hey ${firstName}! I had trouble connecting just now — try again in a sec. 🔄`
+      const fb = `Hey ${firstName}! I had trouble connecting just now - try again in a sec.`
       setMessages(m => [...m, { role: 'assistant', content: fb }])
       speak(fb)
     }
     setLoading(false)
   }, [input, loading, apiUrl, getAuthHeaders, firstName, speak])
 
-  // proactive opening when first opened
   useEffect(() => {
     if (!open || kickedRef.current) return
     kickedRef.current = true
     send(KICKOFF, true)
   }, [open, send])
 
-  // stop voice + mic when closing
   useEffect(() => {
     if (open) return
     try { window.speechSynthesis?.cancel() } catch {}
-    setTalking(false)
+    talkingRef.current = false
     try { recogRef.current?.stop() } catch {}
   }, [open])
 
   function toggleMute() {
     setMuted(m => {
-      if (!m) { try { window.speechSynthesis?.cancel() } catch {}; setTalking(false) }
+      if (!m) { try { window.speechSynthesis?.cancel() } catch {}; talkingRef.current = false }
       return !m
     })
   }
@@ -254,10 +291,7 @@ export default function TalkingBuddy({
     try {
       const r = new SR()
       r.lang = 'en-IN'; r.interimResults = false; r.maxAlternatives = 1
-      r.onresult = e => {
-        const t = e.results[0][0].transcript
-        setInput(prev => (prev ? prev + ' ' : '') + t)
-      }
+      r.onresult = e => { setInput(prev => (prev ? prev + ' ' : '') + e.results[0][0].transcript) }
       r.onend = () => setListening(false)
       r.onerror = () => setListening(false)
       recogRef.current = r
@@ -277,7 +311,6 @@ export default function TalkingBuddy({
 
   return (
     <>
-      {/* Floating launcher */}
       <div
         onClick={() => setOpen(o => !o)}
         title="Your AI study buddy"
@@ -285,55 +318,49 @@ export default function TalkingBuddy({
           position: 'fixed', bottom: 24, right: 24, width: 60, height: 60, borderRadius: '50%',
           background: `linear-gradient(135deg, ${accent}, ${accent2})`,
           boxShadow: `0 8px 26px ${accent}66`, cursor: 'pointer', zIndex: 1000,
-          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 26,
           animation: open ? 'none' : 'tbFloat 3.2s ease-in-out infinite',
         }}
       >
-        {!open && (
-          <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: `2px solid ${accent}`, animation: 'tbRing 2.2s ease-out infinite' }} />
-        )}
-        {open
-          ? <span style={{ color: '#fff', fontSize: 24, fontWeight: 800 }}>×</span>
-          : <BuddyFace size={46} accent={accent} accent2={accent2} mood="happy" />}
-        {!open && (
-          <span style={{ position: 'absolute', bottom: 4, right: 4, width: 12, height: 12, borderRadius: '50%', background: '#22c55e', border: '2px solid #fff' }} />
-        )}
+        {!open && <span style={{ position: 'absolute', inset: 0, borderRadius: '50%', border: `2px solid ${accent}`, animation: 'tbRing 2.2s ease-out infinite' }} />}
+        <span style={{ color: '#fff' }}>{open ? '×' : '🧑‍🏫'}</span>
+        {!open && <span style={{ position: 'absolute', bottom: 4, right: 4, width: 12, height: 12, borderRadius: '50%', background: '#22c55e', border: '2px solid #fff' }} />}
       </div>
 
-      {/* Panel */}
       {open && (
         <div style={{
           position: 'fixed', bottom: 96, right: 24, width: 'min(360px, calc(100vw - 32px))',
-          height: 'min(540px, calc(100vh - 130px))', borderRadius: 20, overflow: 'hidden',
+          height: 'min(560px, calc(100vh - 130px))', borderRadius: 20, overflow: 'hidden',
           background: 'var(--bg2, #ffffff)', border: '1px solid var(--border, rgba(15,23,42,.1))',
           boxShadow: '0 24px 70px rgba(15,23,42,.28)', zIndex: 999, display: 'flex',
           flexDirection: 'column', fontFamily: FONT, animation: 'tbPop .22s ease-out',
         }}>
-          {/* Header with live avatar */}
-          <div style={{ padding: '14px 16px', background: `linear-gradient(135deg, ${accent}, ${accent2})`, display: 'flex', alignItems: 'center', gap: 12 }}>
-            <div style={{ width: 52, height: 52, flexShrink: 0 }}>
-              <BuddyFace size={52} accent="#ffffff" accent2="#e9d5ff" mood={loading ? 'thinking' : mood} talking={talking} blink={blink} mouthOpen={mouthOpen} />
-            </div>
-            <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ color: '#fff', fontWeight: 800, fontSize: 15, fontFamily: "'Sora', sans-serif" }}>Spark</div>
-              <div style={{ color: 'rgba(255,255,255,.85)', fontSize: 11.5 }}>
-                {loading ? 'thinking…' : talking ? 'speaking…' : `your study buddy`}
-              </div>
+          <div style={{ position: 'relative', height: 215, flexShrink: 0, background: `linear-gradient(160deg, ${accent}, ${accent2})` }}>
+            <Canvas camera={{ position: [0, 1.55, 1.05], fov: 28 }} gl={{ alpha: true, antialias: true }} style={{ width: '100%', height: '100%' }}>
+              <ambientLight intensity={0.9} />
+              <directionalLight position={[2, 4, 3]} intensity={1.3} />
+              <directionalLight position={[-2, 2, 2]} intensity={0.5} />
+              <Suspense fallback={<Loader />}>
+                <Avatar url={modelUrl} talkingRef={talkingRef} />
+              </Suspense>
+              <Rig />
+            </Canvas>
+
+            <div style={{ position: 'absolute', left: 14, bottom: 12, color: '#fff', textShadow: '0 1px 6px rgba(0,0,0,.4)' }}>
+              <div style={{ fontWeight: 800, fontSize: 15, fontFamily: "'Sora', sans-serif" }}>Spark</div>
+              <div style={{ fontSize: 11.5, opacity: .9 }}>{loading ? 'thinking...' : 'your study buddy'}</div>
             </div>
             <button onClick={toggleMute} title={muted ? 'Unmute voice' : 'Mute voice'}
-              style={{ background: 'rgba(255,255,255,.2)', border: 'none', borderRadius: 8, width: 30, height: 30, cursor: 'pointer', fontSize: 14, color: '#fff' }}>
+              style={{ position: 'absolute', top: 10, right: 48, background: 'rgba(255,255,255,.25)', border: 'none', borderRadius: 8, width: 30, height: 30, cursor: 'pointer', fontSize: 14 }}>
               {muted ? '🔇' : '🔊'}
             </button>
             <button onClick={() => setOpen(false)} title="Close"
-              style={{ background: 'rgba(255,255,255,.2)', border: 'none', borderRadius: 8, width: 30, height: 30, cursor: 'pointer', fontSize: 16, color: '#fff' }}>×</button>
+              style={{ position: 'absolute', top: 10, right: 10, background: 'rgba(255,255,255,.25)', border: 'none', borderRadius: 8, width: 30, height: 30, cursor: 'pointer', fontSize: 16, color: '#fff' }}>×</button>
           </div>
 
-          {/* Messages */}
           <div style={{ flex: 1, overflowY: 'auto', padding: 14, display: 'flex', flexDirection: 'column', gap: 10, background: 'var(--bg, #f4f4f0)' }}>
             {messages.length === 0 && !loading && (
-              <div style={{ textAlign: 'center', color: 'var(--text, #64748b)', fontSize: 12.5, padding: '20px 8px' }}>
-                Hi {firstName}! Give me a second…
-              </div>
+              <div style={{ textAlign: 'center', color: 'var(--text, #64748b)', fontSize: 12.5, padding: '20px 8px' }}>Hi {firstName}! Give me a second...</div>
             )}
             {messages.map((m, i) => (
               <div key={i} style={{ display: 'flex', justifyContent: m.role === 'user' ? 'flex-end' : 'flex-start' }}>
@@ -357,7 +384,6 @@ export default function TalkingBuddy({
             <div ref={bottomRef} />
           </div>
 
-          {/* Quick action chips (only before the first user message) */}
           {messages.filter(m => m.role === 'user').length === 0 && !loading && (
             <div style={{ display: 'flex', gap: 6, padding: '0 12px 8px', flexWrap: 'wrap' }}>
               {QUICK.map(q => (
@@ -369,7 +395,6 @@ export default function TalkingBuddy({
             </div>
           )}
 
-          {/* Input */}
           <div style={{ padding: 10, borderTop: '1px solid var(--border, rgba(15,23,42,.1))', display: 'flex', gap: 7, background: 'var(--bg2, #fff)' }}>
             {micSupported && (
               <button onClick={toggleMic} title="Speak"
@@ -381,7 +406,7 @@ export default function TalkingBuddy({
               value={input}
               onChange={e => setInput(e.target.value)}
               onKeyDown={e => e.key === 'Enter' && send()}
-              placeholder="Ask me anything…"
+              placeholder="Ask me anything..."
               disabled={loading}
               style={{ flex: 1, padding: '9px 13px', borderRadius: 10, border: '1px solid var(--border, rgba(15,23,42,.1))', background: 'var(--code-bg, rgba(15,23,42,.035))', color: 'var(--text-h, #1e293b)', fontSize: 13.5, fontFamily: FONT, outline: 'none' }}
             />
