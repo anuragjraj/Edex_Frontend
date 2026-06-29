@@ -55,7 +55,7 @@ const DEFAULT_API =
    ----------------------------------------------------------------- */
 const PERSONAS = {
   student: {
-    pitch: 1.06, rate: 1.06,
+    pitch: 0.94, rate: 1.0,
     voiceMatch: /guy|mark|aaron|eric|ryan|james|google us english|liam/i,
     style:
       "\n\n[Speak like a friendly study buddy: warm, upbeat, casual peer tone, simple " +
@@ -69,7 +69,7 @@ const PERSONAS = {
     ],
   },
   teacher: {
-    pitch: 0.88, rate: 0.98,
+    pitch: 0.84, rate: 0.95,
     voiceMatch: /daniel|david|rishi|brian|matthew|google uk english male|arthur|oliver/i,
     style:
       "\n\n[Speak like a respected senior mentor / lead educator: composed, knowledgeable, " +
@@ -328,22 +328,27 @@ function Avatar({ url, speechRef, gestureRef, restMode }) {
       bb.quaternion.copy(rr); _e.set(x, y, z, 'XYZ'); _q.setFromEuler(_e); bb.quaternion.multiply(_q)
     }
     const s1 = Math.sin(t*0.9), s3 = Math.sin(t*1.7+0.6)
-    set('LeftShoulder', 0, 0,  E*0.03 + g.accL*0.06)
-    set('RightShoulder',0, 0, -(E*0.03 + g.accR*0.06))
-    set('LeftArm',  -(E*0.05 + g.accL*0.22) - sit*0.10,  g.accL*0.08,  E*0.02 + g.accL*0.10 + sit*0.05)
-    set('RightArm', -(E*0.05 + g.accR*0.22) - sit*0.10, -g.accR*0.08, -(E*0.02 + g.accR*0.10) - sit*0.05)
-    set('LeftForeArm',  -(E*0.08 + g.accL*0.28) - sit*0.55,  g.accL*0.18, 0)
-    set('RightForeArm', -(E*0.08 + g.accR*0.28) - sit*0.55, -g.accR*0.18, 0)
-    set('LeftHand',  g.accL*0.16, 0,  g.accL*0.18 + s1*0.02)
-    set('RightHand', g.accR*0.16, 0, -(g.accR*0.18) - s1*0.02)
-    const curl = 0.14 + Math.sin(t*0.9)*0.025 + sit*0.10
+    // ── Hands held in a relaxed "at ease" pose in front of the body — NO gesturing ──
+    //    Tweak these four numbers if the hands sit too high/low or don't meet in front:
+    const ARM_FWD = -0.15   // upper arms slightly forward
+    const ARM_IN  = 0.32    // upper arms drawn in toward the body
+    const FORE    = 0.80    // forearm bend (bigger = hands higher/more in front)
+    const FORE_IN = 0.34    // forearms angled inward so the hands meet in front
+    const FCURL   = 0.20    // soft, relaxed finger curl (static)
+    set('LeftShoulder', 0, 0, 0)
+    set('RightShoulder', 0, 0, 0)
+    set('LeftArm',  ARM_FWD, 0,  ARM_IN)
+    set('RightArm', ARM_FWD, 0, -ARM_IN)
+    set('LeftForeArm',  -FORE,  FORE_IN, 0)
+    set('RightForeArm', -FORE, -FORE_IN, 0)
+    set('LeftHand', 0, 0, 0)
+    set('RightHand', 0, 0, 0)
     ;['Index','Middle','Ring','Pinky'].forEach((f, i) => {
-      const cL = curl - g.accL*0.16 + i*0.012, cR = curl - g.accR*0.16 + i*0.012
-      set(`LeftHand${f}1`,0,0, cL); set(`LeftHand${f}2`,0,0, cL*0.8); set(`LeftHand${f}3`,0,0, cL*0.6)
-      set(`RightHand${f}1`,0,0,-cR); set(`RightHand${f}2`,0,0,-cR*0.8); set(`RightHand${f}3`,0,0,-cR*0.6)
+      const c = FCURL + i*0.012
+      set(`LeftHand${f}1`,0,0, c);  set(`LeftHand${f}2`,0,0, c*0.8);  set(`LeftHand${f}3`,0,0, c*0.6)
+      set(`RightHand${f}1`,0,0,-c); set(`RightHand${f}2`,0,0,-c*0.8); set(`RightHand${f}3`,0,0,-c*0.6)
     })
-    set('LeftHandThumb1', 0, -curl*0.5, 0); set('LeftHandThumb2', 0, 0, curl*0.4); set('LeftHandThumb3', 0, 0, curl*0.3)
-    set('RightHandThumb1',0,  curl*0.5, 0); set('RightHandThumb2',0, 0, -curl*0.4); set('RightHandThumb3',0, 0, -curl*0.3)
+    set('LeftHandThumb1', 0, -FCURL*0.5, 0);  set('RightHandThumb1', 0, FCURL*0.5, 0)
 
     /* ===== OWNED legs: reset to rest, then bend for sitting (parent-space) ===== */
     const setLeg = (name, ax) => {
@@ -354,7 +359,7 @@ function Avatar({ url, speechRef, gestureRef, restMode }) {
     setLeg('LeftLeg',   SIT_KNEE*sit);  setLeg('RightLeg',  SIT_KNEE*sit)
 
     /* ===== core (mixer-driven → safe additive sway, gated to speaking) ===== */
-    const sway = E * 0.02
+    const sway = E * 0.008
     _e.set(E*0.015 + sit*0.05, s1*sway*0.4, Math.sin(t*0.55)*sway, 'XYZ'); _q.setFromEuler(_e); B.Spine && B.Spine.quaternion.multiply(_q)
     _e.set(E*0.012, s1*sway*0.4, Math.sin(t*0.55)*sway*0.7, 'XYZ'); _q.setFromEuler(_e); B.Spine1 && B.Spine1.quaternion.multiply(_q)
     _e.set(E*0.012, s1*sway*0.4, s3*sway*0.6, 'XYZ'); _q.setFromEuler(_e); B.Spine2 && B.Spine2.quaternion.multiply(_q)
@@ -445,21 +450,41 @@ export default function TalkingBuddy({
   useEffect(() => { if (open) bottomRef.current?.scrollIntoView({ behavior:'smooth' }) }, [messages, open, loading])
   useEffect(() => { const fn = () => setIsNarrow(window.innerWidth < 640); fn(); window.addEventListener('resize', fn); return () => window.removeEventListener('resize', fn) }, [])
 
+  // Score every installed voice and pick the warmest, most natural, Indian-English MALE one.
+  // Quality matters more than accent for emotional connection — a robotic "Indian" voice
+  // (e.g. iOS compact "Rishi") feels worse than a warm one, so we reward natural/neural voices.
   const pickVoice = useCallback(() => {
     const synth = window.speechSynthesis; if (!synth) return null
     const voices = synth.getVoices() || []
-    const FEMALE = /female|samantha|zira|aria|jenny|salli|joanna|kendra|tessa|veena|raveena|heera|kalpana|swara|neerja|asha/i
-    const INDIAN_MALE = /rishi|ravi|prabhat|hemant|madhur|aarav|kunal|gagan|sandeep|orson/i
-    const lang = v => (v.lang || '').toLowerCase()
-    return (
-      voices.find(v => INDIAN_MALE.test(v.name)) ||                            // named Indian-English male voice
-      voices.find(v => lang(v).startsWith('en-in') && !FEMALE.test(v.name)) || // male Indian English
-      voices.find(v => lang(v).startsWith('en-in')) ||                         // any Indian English (the accent is what matters)
-      voices.find(v => lang(v).startsWith('hi') && !FEMALE.test(v.name)) ||    // Hindi male as a close fallback
-      voices.find(v => /\bmale\b|daniel|david|alex|fred|guy/i.test(v.name)) || // generic male fallback
-      voices.find(v => lang(v).startsWith('en') && !FEMALE.test(v.name)) ||
-      voices.find(v => lang(v).startsWith('en')) || null
-    )
+    if (!voices.length) return null
+    const FEMALE = /female|woman|samantha|zira|aria|jenny|salli|joanna|kendra|tessa|veena|raveena|heera|kalpana|swara|neerja|asha|priya|isha|ananya|sneha|google.*(hindi|हिन्दी)/i
+    const MALE   = /\bmale\b|\bman\b|prabhat|aarav|kunal|rehaan|arjun|rishi|ravi|hemant|madhur|gagan|sandeep|daniel|alex|fred|guy|mark|aaron|orson/i
+    const score = v => {
+      const n = v.name || '', l = (v.lang || '').toLowerCase()
+      let s = 0
+      // ── warmth / quality (the biggest lever) ──
+      if (/online \(natural\)|neural|natural/i.test(n)) s += 120  // Edge/Azure neural voices — best & free
+      if (/enhanced|premium|siri/i.test(n))             s += 60   // iOS/macOS downloaded HQ voice
+      if (/google/i.test(n))                            s += 35   // Google network voices (Android/Chrome)
+      if (v.localService === false)                     s += 25   // network voice ≈ higher fidelity
+      // ── Indian connection ──
+      if      (l.startsWith('en-in')) s += 70
+      else if (l.startsWith('hi'))    s += 35
+      else if (l.startsWith('en-gb')) s += 12
+      else if (l.startsWith('en'))    s += 4
+      // ── gender ──
+      if (FEMALE.test(n)) s -= 200
+      if (MALE.test(n))   s += 45
+      return s
+    }
+    let best = null, bestS = -Infinity
+    for (const v of voices) {
+      const l = (v.lang || '').toLowerCase()
+      if (!l.startsWith('en') && !l.startsWith('hi')) continue  // ignore non-English/Hindi
+      const s = score(v)
+      if (s > bestS) { bestS = s; best = v }
+    }
+    return best
   }, [])
 
   const showBubble = useCallback((text) => {
