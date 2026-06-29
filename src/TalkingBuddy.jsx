@@ -312,18 +312,22 @@ function Avatar({ url, speechRef, gestureRef, restMode }) {
     g.sit = lerp(g.sit, (restMode === 'sit' && !speaking) ? 1 : 0, Math.min(1, delta * 2.2))
     const sit = g.sit
 
-    /* ===== arms: idle clip keeps them down; we only BEND THE ELBOWS so the hands
-       come up & together, resting clasped near the stomach (additive, no accumulation) ===== */
+    /* ===== arms: idle clip keeps the upper arms DOWN; we reset+bend the elbows each
+       frame (deterministic — never accumulates) so the hands rest near the stomach ===== */
     const s1 = Math.sin(t*0.9), s3 = Math.sin(t*1.7+0.6)
     const FORE    = 1.30   // elbow bend — higher = hands sit higher (toward chest), lower = toward hips
     const FORE_IN = 0.50   // inward angle so the two hands meet in front
-    const FCURL   = 0.14   // light finger curl so the resting hands look soft
-    const addLocal = (name, x, y, z) => { const bb = B[name]; if (!bb) return; _e.set(x, y, z, 'XYZ'); _q.setFromEuler(_e); bb.quaternion.multiply(_q) }
-    addLocal('LeftForeArm',  -FORE,  FORE_IN, 0)
-    addLocal('RightForeArm', -FORE, -FORE_IN, 0)
+    const FCURL   = 0.16   // light finger curl so the resting hands look soft
+    const set = (name, x, y, z) => {
+      const bb = B[name], rr = R[name]; if (!bb || !rr) return
+      bb.quaternion.copy(rr); _e.set(x, y, z, 'XYZ'); _q.setFromEuler(_e); bb.quaternion.multiply(_q)
+    }
+    set('LeftForeArm',  -FORE,  FORE_IN, 0)
+    set('RightForeArm', -FORE, -FORE_IN, 0)
     ;['Index','Middle','Ring','Pinky'].forEach((f, i) => {
-      const c = FCURL + i*0.01
-      addLocal(`LeftHand${f}1`, 0, 0,  c);  addLocal(`RightHand${f}1`, 0, 0, -c)
+      const c = FCURL + i*0.012
+      set(`LeftHand${f}1`, 0, 0,  c);  set(`LeftHand${f}2`, 0, 0,  c*0.8);  set(`LeftHand${f}3`, 0, 0,  c*0.6)
+      set(`RightHand${f}1`, 0, 0, -c); set(`RightHand${f}2`, 0, 0, -c*0.8); set(`RightHand${f}3`, 0, 0, -c*0.6)
     })
 
     /* ===== OWNED legs: reset to rest, then bend for sitting (parent-space) ===== */
