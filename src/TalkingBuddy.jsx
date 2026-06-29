@@ -328,13 +328,14 @@ function Avatar({ url, speechRef, gestureRef, restMode }) {
       bb.quaternion.copy(rr); _e.set(x, y, z, 'XYZ'); _q.setFromEuler(_e); bb.quaternion.multiply(_q)
     }
     const s1 = Math.sin(t*0.9), s3 = Math.sin(t*1.7+0.6)
-    // ── Hands held in a relaxed "at ease" pose in front of the body — NO gesturing ──
-    //    Tweak these four numbers if the hands sit too high/low or don't meet in front:
-    const ARM_FWD = -0.15   // upper arms slightly forward
-    const ARM_IN  = 0.32    // upper arms drawn in toward the body
-    const FORE    = 0.80    // forearm bend (bigger = hands higher/more in front)
-    const FORE_IN = 0.34    // forearms angled inward so the hands meet in front
-    const FCURL   = 0.20    // soft, relaxed finger curl (static)
+    // ── Hands clasped low in front, "stand at ease" — elbows tucked to the body ──
+    //    Tweak these if needed (see notes after the file):
+    const ARM_FWD = -0.10   // upper arms: almost straight down, a touch forward
+    const ARM_IN  = 0.60    // upper arms drawn IN to the body (drops the elbows to the sides)
+    const FORE    = 0.95    // forearm bend so the hands come to the front
+    const FORE_IN = 0.55    // forearms angled inward so the hands meet/clasp at the center
+    const FCURL   = 0.26    // relaxed finger curl (hands softly closed, resting together)
+    const THUMB   = 0.45    // thumbs tucked in toward the body
     set('LeftShoulder', 0, 0, 0)
     set('RightShoulder', 0, 0, 0)
     set('LeftArm',  ARM_FWD, 0,  ARM_IN)
@@ -348,7 +349,8 @@ function Avatar({ url, speechRef, gestureRef, restMode }) {
       set(`LeftHand${f}1`,0,0, c);  set(`LeftHand${f}2`,0,0, c*0.8);  set(`LeftHand${f}3`,0,0, c*0.6)
       set(`RightHand${f}1`,0,0,-c); set(`RightHand${f}2`,0,0,-c*0.8); set(`RightHand${f}3`,0,0,-c*0.6)
     })
-    set('LeftHandThumb1', 0, -FCURL*0.5, 0);  set('RightHandThumb1', 0, FCURL*0.5, 0)
+    set('LeftHandThumb1', 0, -THUMB, THUMB*0.5);  set('LeftHandThumb2', 0, 0, THUMB*0.4)
+    set('RightHandThumb1', 0, THUMB, -THUMB*0.5); set('RightHandThumb2', 0, 0, -THUMB*0.4)
 
     /* ===== OWNED legs: reset to rest, then bend for sitting (parent-space) ===== */
     const setLeg = (name, ax) => {
