@@ -55,7 +55,7 @@ const DEFAULT_API =
    ----------------------------------------------------------------- */
 const PERSONAS = {
   student: {
-    pitch: 1.06, rate: 1.06,
+    pitch: 0.92, rate: 1.05,
     voiceMatch: /guy|mark|aaron|eric|ryan|james|google us english|liam/i,
     style:
       "\n\n[Speak like a friendly study buddy: warm, upbeat, casual peer tone, simple " +
@@ -69,7 +69,7 @@ const PERSONAS = {
     ],
   },
   teacher: {
-    pitch: 0.88, rate: 0.98,
+    pitch: 0.82, rate: 0.98,
     voiceMatch: /daniel|david|rishi|brian|matthew|google uk english male|arthur|oliver/i,
     style:
       "\n\n[Speak like a respected senior mentor / lead educator: composed, knowledgeable, " +
@@ -448,15 +448,16 @@ export default function TalkingBuddy({
   const pickVoice = useCallback(() => {
     const synth = window.speechSynthesis; if (!synth) return null
     const voices = synth.getVoices() || []
-    const FEMALE = /female|samantha|zira|aria|jenny|salli|joanna|kendra|tessa|veena|raveena|heera|kalpana|swara|neerja|asha/i
+    const FEMALE = /female|woman|samantha|zira|aria|jenny|salli|joanna|kendra|tessa|veena|raveena|heera|kalpana|swara|neerja|asha|priya|isha|ananya|google.*(hindi|हिन्दी)/i
     const INDIAN_MALE = /rishi|ravi|prabhat|hemant|madhur|aarav|kunal|gagan|sandeep|orson/i
+    const MALE = /\bmale\b|\bman\b|daniel|david|alex|fred|guy|mark|george|oliver|arthur|aaron|rishi|ravi|prabhat/i
     const lang = v => (v.lang || '').toLowerCase()
     return (
-      voices.find(v => INDIAN_MALE.test(v.name)) ||                            // named Indian-English male voice
-      voices.find(v => lang(v).startsWith('en-in') && !FEMALE.test(v.name)) || // male Indian English
-      voices.find(v => lang(v).startsWith('en-in')) ||                         // any Indian English (the accent is what matters)
-      voices.find(v => lang(v).startsWith('hi') && !FEMALE.test(v.name)) ||    // Hindi male as a close fallback
-      voices.find(v => /\bmale\b|daniel|david|alex|fred|guy/i.test(v.name)) || // generic male fallback
+      voices.find(v => INDIAN_MALE.test(v.name)) ||                                       // 1. named Indian-English MALE (best: male + Indian)
+      voices.find(v => lang(v).startsWith('en-in') && MALE.test(v.name)) ||               // 2. Indian English flagged male
+      voices.find(v => MALE.test(v.name) && !FEMALE.test(v.name)) ||                       // 3. ANY guaranteed-male voice (beats an unknown/female Indian one)
+      voices.find(v => lang(v).startsWith('en-in') && !FEMALE.test(v.name)) ||            // 4. Indian English, not obviously female
+      voices.find(v => lang(v).startsWith('hi') && !FEMALE.test(v.name)) ||               // 5. Hindi, not female
       voices.find(v => lang(v).startsWith('en') && !FEMALE.test(v.name)) ||
       voices.find(v => lang(v).startsWith('en')) || null
     )
