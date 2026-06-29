@@ -36,7 +36,7 @@ function useFonts() {
         }
         * { box-sizing: border-box; }
         html, body { overflow-x: clip; max-width: 100%; }
-        body { margin: 0; background: var(--bg); color: var(--text-h); }
+        body { margin: 0; background: transparent; color: var(--text-h); }
         @keyframes spin      { to { transform: rotate(360deg) } }
         @keyframes dotBounce { 0%,100%{opacity:.25;transform:scale(.8)} 50%{opacity:1;transform:scale(1)} }
         @keyframes slideUp   { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
@@ -1234,7 +1234,7 @@ const emptyRO    = { color: 'var(--text)', fontSize: 13, margin: 0, fontStyle: '
 //  DESIGN TOKENS
 // ══════════════════════════════════════════════════════════════
 const T = {
-  card:   { background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:'14px', padding:'20px', boxShadow:'0 2px 12px rgba(0,0,0,.12)' },
+  card:   { background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:'14px', padding:'20px', boxShadow:'var(--shadow-md)' },
   label:  { display:'block', fontSize:'10.5px', fontWeight:800, color:'var(--text)', textTransform:'uppercase', letterSpacing:'0.6px', marginBottom:'6px', fontFamily:"'Nunito', sans-serif" },
   input:  { width:'100%', padding:'10px 14px', borderRadius:'10px', border:'1.5px solid var(--border)', background:'var(--code-bg)', color:'var(--text-h)', fontSize:'14px', fontFamily:"'Nunito', sans-serif", boxSizing:'border-box', outline:'none', transition:'border-color .2s' },
   select: { width:'100%', padding:'10px 14px', borderRadius:'10px', border:'1.5px solid var(--border)', background:'var(--code-bg)', color:'var(--text-h)', fontSize:'14px', fontFamily:"'Nunito', sans-serif", appearance:'auto', outline:'none', cursor:'pointer' },
@@ -1419,7 +1419,7 @@ function MultiChapterSelect({ subject, cls, selected = [], onChange, max = 20 })
           width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
           padding: '10px 14px', borderRadius: 10,
           border: `1.5px solid ${open ? 'var(--accent)' : 'var(--border)'}`,
-          background: '#0f0f23', color: selected.length ? '#e2e8f0' : '#64748b',
+          background: 'var(--bg2)', color: selected.length ? 'var(--text-h)' : 'var(--text)',
           fontSize: 14, fontFamily: "'Nunito', sans-serif", cursor: 'pointer',
           transition: 'border-color .2s', textAlign: 'left',
         }}
@@ -1449,8 +1449,8 @@ function MultiChapterSelect({ subject, cls, selected = [], onChange, max = 20 })
       {open && (
         <div style={{
           position: 'absolute', top: 'calc(100% + 6px)', left: 0, right: 0,
-          background: '#0f0f23', border: '1.5px solid var(--accent-border)',
-          borderRadius: 12, boxShadow: '0 12px 40px rgba(0,0,0,.5)',
+          background: 'var(--bg2)', border: '1.5px solid var(--accent-border)',
+          borderRadius: 12, boxShadow: 'var(--shadow-md)',
           zIndex: 500, overflow: 'hidden',
         }}>
           {/* Search + bulk actions */}
@@ -1461,8 +1461,8 @@ function MultiChapterSelect({ subject, cls, selected = [], onChange, max = 20 })
               placeholder="Search chapters…"
               style={{
                 flex: 1, padding: '6px 10px', borderRadius: 8,
-                border: '1px solid var(--border)', background: 'rgba(255,255,255,.05)',
-                color: '#e2e8f0', fontSize: 13, fontFamily: "'Nunito', sans-serif", outline: 'none',
+                border: '1px solid var(--border)', background: 'var(--code-bg)',
+                color: 'var(--text-h)', fontSize: 13, fontFamily: "'Nunito', sans-serif", outline: 'none',
               }}
             />
             <button onClick={selectAll} style={{ padding: '5px 10px', borderRadius: 7, border: '1px solid var(--border)', background: 'transparent', color: 'var(--accent)', fontSize: 11.5, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap', fontFamily: "'Nunito', sans-serif" }}>All</button>
@@ -1498,7 +1498,7 @@ function MultiChapterSelect({ subject, cls, selected = [], onChange, max = 20 })
                   }}>
                     {checked && <span style={{ color: '#fff', fontSize: 10, fontWeight: 900, lineHeight: 1 }}>✓</span>}
                   </div>
-                  <span style={{ fontSize: 13.5, color: checked ? 'var(--accent)' : '#e2e8f0', fontWeight: checked ? 700 : 400, fontFamily: "'Nunito', sans-serif" }}>
+                  <span style={{ fontSize: 13.5, color: checked ? 'var(--accent)' : 'var(--text-h)', fontWeight: checked ? 700 : 400, fontFamily: "'Nunito', sans-serif" }}>
                     {ch}
                   </span>
                 </div>
@@ -6516,7 +6516,7 @@ const renderTab = t => {
   }
 
   return (
-    <div style={{ minHeight: '100vh', background: 'var(--bg)', display: 'flex', flexDirection: 'column', fontFamily: "'Nunito', sans-serif" }}>
+    <div style={{ minHeight: '100vh', background: 'transparent', display: 'flex', flexDirection: 'column', fontFamily: "'Nunito', sans-serif" }}>
 
       {/* ── Top header ───────────────────────────────────────── */}
       <header style={{ borderBottom: '1px solid var(--border)', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 58, position: 'sticky', top: 0, zIndex: 100,background: 'rgba(255,255,255,.92)', backdropFilter: 'blur(20px)', boxShadow: '0 1px 12px rgba(15,23,42,.06)' }}>

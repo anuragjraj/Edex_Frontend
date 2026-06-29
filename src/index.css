@@ -1,27 +1,44 @@
 :root {
   color-scheme: light;
-  --bg:            #f4f4f0;   /* soft warm off-white page background */
-  --bg2:           #ffffff;   /* cards sit slightly brighter than page */
-  --text:          #64748b;   /* muted slate for secondary text */
-  --text-h:        #1e293b;   /* dark slate for headings/body (not pure black) */
-  --border:        rgba(15,23,42,.10);
-  --accent:        #4f46e5;   /* indigo, one step deeper for light-bg contrast */
-  --accent-bg:     rgba(79,70,229,.08);
-  --accent-border: rgba(79,70,229,.20);
-  --code-bg:       rgba(15,23,42,.035);
-  --social-bg:     rgba(15,23,42,.035);
+
+  --bg:            #f3f2ee;   /* solid — safe for borders */
+  --bg2:           #ffffff;   /* cards */
+  --text:          #5b6472;
+  --text-h:        #1d2433;
+  --border:        rgba(15,23,42,.09);
+
+  --accent:        #4f46e5;
+  --accent-2:      #8b5cf6;
+  --accent-bg:     rgba(79,70,229,.07);
+  --accent-border: rgba(79,70,229,.18);
+  --code-bg:       rgba(15,23,42,.03);
+  --social-bg:     rgba(15,23,42,.03);
+
+  --shadow-sm: 0 1px 2px rgba(15,23,42,.04), 0 1px 3px rgba(15,23,42,.05);
+  --shadow-md: 0 2px 6px rgba(15,23,42,.05), 0 8px 24px rgba(15,23,42,.06);
+
+  --page:
+    radial-gradient(1100px 560px at 12% -8%,  rgba(99,102,241,.07), transparent 60%),
+    radial-gradient(1000px 520px at 108% 4%,  rgba(139,92,246,.06), transparent 55%),
+    radial-gradient(900px 700px  at 50% 120%, rgba(6,182,212,.045), transparent 60%),
+    linear-gradient(180deg, #f6f5f1 0%, #eef0f4 100%);
 }
 
 *, *::before, *::after {
   box-sizing: border-box;
 }
 
-html, body, #root {
+html {
+  background: var(--page);
+  background-attachment: fixed;
+  min-height: 100vh;
+}
+body, #root {
   margin: 0;
   padding: 0;
   min-height: 100vh;
-  background: #f4f4f0;   /* was #05050e */
-  color: #1e293b;        /* was #e2e8f0 */
+  background: transparent;
+  color: var(--text-h);
 }
 
 /* Custom scrollbar */
