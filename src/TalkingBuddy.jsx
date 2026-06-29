@@ -55,7 +55,7 @@ const DEFAULT_API =
    ----------------------------------------------------------------- */
 const PERSONAS = {
   student: {
-    pitch: 0.92, rate: 1.05,
+    pitch: 0.94, rate: 1.0,
     voiceMatch: /guy|mark|aaron|eric|ryan|james|google us english|liam/i,
     style:
       "\n\n[Speak like a friendly study buddy: warm, upbeat, casual peer tone, simple " +
@@ -69,7 +69,7 @@ const PERSONAS = {
     ],
   },
   teacher: {
-    pitch: 0.82, rate: 0.98,
+    pitch: 0.84, rate: 0.95,
     voiceMatch: /daniel|david|rishi|brian|matthew|google uk english male|arthur|oliver/i,
     style:
       "\n\n[Speak like a respected senior mentor / lead educator: composed, knowledgeable, " +
@@ -445,22 +445,41 @@ export default function TalkingBuddy({
   useEffect(() => { if (open) bottomRef.current?.scrollIntoView({ behavior:'smooth' }) }, [messages, open, loading])
   useEffect(() => { const fn = () => setIsNarrow(window.innerWidth < 640); fn(); window.addEventListener('resize', fn); return () => window.removeEventListener('resize', fn) }, [])
 
+  // Score every installed voice and pick the warmest, most natural, Indian-English MALE one.
+  // Quality matters more than accent for emotional connection — a robotic "Indian" voice
+  // (e.g. iOS compact "Rishi") feels worse than a warm one, so we reward natural/neural voices.
   const pickVoice = useCallback(() => {
     const synth = window.speechSynthesis; if (!synth) return null
     const voices = synth.getVoices() || []
-    const FEMALE = /female|woman|samantha|zira|aria|jenny|salli|joanna|kendra|tessa|veena|raveena|heera|kalpana|swara|neerja|asha|priya|isha|ananya|google.*(hindi|हिन्दी)/i
-    const INDIAN_MALE = /rishi|ravi|prabhat|hemant|madhur|aarav|kunal|gagan|sandeep|orson/i
-    const MALE = /\bmale\b|\bman\b|daniel|david|alex|fred|guy|mark|george|oliver|arthur|aaron|rishi|ravi|prabhat/i
-    const lang = v => (v.lang || '').toLowerCase()
-    return (
-      voices.find(v => INDIAN_MALE.test(v.name)) ||                                       // 1. named Indian-English MALE (best: male + Indian)
-      voices.find(v => lang(v).startsWith('en-in') && MALE.test(v.name)) ||               // 2. Indian English flagged male
-      voices.find(v => MALE.test(v.name) && !FEMALE.test(v.name)) ||                       // 3. ANY guaranteed-male voice (beats an unknown/female Indian one)
-      voices.find(v => lang(v).startsWith('en-in') && !FEMALE.test(v.name)) ||            // 4. Indian English, not obviously female
-      voices.find(v => lang(v).startsWith('hi') && !FEMALE.test(v.name)) ||               // 5. Hindi, not female
-      voices.find(v => lang(v).startsWith('en') && !FEMALE.test(v.name)) ||
-      voices.find(v => lang(v).startsWith('en')) || null
-    )
+    if (!voices.length) return null
+    const FEMALE = /female|woman|samantha|zira|aria|jenny|salli|joanna|kendra|tessa|veena|raveena|heera|kalpana|swara|neerja|asha|priya|isha|ananya|sneha|google.*(hindi|हिन्दी)/i
+    const MALE   = /\bmale\b|\bman\b|prabhat|aarav|kunal|rehaan|arjun|rishi|ravi|hemant|madhur|gagan|sandeep|daniel|alex|fred|guy|mark|aaron|orson/i
+    const score = v => {
+      const n = v.name || '', l = (v.lang || '').toLowerCase()
+      let s = 0
+      // ── warmth / quality (the biggest lever) ──
+      if (/online \(natural\)|neural|natural/i.test(n)) s += 120  // Edge/Azure neural voices — best & free
+      if (/enhanced|premium|siri/i.test(n))             s += 60   // iOS/macOS downloaded HQ voice
+      if (/google/i.test(n))                            s += 35   // Google network voices (Android/Chrome)
+      if (v.localService === false)                     s += 25   // network voice ≈ higher fidelity
+      // ── Indian connection ──
+      if      (l.startsWith('en-in')) s += 70
+      else if (l.startsWith('hi'))    s += 35
+      else if (l.startsWith('en-gb')) s += 12
+      else if (l.startsWith('en'))    s += 4
+      // ── gender ──
+      if (FEMALE.test(n)) s -= 200
+      if (MALE.test(n))   s += 45
+      return s
+    }
+    let best = null, bestS = -Infinity
+    for (const v of voices) {
+      const l = (v.lang || '').toLowerCase()
+      if (!l.startsWith('en') && !l.startsWith('hi')) continue  // ignore non-English/Hindi
+      const s = score(v)
+      if (s > bestS) { bestS = s; best = v }
+    }
+    return best
   }, [])
 
   const showBubble = useCallback((text) => {
