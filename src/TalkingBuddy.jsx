@@ -297,7 +297,7 @@ function Avatar({ url, speechRef, gestureRef, restMode }) {
       curRef.current[key] = nv; setMorph(key, nv * Math.max(0.5, v.jaw * 1.4 + 0.2))
     }
     setMorph('jawOpen', v.jaw); setMorph('mouthOpen', v.jaw * 0.5)
-    const smileT = speaking ? 0.30 : 0.20 + Math.sin(t * 0.3) * 0.03
+    const smileT = speaking ? 0.26 : 0.34 + Math.sin(t * 0.3) * 0.03
     v.smile = lerp(v.smile, smileT, d * 0.5)
     setMorph('mouthSmile', v.smile); setMorph('mouthSmileLeft', v.smile); setMorph('mouthSmileRight', v.smile)
     v.brow = lerp(v.brow, v.browTarget, d * 0.8)
@@ -409,7 +409,7 @@ const BREVITY = "\n\n[Reply in 1-3 short sentences. Conversational. No lists.]"
 export default function TalkingBuddy({
   user,
   audience,
-  restMode = 'sit',                 // 'sit' (calm, seated when idle) | 'stand'
+  restMode = 'stand',               // 'stand' (calm + smiling when idle) | 'sit'
   apiUrl = DEFAULT_API,
   getAuthHeaders = defaultHeaders,
   modelUrl = MODEL_URL,
@@ -448,15 +448,19 @@ export default function TalkingBuddy({
   const pickVoice = useCallback(() => {
     const synth = window.speechSynthesis; if (!synth) return null
     const voices = synth.getVoices() || []
-    const FEMALE = /female|samantha|zira|aria|jenny|salli|joanna|kendra|tessa|veena|raveena/i
+    const FEMALE = /female|samantha|zira|aria|jenny|salli|joanna|kendra|tessa|veena|raveena|heera|kalpana|swara|neerja|asha/i
+    const INDIAN_MALE = /rishi|ravi|prabhat|hemant|madhur|aarav|kunal|gagan|sandeep|orson/i
+    const lang = v => (v.lang || '').toLowerCase()
     return (
-      voices.find(v => persona.voiceMatch.test(v.name)) ||
-      voices.find(v => /\bmale\b|david|daniel|alex|fred|rishi|guy/i.test(v.name)) ||
-      voices.find(v => /google (uk|us) english/i.test(v.name) && !FEMALE.test(v.name)) ||
-      voices.find(v => (v.lang||'').toLowerCase().startsWith('en') && !FEMALE.test(v.name)) ||
-      voices.find(v => (v.lang||'').toLowerCase().startsWith('en')) || null
+      voices.find(v => INDIAN_MALE.test(v.name)) ||                            // named Indian-English male voice
+      voices.find(v => lang(v).startsWith('en-in') && !FEMALE.test(v.name)) || // male Indian English
+      voices.find(v => lang(v).startsWith('en-in')) ||                         // any Indian English (the accent is what matters)
+      voices.find(v => lang(v).startsWith('hi') && !FEMALE.test(v.name)) ||    // Hindi male as a close fallback
+      voices.find(v => /\bmale\b|daniel|david|alex|fred|guy/i.test(v.name)) || // generic male fallback
+      voices.find(v => lang(v).startsWith('en') && !FEMALE.test(v.name)) ||
+      voices.find(v => lang(v).startsWith('en')) || null
     )
-  }, [persona])
+  }, [])
 
   const showBubble = useCallback((text) => {
     setBubble(text)
@@ -481,6 +485,7 @@ export default function TalkingBuddy({
       synth.cancel()
       const say = () => {
         const u = new SpeechSynthesisUtterance(text)
+        u.lang = 'en-IN'
         u.rate = persona.rate; u.pitch = persona.pitch
         const v = pickVoice(); if (v) u.voice = v
         u.onstart = () => startVisemes(text)
