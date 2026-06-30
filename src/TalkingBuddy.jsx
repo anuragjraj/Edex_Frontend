@@ -21,6 +21,7 @@
  *     to keep him standing calmly instead.
  *   • Speaks the FULL reply (no truncation), lip-synced to the words.
  *   • Persona: audience="student" (warm buddy voice/tone) | "teacher" (senior mentor).
+ *   • VOICE: a friendly small-boy voice (high pitch, bright/bouncy delivery).
  *
  * REQUIRES:  npm install three @react-three/fiber @react-three/drei
  * USAGE:     {user && <TalkingBuddy user={user} audience="student" restMode="sit" />}
@@ -52,14 +53,19 @@ const DEFAULT_API =
 
 /* -----------------------------------------------------------------
    PERSONAS — voice + tone per audience
+   VOICE TUNING: a small boy. The single biggest lever on the Web Speech API
+   is PITCH (0–2, default 1). Children sit high — ~1.6–1.8 reads clearly as a
+   young boy. Keep rate near-normal so words stay intelligible; a touch quick
+   makes it feel bright and kid-like.
    ----------------------------------------------------------------- */
 const PERSONAS = {
   student: {
-    pitch: 0.94, rate: 1.0,
-    voiceMatch: /guy|mark|aaron|eric|ryan|james|google us english|liam/i,
+    pitch: 1.75, rate: 1.06,
+    // prefer voices that already sound young/bright; pitch does the rest
+    voiceMatch: /child|kid|junior|boy|google us english|guy|aaron|eric|ryan/i,
     style:
-      "\n\n[Speak like a friendly study buddy: warm, upbeat, casual peer tone, simple " +
-      "everyday words and contractions, encouraging, never lecture. Keep it natural.]",
+      "\n\n[Speak like a friendly little boy study buddy: warm, excited, playful peer tone, " +
+      "simple everyday words and contractions, super encouraging, never lecture. Keep it natural and bright.]",
     label: 'Spark', sub: 'your study buddy', avatarEmoji: '🙂',
     kick: "Greet me by my first name in ONE short, warm, buddy-style sentence, then suggest ONE fun thing to study next. Casual and friendly.",
     quick: [
@@ -69,13 +75,14 @@ const PERSONAS = {
     ],
   },
   teacher: {
-    pitch: 0.84, rate: 0.95,
-    voiceMatch: /daniel|david|rishi|brian|matthew|google uk english male|arthur|oliver/i,
+    // still a small boy, just a little calmer/steadier than the student persona
+    pitch: 1.6, rate: 1.0,
+    voiceMatch: /child|kid|junior|boy|google us english|guy|aaron|eric|ryan/i,
     style:
-      "\n\n[Speak like a respected senior mentor / lead educator: composed, knowledgeable, " +
-      "professional and warm but authoritative, precise wording, no slang or filler.]",
+      "\n\n[Speak like a bright, polite young boy helper: clear, cheerful, simple words, " +
+      "respectful and warm, a little careful and tidy in how you explain things.]",
     label: 'Mentor', sub: 'your teaching assistant', avatarEmoji: '🧑‍🏫',
-    kick: "Greet me by my first name in ONE concise, professional, respectful sentence, then note ONE specific thing worth focusing on next.",
+    kick: "Greet me by my first name in ONE concise, friendly sentence, then note ONE specific thing worth focusing on next.",
     quick: [
       { label: '📋 Focus today', msg: "What should I prioritise right now? One concise line." },
       { label: '🎯 Class idea', msg: "Suggest one effective teaching idea for my next session." },
@@ -430,37 +437,42 @@ export default function TalkingBuddy({
   useEffect(() => { if (open) bottomRef.current?.scrollIntoView({ behavior:'smooth' }) }, [messages, open, loading])
   useEffect(() => { const fn = () => setIsNarrow(window.innerWidth < 640); fn(); window.addEventListener('resize', fn); return () => window.removeEventListener('resize', fn) }, [])
 
-  // Score every installed voice and pick the warmest, most natural, Indian-English MALE one.
-  // Quality matters more than accent for emotional connection — a robotic "Indian" voice
-  // (e.g. iOS compact "Rishi") feels worse than a warm one, so we reward natural/neural voices.
+  // Score every installed voice and pick the brightest, most natural one that
+  // suits a SMALL BOY. There are very few true child voices in browser TTS, so
+  // the real lever is PITCH (set high in the persona). Here we just pick a clear,
+  // natural English voice and lightly favour young/boy-ish names where present.
   const pickVoice = useCallback(() => {
     const synth = window.speechSynthesis; if (!synth) return null
     const voices = synth.getVoices() || []
     if (!voices.length) return null
-    const FEMALE = /female|woman|samantha|zira|aria|jenny|salli|joanna|kendra|tessa|veena|raveena|heera|kalpana|swara|neerja|asha|priya|isha|ananya|sneha|google.*(hindi|हिन्दी)/i
-    const MALE   = /\bmale\b|\bman\b|prabhat|aarav|kunal|rehaan|arjun|rishi|ravi|hemant|madhur|gagan|sandeep|daniel|alex|fred|guy|mark|aaron|orson/i
+    // strongly adult/deep timbres read badly even when pitched up — avoid them
+    const DEEP = /\b(deep|bass|baritone)\b|barry|brian|george|fred|bruce|lee|reed|paul|rocko/i
+    // genuine child / youthful voices if the platform ships any
+    const CHILD = /child|kid|junior|\bboy\b|junior|jimmy|tommy|noah|leo|max\b/i
+    // bright, lighter voices that pitch up nicely into a young range
+    const BRIGHT = /samantha|aria|jenny|google us english|guy|aaron|eric|ryan|kid|child/i
     const score = v => {
       const n = v.name || '', l = (v.lang || '').toLowerCase()
       let s = 0
-      // ── warmth / quality (the biggest lever) ──
+      // ── quality (the biggest lever after pitch) ──
       if (/online \(natural\)|neural|natural/i.test(n)) s += 120  // Edge/Azure neural voices — best & free
       if (/enhanced|premium|siri/i.test(n))             s += 60   // iOS/macOS downloaded HQ voice
-      if (/google/i.test(n))                            s += 35   // Google network voices (Android/Chrome)
+      if (/google/i.test(n))                            s += 45   // Google network voices (Android/Chrome)
       if (v.localService === false)                     s += 25   // network voice ≈ higher fidelity
-      // ── Indian connection ──
-      if      (l.startsWith('en-in')) s += 70
-      else if (l.startsWith('hi'))    s += 35
-      else if (l.startsWith('en-gb')) s += 12
-      else if (l.startsWith('en'))    s += 4
-      // ── gender ──
-      if (FEMALE.test(n)) s -= 200
-      if (MALE.test(n))   s += 45
+      // ── child / brightness fit ──
+      if (CHILD.test(n))  s += 130   // a real child voice wins outright if it exists
+      if (BRIGHT.test(n)) s += 40    // light/bright timbres pitch up cleanly
+      if (DEEP.test(n))   s -= 120   // deep voices sound wrong even at high pitch
+      // ── language: prefer plain English, mild preference for US ──
+      if      (l.startsWith('en-us')) s += 30
+      else if (l.startsWith('en-gb')) s += 18
+      else if (l.startsWith('en'))    s += 10
       return s
     }
     let best = null, bestS = -Infinity
     for (const v of voices) {
       const l = (v.lang || '').toLowerCase()
-      if (!l.startsWith('en') && !l.startsWith('hi')) continue  // ignore non-English/Hindi
+      if (!l.startsWith('en')) continue  // English voices only
       const s = score(v)
       if (s > bestS) { bestS = s; best = v }
     }
@@ -490,8 +502,8 @@ export default function TalkingBuddy({
       synth.cancel()
       const say = () => {
         const u = new SpeechSynthesisUtterance(text)
-        u.lang = 'en-IN'
-        u.rate = persona.rate; u.pitch = persona.pitch
+        u.lang = 'en-US'
+        u.rate = persona.rate; u.pitch = persona.pitch   // high pitch = small boy
         const v = pickVoice(); if (v) u.voice = v
         u.onstart = () => startVisemes(text)
         u.onboundary = (e) => { if (typeof e.charIndex === 'number') syncToBoundary(e.charIndex) }
@@ -513,6 +525,8 @@ export default function TalkingBuddy({
       else if (typeof source === 'string') buf = await (await fetch(source)).arrayBuffer()
       const audioBuf = await ctx.decodeAudioData(buf)
       const src = ctx.createBufferSource(); src.buffer = audioBuf
+      // nudge playback up a little so external/synth audio also reads younger
+      src.playbackRate.value = 1.12
       const analyser = ctx.createAnalyser(); analyser.fftSize = 512
       const data = new Uint8Array(analyser.frequencyBinCount)
       src.connect(analyser); analyser.connect(ctx.destination)
@@ -562,7 +576,7 @@ export default function TalkingBuddy({
     const SR = window.SpeechRecognition || window.webkitSpeechRecognition; if (!SR) return
     if (listening) { try { recogRef.current?.stop() } catch {}; return }
     try {
-      const r = new SR(); r.lang='en-IN'; r.interimResults=false; r.maxAlternatives=1
+      const r = new SR(); r.lang='en-US'; r.interimResults=false; r.maxAlternatives=1
       r.onresult = e => { setInput(prev => (prev ? prev+' ' : '') + e.results[0][0].transcript) }
       r.onend = () => setListening(false); r.onerror = () => setListening(false)
       recogRef.current = r; setListening(true); r.start()
