@@ -67,7 +67,7 @@ const PERSONAS = {
       "\n\n[Speak like a friendly teenage study buddy (about 10th grade): warm, upbeat, " +
       "casual peer tone, simple everyday words and contractions, encouraging, never lecture. Keep it natural.]",
     label: 'Spark', sub: 'your study buddy', avatarEmoji: '🙂',
-    kick: "Greet me by my first name in ONE short, warm, buddy-style sentence, then suggest ONE fun thing to study next. Casual and friendly.",
+    kick: "Start our chat now: greet me warmly by my first name, a quick 'how's your day', then recap what I was last studying from my data and ask if I want to continue it or switch topics. Keep it short and friendly.",
     quick: [
       { label: '📚 What now?', msg: "What should I study right now? Keep it short and casual." },
       { label: '🔥 Hype me up', msg: "Give me a quick, genuine pep talk like a friend would." },
@@ -82,7 +82,7 @@ const PERSONAS = {
       "\n\n[Speak like a bright, polite teenage helper (about 10th grade): clear, cheerful, " +
       "simple words, respectful and warm, a little careful and tidy in how you explain things.]",
     label: 'Mentor', sub: 'your teaching assistant', avatarEmoji: '🧑‍🏫',
-    kick: "Greet me by my first name in ONE concise, friendly sentence, then note ONE specific thing worth focusing on next.",
+    kick: "Start our chat now: greet me by my first name, a brief friendly check-in, then recap what I was last working on from my data and ask whether I want to continue it or focus elsewhere. Concise and warm.",
     quick: [
       { label: '📋 Focus today', msg: "What should I prioritise right now? One concise line." },
       { label: '🎯 Class idea', msg: "Suggest one effective teaching idea for my next session." },
@@ -396,7 +396,7 @@ function Loader() {
   return <Html center><div style={{ width:26, height:26, border:'3px solid rgba(99,102,241,.3)', borderTopColor:'#6366F1', borderRadius:'50%', animation:'tbSpin .8s linear infinite' }} /></Html>
 }
 
-const BREVITY = "\n\n[Reply in 1-3 short sentences. Conversational. No lists.]"
+const BREVITY = "\n\n[Keep it short and warm — usually 2-4 sentences. Conversational, no bullet lists.]"
 
 export default function TalkingBuddy({
   user,
