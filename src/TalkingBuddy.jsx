@@ -1,72 +1,48 @@
 /**
- * TalkingBuddy — a standing/seated, life-like 3D human avatar that greets and talks.
+ * TalkingBuddy — 2D illustrated study buddy (drop-in replacement for the 3D one).
  *
- * MOTION MODEL (rewritten for stability)
- * ──────────────────────────────────────
- * The animation clips don't keyframe the shoulders or legs at all, and reuse one
- * canned arm loop. Nudging those bones additively made them DRIFT (accumulate),
- * which looked disoriented. So now:
+ * WHAT CHANGED vs the 3D version
+ * ──────────────────────────────
+ *  • No three.js / @react-three/fiber / @react-three/drei, and NO /avatar.glb.
+ *    The avatar is a self-contained inline SVG (the friendly "Simple 2D Avatar"
+ *    woman: lavender backdrop, brown hair, cream sweater).
+ *  • FEMALE VOICE: the voice picker now scores female voices first, and the
+ *    persona pitch/rate are tuned for a warm, natural woman.
+ *  • WARMTH while speaking: her mouth lip-syncs to the words, her smile deepens,
+ *    her cheeks glow, and a soft halo gently pulses — so it reads as a warm,
+ *    friendly person talking to you rather than a flat mouth flap.
  *
- *   • The whole UPPER-LIMB + FINGER chain and the LEGS are OWNED procedurally:
- *     every frame we reset each bone to its captured rest pose, then pose it.
- *     This is deterministic — it can never accumulate or fight the clip.
- *   • The mixer still drives the spine / neck / head / hips for breathing + presence
- *     (those ARE keyframed, so a small additive sway there is safe).
+ * Same public API as before — just `<TalkingBuddy user={user} />` works.
+ * Extra props (audience, apiUrl, getAuthHeaders, accent, accent2,
+ * synthesizeAudio) are still honoured; old 3D-only props (modelUrl, restMode)
+ * are accepted and ignored so you don't have to touch the call site.
  *
- * BEHAVIOUR
- *   • Movement ONLY while speaking: speech-synced arm/wrist "beats" on stressed
- *     syllables (alternating sides), a soft body sway, and a 1–2 cm lateral shift.
- *   • At rest (student is studying): he SITS on a stool and goes calm/still, then
- *     stands up to talk and sits back down when finished. Set restMode="stand"
- *     to keep him standing calmly instead.
- *   • Speaks the FULL reply (no truncation), lip-synced to the words.
- *   • Persona: audience="student" (warm buddy voice/tone) | "teacher" (senior mentor).
- *   • VOICE: a friendly teenage (≈10th-grade) voice — light and youthful but not childish.
- *
- * REQUIRES:  npm install three @react-three/fiber @react-three/drei
- * USAGE:     {user && <TalkingBuddy user={user} audience="student" restMode="sit" />}
+ * REQUIRES: just React. (You can `npm uninstall three @react-three/fiber
+ * @react-three/drei` if nothing else uses them, and delete public/avatar.glb.)
  */
 
-import { useState, useEffect, useRef, useCallback, useMemo, Suspense } from 'react'
-import { Canvas, useFrame, useThree } from '@react-three/fiber'
-import { useGLTF, useAnimations, Html, ContactShadows } from '@react-three/drei'
-import * as THREE from 'three'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 
 /* -----------------------------------------------------------------
    SETTINGS
    ----------------------------------------------------------------- */
-const MODEL_URL = '/avatar.glb'
-const TARGET_HEIGHT = 1.7
-const MODEL_ROTATION_Y = 0          // set to Math.PI if the avatar faces AWAY
-
-const LATERAL = 0.02                // max sideways shift while speaking (~2 cm)
-
-// --- seated pose (tune these if the legs bend the wrong way) ---
-const SIT_DROP = 0.45               // how far the hips drop when seated (metres)
-const SIT_HIP  = -1.5               // thigh flexion (flip sign if knees point up)
-const SIT_KNEE =  1.5               // knee flexion  (flip sign if shins kick forward)
-const STOOL_SEAT_Y = 0.47           // stool seat height (≈ seated hip height)
-
 const DEFAULT_API =
   (typeof import.meta !== 'undefined' && import.meta.env && import.meta.env.VITE_API_URL) ||
   'http://localhost:5000'
 
 /* -----------------------------------------------------------------
-   PERSONAS — voice + tone per audience
-   VOICE TUNING: a ≈10th-grade teenager (15–16). PITCH (0–2, default 1) is the
-   main lever on the Web Speech API. A small child sits ~1.6–1.8 and sounds
-   squeaky; a teen sits just above normal — ~1.15–1.30 reads as youthful but
-   not childish. Keep rate near-normal so it stays natural.
+   PERSONAS — warm female voice per audience.
+   PITCH is the main lever on the Web Speech API: ~1.0–1.1 keeps a natural
+   adult-woman timbre (we pick a female voice below, pitch just fine-tunes it).
    ----------------------------------------------------------------- */
 const PERSONAS = {
   student: {
-    pitch: 1.28, rate: 1.02,
-    // prefer clear, lighter young-sounding voices; pitch does the rest
-    voiceMatch: /google us english|guy|aaron|eric|ryan|jenny|aria/i,
+    pitch: 1.06, rate: 1.0,
     style:
-      "\n\n[Speak like a friendly teenage study buddy (about 10th grade): warm, upbeat, " +
-      "casual peer tone, simple everyday words and contractions, encouraging, never lecture. Keep it natural.]",
-    label: 'Spark', sub: 'your study buddy', avatarEmoji: '🙂',
+      "\n\n[Speak like a warm, friendly female study buddy: kind, upbeat, " +
+      "encouraging, simple everyday words and contractions, never lecture. " +
+      "Sound genuinely happy to be helping.]",
+    label: 'Spark', sub: 'your study buddy', avatarEmoji: '😊',
     kick: "Start our chat now: greet me warmly by my first name, a quick 'how's your day', then recap what I was last studying from my data and ask if I want to continue it or switch topics. Keep it short and friendly.",
     quick: [
       { label: '📚 What now?', msg: "What should I study right now? Keep it short and casual." },
@@ -75,13 +51,11 @@ const PERSONAS = {
     ],
   },
   teacher: {
-    // still a teenager, just a little calmer/steadier than the student persona
-    pitch: 1.18, rate: 0.98,
-    voiceMatch: /google us english|guy|aaron|eric|ryan|jenny|aria/i,
+    pitch: 1.0, rate: 0.98,
     style:
-      "\n\n[Speak like a bright, polite teenage helper (about 10th grade): clear, cheerful, " +
-      "simple words, respectful and warm, a little careful and tidy in how you explain things.]",
-    label: 'Mentor', sub: 'your teaching assistant', avatarEmoji: '🧑‍🏫',
+      "\n\n[Speak like a warm, encouraging female mentor: clear, kind, " +
+      "supportive and tidy in how you explain things, with a friendly tone.]",
+    label: 'Mentor', sub: 'your teaching assistant', avatarEmoji: '👩‍🏫',
     kick: "Start our chat now: greet me by my first name, a brief friendly check-in, then recap what I was last working on from my data and ask whether I want to continue it or focus elsewhere. Concise and warm.",
     quick: [
       { label: '📋 Focus today', msg: "What should I prioritise right now? One concise line." },
@@ -92,16 +66,13 @@ const PERSONAS = {
 }
 
 /* -----------------------------------------------------------------
-   PHONEME → VISEME LIP-SYNC
+   PHONEME → VISEME (used only to time the jaw/mouth opening)
    ----------------------------------------------------------------- */
 const VISEME = {
-  sil:{key:'viseme_sil',jaw:0}, PP:{key:'viseme_PP',jaw:0}, FF:{key:'viseme_FF',jaw:.12},
-  TH:{key:'viseme_TH',jaw:.14}, DD:{key:'viseme_DD',jaw:.18}, kk:{key:'viseme_kk',jaw:.20},
-  CH:{key:'viseme_CH',jaw:.16}, SS:{key:'viseme_SS',jaw:.12}, nn:{key:'viseme_nn',jaw:.14},
-  RR:{key:'viseme_RR',jaw:.18}, aa:{key:'viseme_aa',jaw:.55}, E:{key:'viseme_E',jaw:.32},
-  I:{key:'viseme_I',jaw:.26},   O:{key:'viseme_O',jaw:.42},  U:{key:'viseme_U',jaw:.30},
+  sil:{jaw:0}, PP:{jaw:0}, FF:{jaw:.12}, TH:{jaw:.14}, DD:{jaw:.20}, kk:{jaw:.22},
+  CH:{jaw:.18}, SS:{jaw:.12}, nn:{jaw:.14}, RR:{jaw:.18}, aa:{jaw:.62}, E:{jaw:.36},
+  I:{jaw:.28}, O:{jaw:.5}, U:{jaw:.34},
 }
-const ALL_VISEME_KEYS = Object.values(VISEME).map(v => v.key)
 const VOWELS = new Set(['aa','E','I','O','U'])
 
 function wordToVisemes(word) {
@@ -168,232 +139,228 @@ function cleanForSpeech(t = '') {
     .replace(/\s{2,}/g,' ').trim()
 }
 function injectStyles() {
-  if (typeof document === 'undefined' || document.getElementById('tb3d-styles')) return
-  const s = document.createElement('style'); s.id = 'tb3d-styles'
+  if (typeof document === 'undefined' || document.getElementById('tb2d-styles')) return
+  const s = document.createElement('style'); s.id = 'tb2d-styles'
   s.textContent = `
     @keyframes tbPop{from{opacity:0;transform:scale(.85) translateY(12px)}to{opacity:1;transform:none}}
     @keyframes tbBub{from{opacity:0;transform:translateY(8px) scale(.96)}to{opacity:1;transform:none}}
     @keyframes tbDot{0%,100%{opacity:.25;transform:scale(.8)}50%{opacity:1;transform:scale(1)}}
-    @keyframes tbSpin{to{transform:rotate(360deg)}}
-    @keyframes tbPulse{0%,100%{box-shadow:0 0 0 0 rgba(99,102,241,.45)}70%{box-shadow:0 0 0 12px rgba(99,102,241,0)}}
+    @keyframes tbPulse{0%,100%{box-shadow:0 0 0 0 rgba(124,91,214,.45)}70%{box-shadow:0 0 0 12px rgba(124,91,214,0)}}
   `
   document.head.appendChild(s)
 }
 function lerp(a, b, t) { return a + (b - a) * t }
 
-const _e = new THREE.Euler(), _q = new THREE.Quaternion()
-
 /* -----------------------------------------------------------------
-   THE 3D AVATAR
+   THE 2D AVATAR  (inline SVG, lip-synced + smiling)
    ----------------------------------------------------------------- */
-function Avatar({ url, speechRef, gestureRef, restMode }) {
-  const group = useRef()
-  const { scene, animations } = useGLTF(url, true)
-
-  // mixer drives bones only — we own the entire face (synced to live speech)
-  const boneClips = useMemo(() => animations.map(c => {
-    const cc = c.clone(); cc.tracks = cc.tracks.filter(tr => !/\.morphTargetInfluences/.test(tr.name)); return cc
-  }), [animations])
-  const { actions } = useAnimations(boneClips, group)
-
-  const clipMap = useMemo(() => {
-    const names = Object.keys(actions)
-    const find = (re, avoid) => names.find(n => re.test(n) && (!avoid || !avoid.test(n)))
-    return {
-      idle: find(/idle|breath/i) || names[0],
-      talk: find(/talk.*(hands|body|lip)/i, /walk|fast|preview/i) || find(/talk/i, /walk|preview/i),
-      wave: find(/wave|greet/i),
-    }
-  }, [actions])
-
-  const meshesRef = useRef([]); const dictRef = useRef([])
-  const curRef = useRef({}); const boneRef = useRef({}); const restRef = useRef({})
-  const blinkRef = useRef({ t:0, next:1.6+Math.random()*3 })
-  const saccadeRef = useRef({ t:0, next:2+Math.random()*4, x:0, y:0, tx:0, ty:0 })
-  const visRef = useRef({ smile:.18, jaw:0, brow:0, browTarget:0 })
-  const gRef = useRef({ energy:0, lead:0, accL:0, accR:0, lastIdx:-1, sit:1, headTilt:0, htT:0, htN:4 })
-  const latRef = useRef({ x:0, tx:0, t:0, next:1.5 })
-  const animRef = useRef({ current:null, mode:'idle', waving:false })
-
-  // bones we fully own (reset→pose each frame)
-  const OWN_ARMS = useMemo(() => {
-    const out = ['LeftShoulder','RightShoulder','LeftArm','RightArm','LeftForeArm','RightForeArm','LeftHand','RightHand']
-    for (const side of ['Left','Right']) for (const f of ['Index','Middle','Ring','Pinky','Thumb']) for (const k of [1,2,3]) out.push(`${side}Hand${f}${k}`)
-    return out
-  }, [])
-  const OWN_LEGS = ['LeftUpLeg','RightUpLeg','LeftLeg','RightLeg','LeftFoot','RightFoot']
-
-  /* setup: scale, recenter, collect meshes + bones + capture REST pose */
-  useEffect(() => {
-    let box = new THREE.Box3().setFromObject(scene)
-    const size = new THREE.Vector3(); box.getSize(size)
-    scene.scale.setScalar(TARGET_HEIGHT / (size.y || 1))
-    box = new THREE.Box3().setFromObject(scene)
-    const center = new THREE.Vector3(); box.getCenter(center)
-    scene.position.x -= center.x; scene.position.z -= center.z; scene.position.y -= box.min.y
-
-    const meshes = [], dicts = [], bones = {}, rest = {}
-    scene.traverse(o => {
-      if (o.isMesh && o.morphTargetDictionary) { meshes.push(o); dicts.push(o.morphTargetDictionary) }
-      if (o.isMesh) { o.castShadow = true; o.frustumCulled = false }
-      if (o.isBone) { bones[o.name] = o; rest[o.name] = o.quaternion.clone() }  // pristine rest (mixer hasn't run yet)
-    })
-    meshesRef.current = meshes; dictRef.current = dicts; boneRef.current = bones; restRef.current = rest
-    gRef.current.sit = restMode === 'sit' ? 1 : 0
-  }, [scene, restMode])
+function Avatar2D({ speechRef }) {
+  const wrapRef       = useRef(null)
+  const mouthRef      = useRef(null)
+  const eyesOpenRef   = useRef(null)
+  const eyesClosedRef = useRef(null)
+  const cheekLRef     = useRef(null)
+  const cheekRRef     = useRef(null)
+  const glowRef       = useRef(null)
 
   useEffect(() => {
-    const idle = actions[clipMap.idle]
-    if (idle) { idle.reset().fadeIn(0.4).play(); animRef.current.current = idle; animRef.current.mode = 'idle' }
-    return () => idle && idle.fadeOut(0.3)
-  }, [actions, clipMap])
+    let raf, mounted = true
+    const SVGNS = 'http://www.w3.org/2000/svg'
+    const MX = 180, MY = 234
+    let curOpen = 0, curSmile = 0.55, curCheek = 0.32, breath = 0
+    let blinkT = 0, blinkNext = 2 + Math.random() * 3
+    const reduce = typeof window !== 'undefined' && window.matchMedia &&
+      window.matchMedia('(prefers-reduced-motion: reduce)').matches
 
-  const transition = useCallback((name, fade = 0.45, opts = {}) => {
-    const a = animRef.current, next = actions[name]
-    if (!next || next === a.current) return
-    if (opts.once) { next.setLoop(THREE.LoopOnce, 1); next.clampWhenFinished = true }
-    else { next.setLoop(THREE.LoopRepeat, Infinity); next.clampWhenFinished = false }
-    next.reset(); next.setEffectiveWeight(1); next.fadeIn(fade).play()
-    if (a.current && a.current !== next) a.current.fadeOut(fade)
-    a.current = next
-  }, [actions])
-
-  const setMorph = useCallback((name, value) => {
-    const meshes = meshesRef.current, dicts = dictRef.current
-    for (let i = 0; i < meshes.length; i++) { const idx = dicts[i][name]; if (idx !== undefined) meshes[i].morphTargetInfluences[idx] = value }
-  }, [])
-
-  useFrame((state, delta) => {
-    const t = state.clock.elapsedTime, d = Math.min(1, delta * 14)
-    const sp = speechRef.current, speaking = !!(sp && sp.active)
-    const a = animRef.current, g = gRef.current
-    const B = boneRef.current, R = restRef.current
-
-    /* ===== body: always the authored "hands down" idle (calm, no gesturing, even while speaking) ===== */
-    if (a.mode !== 'idle') { transition(clipMap.idle, 0.4); a.mode = 'idle' }
-
-    /* ===== FACE ===== */
-    const v = visRef.current
-    let targetJaw = 0, activeKey = 'viseme_sil', beat = false
-    if (speaking && sp.seq && sp.seq.length) {
-      let idx = sp.syncIdx, acc = sp.syncTime
-      while (idx < sp.seq.length - 1 && acc + sp.seq[idx].dur < t) { acc += sp.seq[idx].dur; idx++ }
-      sp.idx = idx
-      const cur = sp.seq[idx], vinfo = VISEME[cur.code] || VISEME.sil
-      activeKey = vinfo.key
-      const amp = sp.amp ? sp.amp() : null
-      targetJaw = amp != null ? Math.max(vinfo.jaw * 0.4, amp) : vinfo.jaw * (0.85 + Math.random() * 0.3)
-      v.browTarget = VOWELS.has(cur.code) ? 0.22 : 0.05
-      if (idx !== g.lastIdx) { if (cur.stressed) beat = true; g.lastIdx = idx }
-    } else v.browTarget = 0
-
-    v.jaw = lerp(v.jaw, targetJaw, d * 1.6)
-    for (const key of ALL_VISEME_KEYS) {
-      const cur = curRef.current[key] || 0
-      const nv = lerp(cur, key === activeKey ? 1 : 0, d * (key === activeKey ? 1.7 : 1.1))
-      curRef.current[key] = nv; setMorph(key, nv * Math.max(0.5, v.jaw * 1.4 + 0.2))
+    const el = (tag, attrs) => {
+      const n = document.createElementNS(SVGNS, tag)
+      for (const k in attrs) n.setAttribute(k, attrs[k])
+      return n
     }
-    setMorph('jawOpen', v.jaw); setMorph('mouthOpen', v.jaw * 0.5)
-    const smileT = speaking ? 0.26 : 0.34 + Math.sin(t * 0.3) * 0.03
-    v.smile = lerp(v.smile, smileT, d * 0.5)
-    setMorph('mouthSmile', v.smile); setMorph('mouthSmileLeft', v.smile); setMorph('mouthSmileRight', v.smile)
-    v.brow = lerp(v.brow, v.browTarget, d * 0.8)
-    setMorph('browInnerUp', v.brow); setMorph('browOuterUpLeft', v.brow * 0.7); setMorph('browOuterUpRight', v.brow * 0.7)
-    const b = blinkRef.current; b.t += delta; if (b.t > b.next) { b.t = 0; b.next = 1.6 + Math.random() * 3.6 }
-    const bv = b.t < 0.06 ? b.t/0.06 : b.t < 0.14 ? 1 - (b.t-0.06)/0.08 : 0
-    setMorph('eyeBlinkLeft', bv); setMorph('eyeBlinkRight', bv)
-    const sc = saccadeRef.current; sc.t += delta
-    if (sc.t > sc.next) { sc.t = 0; sc.next = 1.5 + Math.random()*3.5; sc.tx = (Math.random()-.5)*.5; sc.ty = (Math.random()-.5)*.3 }
-    sc.x = lerp(sc.x, sc.tx, d*0.4); sc.y = lerp(sc.y, sc.ty, d*0.4)
-    setMorph('eyesLookUp', Math.max(0, sc.y)); setMorph('eyesLookDown', Math.max(0, -sc.y))
 
-    /* ===== gesture energy (speaking only) ===== */
-    const ampNow = (speaking && sp.amp) ? sp.amp() : null
-    const baseE = speaking ? (ampNow != null ? Math.min(1, ampNow*1.3 + 0.25) : 0.45) : 0
-    g.energy = lerp(g.energy, baseE, d * 0.5)
-    if (beat) { g.lead = g.lead ? 0 : 1; if (g.lead) g.accR = 1; else g.accL = 1; g.energy = Math.min(1, g.energy + 0.5) }
-    g.accL *= Math.max(0, 1 - delta*4.5); g.accR *= Math.max(0, 1 - delta*4.5)
-    const E = g.energy
+    // open: 0..1 mouth opening   smile: 0..1 how upturned/warm the mouth is
+    const drawMouth = (open, smile) => {
+      const g = mouthRef.current; if (!g) return
+      while (g.firstChild) g.removeChild(g.firstChild)
+      open = Math.max(0, Math.min(1, open))
 
-    // seated amount: sit while idle (if restMode sit), stand up to talk
-    g.sit = lerp(g.sit, (restMode === 'sit' && !speaking) ? 1 : 0, Math.min(1, delta * 2.2))
-    const sit = g.sit
+      if (open < 0.07) {
+        // closed: a warm smile line — deeper curve when smile is higher
+        const dip = 9 + smile * 16
+        g.appendChild(el('path', {
+          d: `M${MX - 30} ${MY - 4} q30 ${dip} 60 0`,
+          stroke: '#c2607a', 'stroke-width': 6, fill: 'none', 'stroke-linecap': 'round',
+        }))
+        // soft warm lower-lip shadow
+        g.appendChild(el('path', {
+          d: `M${MX - 22} ${MY + 2 + smile * 4} q22 ${6} 44 0`,
+          stroke: '#e9a7a7', 'stroke-width': 3, fill: 'none', 'stroke-linecap': 'round', opacity: 0.5,
+        }))
+        return
+      }
 
-    /* ===== arms: idle clip keeps the upper arms DOWN; we reset+bend the elbows each
-       frame (deterministic — never accumulates) so the hands rest near the stomach ===== */
-    const s1 = Math.sin(t*0.9), s3 = Math.sin(t*1.7+0.6)
-    const FORE    = 1.30   // elbow bend — higher = hands sit higher (toward chest), lower = toward hips
-    const FORE_IN = 0.50   // inward angle so the two hands meet in front
-    const FCURL   = 0.16   // light finger curl so the resting hands look soft
-    const set = (name, x, y, z) => {
-      const bb = B[name], rr = R[name]; if (!bb || !rr) return
-      bb.quaternion.copy(rr); _e.set(x, y, z, 'XYZ'); _q.setFromEuler(_e); bb.quaternion.multiply(_q)
+      // open + talking (happy open smile: corners up, upper teeth showing)
+      const w = 48 - 8 * open, h = 8 + 30 * open, rx = w / 2, ry = h / 2
+      g.appendChild(el('ellipse', { cx: MX, cy: MY, rx, ry, fill: '#86384f' }))
+      if (h > 13) { // upper teeth
+        g.appendChild(el('path', {
+          d: `M${MX - rx + 3} ${MY - ry + 2} q${rx - 3} -5 ${(rx - 3) * 2} 0 l0 ${Math.min(7, h * 0.3)} q${-(rx - 3)} 4 ${-(rx - 3) * 2} 0 Z`,
+          fill: '#fff7f2',
+        }))
+      }
+      if (h > 20) { // tongue
+        g.appendChild(el('ellipse', { cx: MX, cy: MY + ry * 0.42, rx: rx * 0.55, ry: ry * 0.3, fill: '#e58a8a' }))
+      }
+      g.appendChild(el('ellipse', { cx: MX, cy: MY, rx, ry, fill: 'none', stroke: '#c2607a', 'stroke-width': 4 }))
+      // lifted corners → reads as a smile even while open
+      const lift = 7 + smile * 5
+      g.appendChild(el('path', { d: `M${MX - rx + 1} ${MY + 1} q-6 ${-lift} -13 ${-lift - 2}`, stroke: '#c2607a', 'stroke-width': 4, fill: 'none', 'stroke-linecap': 'round' }))
+      g.appendChild(el('path', { d: `M${MX + rx - 1} ${MY + 1} q6 ${-lift} 13 ${-lift - 2}`, stroke: '#c2607a', 'stroke-width': 4, fill: 'none', 'stroke-linecap': 'round' }))
     }
-    set('LeftForeArm',  -FORE,  FORE_IN, 0)
-    set('RightForeArm', -FORE, -FORE_IN, 0)
-    ;['Index','Middle','Ring','Pinky'].forEach((f, i) => {
-      const c = FCURL + i*0.012
-      set(`LeftHand${f}1`, 0, 0,  c);  set(`LeftHand${f}2`, 0, 0,  c*0.8);  set(`LeftHand${f}3`, 0, 0,  c*0.6)
-      set(`RightHand${f}1`, 0, 0, -c); set(`RightHand${f}2`, 0, 0, -c*0.8); set(`RightHand${f}3`, 0, 0, -c*0.6)
-    })
 
-    /* ===== OWNED legs: reset to rest, then bend for sitting (parent-space) ===== */
-    const setLeg = (name, ax) => {
-      const bb = B[name], rr = R[name]; if (!bb || !rr) return
-      bb.quaternion.copy(rr); _e.set(ax, 0, 0, 'XYZ'); _q.setFromEuler(_e); bb.quaternion.premultiply(_q)
+    const doBlink = () => {
+      const o = eyesOpenRef.current, c = eyesClosedRef.current
+      if (!o || !c) return
+      o.style.display = 'none'; c.style.display = ''
+      setTimeout(() => { if (o) o.style.display = ''; if (c) c.style.display = 'none' }, 120)
     }
-    setLeg('LeftUpLeg', SIT_HIP*sit);  setLeg('RightUpLeg', SIT_HIP*sit)
-    setLeg('LeftLeg',   SIT_KNEE*sit);  setLeg('RightLeg',  SIT_KNEE*sit)
 
-    /* ===== core (mixer-driven → safe additive sway, gated to speaking) ===== */
-    const sway = E * 0.008
-    _e.set(E*0.015 + sit*0.05, s1*sway*0.4, Math.sin(t*0.55)*sway, 'XYZ'); _q.setFromEuler(_e); B.Spine && B.Spine.quaternion.multiply(_q)
-    _e.set(E*0.012, s1*sway*0.4, Math.sin(t*0.55)*sway*0.7, 'XYZ'); _q.setFromEuler(_e); B.Spine1 && B.Spine1.quaternion.multiply(_q)
-    _e.set(E*0.012, s1*sway*0.4, s3*sway*0.6, 'XYZ'); _q.setFromEuler(_e); B.Spine2 && B.Spine2.quaternion.multiply(_q)
-    g.htT += delta; if (g.htT > g.htN) { g.htT = 0; g.htN = 4 + Math.random()*6; g.headTilt = (Math.random()-.5)*0.12 }
-    _e.set(-E*0.02 - (g.accL+g.accR)*0.03, 0, g.headTilt*0.4, 'XYZ'); _q.setFromEuler(_e); B.Neck && B.Neck.quaternion.multiply(_q)
-    _e.set(-E*0.015 + s3*0.01*(E>0?1:0), sc.x*0.12, g.headTilt*0.5, 'XYZ'); _q.setFromEuler(_e); B.Head && B.Head.quaternion.multiply(_q)
+    const tick = () => {
+      if (!mounted) return
+      const t = performance.now() / 1000
+      const sp = speechRef.current
+      const speaking = !!(sp && sp.active)
 
-    /* ===== whole-body placement: lateral shift (speaking) + sit drop ===== */
-    const L = latRef.current; L.t += delta
-    if (speaking) { if (L.t > L.next) { L.t = 0; L.next = 1.2 + Math.random()*1.8; L.tx = (Math.random()-.5) * 2 * LATERAL } }
-    else L.tx = 0
-    L.x = lerp(L.x, L.tx, d * 0.2)
-    if (group.current) {
-      group.current.position.x = L.x
-      group.current.position.y = -SIT_DROP * sit
-      group.current.position.z = -0.03 * sit
+      // jaw / mouth opening from the live viseme timeline (or audio amplitude)
+      let jaw = 0
+      if (speaking && sp.seq && sp.seq.length) {
+        let idx = sp.syncIdx, acc = sp.syncTime
+        while (idx < sp.seq.length - 1 && acc + sp.seq[idx].dur < t) { acc += sp.seq[idx].dur; idx++ }
+        const cur = sp.seq[idx], vinfo = VISEME[cur.code] || VISEME.sil
+        const amp = sp.amp ? sp.amp() : null
+        jaw = amp != null ? Math.max(vinfo.jaw * 0.4, amp) : vinfo.jaw * (0.8 + Math.random() * 0.35)
+      }
+      curOpen += (jaw - curOpen) * 0.4
+
+      // warmth: deeper smile + brighter cheeks + halo while speaking
+      const smileTarget = speaking ? 0.9 : 0.55 + Math.sin(t * 0.5) * 0.08
+      curSmile += (smileTarget - curSmile) * 0.07
+      const cheekTarget = speaking ? 0.62 : 0.34
+      curCheek += (cheekTarget - curCheek) * 0.05
+
+      drawMouth(curOpen, curSmile)
+      if (cheekLRef.current) cheekLRef.current.setAttribute('opacity', curCheek.toFixed(3))
+      if (cheekRRef.current) cheekRRef.current.setAttribute('opacity', curCheek.toFixed(3))
+      if (glowRef.current) {
+        const gop = 0.18 + (speaking ? 0.28 : 0.08) * (0.6 + 0.4 * Math.sin(t * 2))
+        glowRef.current.setAttribute('opacity', gop.toFixed(3))
+      }
+
+      if (!reduce && wrapRef.current) {
+        breath += 0.02
+        wrapRef.current.setAttribute('transform', `translate(0 ${(Math.sin(breath) * 2).toFixed(2)})`)
+      }
+
+      // blinking
+      if (!reduce) {
+        blinkT += 1 / 60
+        if (blinkT > blinkNext) { blinkT = 0; blinkNext = 2 + Math.random() * 3.5; doBlink() }
+      }
+
+      raf = requestAnimationFrame(tick)
     }
-  })
+    raf = requestAnimationFrame(tick)
+    return () => { mounted = false; cancelAnimationFrame(raf) }
+  }, [speechRef])
 
   return (
-    <group ref={group} rotation={[0, MODEL_ROTATION_Y, 0]}>
-      <primitive object={scene} />
-    </group>
-  )
-}
+    <svg viewBox="0 0 360 360" width="100%" height="100%" role="img" aria-label="Friendly study buddy" style={{ display: 'block' }}>
+      <defs>
+        <radialGradient id="tbBg" cx="50%" cy="38%" r="75%">
+          <stop offset="0%" stopColor="#ede4fb" />
+          <stop offset="60%" stopColor="#d9c9f0" />
+          <stop offset="100%" stopColor="#c2abe6" />
+        </radialGradient>
+        <radialGradient id="tbHalo" cx="50%" cy="42%" r="50%">
+          <stop offset="0%" stopColor="#fff6da" />
+          <stop offset="100%" stopColor="#fff6da" stopOpacity="0" />
+        </radialGradient>
+      </defs>
 
-/* simple stool so "resting" reads as sitting */
-function Stool() {
-  return (
-    <group position={[0, 0, 0.02]}>
-      <mesh position={[0, STOOL_SEAT_Y, 0]} castShadow receiveShadow>
-        <cylinderGeometry args={[0.17, 0.17, 0.05, 24]} />
-        <meshStandardMaterial color="#6b7280" roughness={0.8} />
-      </mesh>
-      {[[0.12,0.12],[-0.12,0.12],[0.12,-0.12],[-0.12,-0.12]].map(([x,z],i)=>(
-        <mesh key={i} position={[x, STOOL_SEAT_Y/2, z]} castShadow>
-          <cylinderGeometry args={[0.018, 0.018, STOOL_SEAT_Y, 12]} />
-          <meshStandardMaterial color="#4b5563" roughness={0.7} />
-        </mesh>
-      ))}
-    </group>
-  )
-}
+      <rect x="0" y="0" width="360" height="360" rx="26" fill="url(#tbBg)" />
+      <ellipse ref={glowRef} cx="180" cy="150" rx="150" ry="150" fill="url(#tbHalo)" opacity="0.2" />
 
-function Rig() { const { camera } = useThree(); useFrame(() => camera.lookAt(0, 0.92, 0)); return null }
-function Loader() {
-  return <Html center><div style={{ width:26, height:26, border:'3px solid rgba(99,102,241,.3)', borderTopColor:'#6366F1', borderRadius:'50%', animation:'tbSpin .8s linear infinite' }} /></Html>
+      <g ref={wrapRef}>
+        {/* hair behind */}
+        <path d="M82 150 C82 70 124 40 180 40 C236 40 278 70 278 150
+                 C290 210 286 286 270 330 L250 330
+                 C262 270 250 224 244 210
+                 C246 250 240 300 234 332 L126 332
+                 C120 300 114 250 116 210
+                 C110 224 98 270 110 330 L90 330
+                 C74 286 70 210 82 150 Z" fill="#3a2a2f" />
+        <path d="M150 60 C120 78 104 120 102 168 C112 150 126 138 140 132
+                 C150 100 168 78 180 70 C160 60 152 58 150 60 Z" fill="#52383f" opacity=".55" />
+
+        {/* neck */}
+        <path d="M156 250 h48 v40 q-24 14 -48 0 Z" fill="#eec3a6" />
+        <path d="M156 250 h48 v30 q-24 10 -48 0 Z" fill="#f7d8c1" />
+
+        {/* sweater */}
+        <path d="M96 360 C96 312 132 286 180 286 C228 286 264 312 264 360 Z" fill="#f2ede1" />
+        <path d="M180 286 C168 300 150 306 138 300 C150 320 168 326 180 326
+                 C192 326 210 320 222 300 C210 306 192 300 180 286 Z" fill="#e1d9c6" />
+
+        {/* face */}
+        <path d="M180 78 C232 78 262 122 262 186 C262 252 226 296 180 296 C134 296 98 252 98 186 C98 122 128 78 180 78 Z" fill="#f7d8c1" />
+        <path d="M262 186 C262 252 226 296 180 296 C214 286 236 244 236 190 C236 140 220 104 188 86 C232 92 262 130 262 186 Z" fill="#eec3a6" opacity=".5" />
+
+        {/* ears */}
+        <circle cx="100" cy="190" r="13" fill="#f7d8c1" />
+        <circle cx="260" cy="190" r="13" fill="#f7d8c1" />
+
+        {/* cheeks (glow with warmth) */}
+        <ellipse ref={cheekLRef} cx="138" cy="212" rx="18" ry="12" fill="#f0a39b" opacity="0.34" />
+        <ellipse ref={cheekRRef} cx="222" cy="212" rx="18" ry="12" fill="#f0a39b" opacity="0.34" />
+
+        {/* eyebrows */}
+        <path d="M124 158 q22 -12 44 -2" stroke="#3a2a2f" strokeWidth="5" fill="none" strokeLinecap="round" />
+        <path d="M192 156 q22 -10 44 2" stroke="#3a2a2f" strokeWidth="5" fill="none" strokeLinecap="round" />
+
+        {/* eyes (open) */}
+        <g ref={eyesOpenRef}>
+          <ellipse cx="146" cy="184" rx="20" ry="23" fill="#fffdf9" />
+          <ellipse cx="214" cy="184" rx="20" ry="23" fill="#fffdf9" />
+          <circle cx="148" cy="186" r="15" fill="#5b3a2e" />
+          <circle cx="212" cy="186" r="15" fill="#5b3a2e" />
+          <circle cx="148" cy="186" r="7" fill="#2a1a14" />
+          <circle cx="212" cy="186" r="7" fill="#2a1a14" />
+          <circle cx="153" cy="180" r="4.5" fill="#fff" />
+          <circle cx="217" cy="180" r="4.5" fill="#fff" />
+          <path d="M126 174 q20 -12 40 -2" stroke="#2e2024" strokeWidth="3.5" fill="none" strokeLinecap="round" />
+          <path d="M194 172 q20 -10 40 2" stroke="#2e2024" strokeWidth="3.5" fill="none" strokeLinecap="round" />
+        </g>
+        {/* eyes (closed) */}
+        <g ref={eyesClosedRef} style={{ display: 'none' }}>
+          <path d="M128 186 q18 12 38 0" stroke="#2e2024" strokeWidth="4" fill="none" strokeLinecap="round" />
+          <path d="M194 186 q18 12 38 0" stroke="#2e2024" strokeWidth="4" fill="none" strokeLinecap="round" />
+        </g>
+
+        {/* nose */}
+        <path d="M178 198 q6 14 -4 20" stroke="#eec3a6" strokeWidth="3" fill="none" strokeLinecap="round" />
+
+        {/* mouth (drawn each frame) */}
+        <g ref={mouthRef} />
+
+        {/* hair front / bangs */}
+        <path d="M98 168 C92 110 128 64 180 64 C232 64 268 110 262 168
+                 C250 138 232 124 220 132 C214 110 198 100 180 100
+                 C162 100 146 110 140 132 C128 124 110 138 98 168 Z" fill="#3a2a2f" />
+        <path d="M180 64 C150 64 128 86 120 120 C140 104 160 100 180 100
+                 C200 100 220 104 240 120 C232 86 210 64 180 64 Z" fill="#52383f" opacity=".5" />
+      </g>
+    </svg>
+  )
 }
 
 const BREVITY = "\n\n[Keep it short and warm — usually 2-4 sentences. Conversational, no bullet lists.]"
@@ -401,13 +368,13 @@ const BREVITY = "\n\n[Keep it short and warm — usually 2-4 sentences. Conversa
 export default function TalkingBuddy({
   user,
   audience,
-  restMode = 'stand',               // 'stand' (calm + smiling when idle) | 'sit'
   apiUrl = DEFAULT_API,
   getAuthHeaders = defaultHeaders,
-  modelUrl = MODEL_URL,
-  accent = '#6366F1',
-  accent2 = '#8B5CF6',
+  accent = '#7c5bd6',
+  accent2 = '#a855f7',
   synthesizeAudio = null,
+  // accepted & ignored (old 3D props) so the call site needn't change:
+  modelUrl, restMode,
 }) {
   const firstName = user?.name?.split(' ')[0] || 'there'
   const resolvedAudience = useMemo(() => {
@@ -429,7 +396,7 @@ export default function TalkingBuddy({
   const bottomRef = useRef(null); const msgsRef = useRef([]); const greetedRef = useRef(false)
   const recogRef = useRef(null); const mutedRef = useRef(false); const bubbleTimer = useRef(null)
   const speechRef = useRef({ active:false, seq:null, idx:0, syncIdx:0, syncTime:0, amp:null })
-  const gestureRef = useRef(null); const audioCtxRef = useRef(null)
+  const audioCtxRef = useRef(null)
 
   useEffect(() => { injectStyles() }, [])
   useEffect(() => { msgsRef.current = messages }, [messages])
@@ -437,39 +404,31 @@ export default function TalkingBuddy({
   useEffect(() => { if (open) bottomRef.current?.scrollIntoView({ behavior:'smooth' }) }, [messages, open, loading])
   useEffect(() => { const fn = () => setIsNarrow(window.innerWidth < 640); fn(); window.addEventListener('resize', fn); return () => window.removeEventListener('resize', fn) }, [])
 
-  // Score every installed voice and pick the clearest, most natural one that
-  // suits a ≈10th-grade TEENAGER. The real lever is PITCH (set in the persona,
-  // a little above normal). Here we pick a clear, lighter English voice and
-  // avoid very deep/booming timbres that read as a grown man.
+  // Pick the clearest, most natural FEMALE English voice available.
   const pickVoice = useCallback(() => {
     const synth = window.speechSynthesis; if (!synth) return null
     const voices = synth.getVoices() || []
     if (!voices.length) return null
-    // very deep/booming timbres read as an adult man even pitched up — avoid
-    const DEEP = /\b(deep|bass|baritone)\b|barry|brian|george|fred|bruce|rocko/i
-    // lighter, brighter voices that suit a youthful range
-    const BRIGHT = /samantha|aria|jenny|google us english|guy|aaron|eric|ryan|zoe|ava/i
+    const FEMALE = /female|woman|samantha|victoria|karen|moira|tessa|fiona|serena|allison|ava|susan|zira|aria|jenny|libby|sonia|michelle|catherine|neerja|heera|swara|google uk english female|google us english/i
+    const MALE   = /\bmale\b|david|mark|george|guy|daniel|fred|alex|james|ryan|eric|aaron|brian|rishi|prabhat|hemant/i
     const score = v => {
       const n = v.name || '', l = (v.lang || '').toLowerCase()
       let s = 0
-      // ── quality (the biggest lever after pitch) ──
-      if (/online \(natural\)|neural|natural/i.test(n)) s += 120  // Edge/Azure neural voices — best & free
-      if (/enhanced|premium|siri/i.test(n))             s += 60   // iOS/macOS downloaded HQ voice
-      if (/google/i.test(n))                            s += 45   // Google network voices (Android/Chrome)
-      if (v.localService === false)                     s += 25   // network voice ≈ higher fidelity
-      // ── youthful fit ──
-      if (BRIGHT.test(n)) s += 45    // lighter timbres read younger
-      if (DEEP.test(n))   s -= 70    // deep voices sound too grown-up
-      // ── language: prefer plain English, mild preference for US ──
+      if (/online \(natural\)|neural|natural/i.test(n)) s += 120
+      if (/enhanced|premium|siri/i.test(n))             s += 60
+      if (/google/i.test(n))                            s += 45
+      if (v.localService === false)                     s += 25
+      if (FEMALE.test(n)) s += 80      // strongly prefer female timbres
+      if (MALE.test(n))   s -= 120     // reject male voices
       if      (l.startsWith('en-us')) s += 30
-      else if (l.startsWith('en-gb')) s += 18
+      else if (l.startsWith('en-gb')) s += 20
+      else if (l.startsWith('en-in')) s += 16
       else if (l.startsWith('en'))    s += 10
       return s
     }
     let best = null, bestS = -Infinity
     for (const v of voices) {
-      const l = (v.lang || '').toLowerCase()
-      if (!l.startsWith('en')) continue  // English voices only
+      if (!(v.lang || '').toLowerCase().startsWith('en')) continue
       const s = score(v)
       if (s > bestS) { bestS = s; best = v }
     }
@@ -479,7 +438,7 @@ export default function TalkingBuddy({
   const showBubble = useCallback((text) => {
     setBubble(text)
     if (bubbleTimer.current) clearTimeout(bubbleTimer.current)
-    const ms = Math.max(9000, text.split(/\s+/).length * 380)   // keep up for the full reply
+    const ms = Math.max(9000, text.split(/\s+/).length * 380)
     bubbleTimer.current = setTimeout(() => setBubble(''), ms)
   }, [])
 
@@ -500,7 +459,7 @@ export default function TalkingBuddy({
       const say = () => {
         const u = new SpeechSynthesisUtterance(text)
         u.lang = 'en-US'
-        u.rate = persona.rate; u.pitch = persona.pitch   // high pitch = small boy
+        u.rate = persona.rate; u.pitch = persona.pitch
         const v = pickVoice(); if (v) u.voice = v
         u.onstart = () => startVisemes(text)
         u.onboundary = (e) => { if (typeof e.charIndex === 'number') syncToBoundary(e.charIndex) }
@@ -522,8 +481,6 @@ export default function TalkingBuddy({
       else if (typeof source === 'string') buf = await (await fetch(source)).arrayBuffer()
       const audioBuf = await ctx.decodeAudioData(buf)
       const src = ctx.createBufferSource(); src.buffer = audioBuf
-      // a slight nudge keeps external/synth audio youthful without sounding sped-up
-      src.playbackRate.value = 1.04
       const analyser = ctx.createAnalyser(); analyser.fftSize = 512
       const data = new Uint8Array(analyser.frequencyBinCount)
       src.connect(analyser); analyser.connect(ctx.destination)
@@ -532,7 +489,6 @@ export default function TalkingBuddy({
     } catch { speakWithSynth(text) }
   }, [startVisemes, stopVisemes, speakWithSynth])
 
-  // speak the FULL reply (no truncation), lip-synced to the words
   const speak = useCallback(async (rawText) => {
     const text = cleanForSpeech(rawText)
     showBubble(text)
@@ -564,7 +520,7 @@ export default function TalkingBuddy({
   useEffect(() => {
     if (greetedRef.current) return
     greetedRef.current = true
-    const t = setTimeout(() => { gestureRef.current = 'wave'; send(persona.kick, true) }, 1200)
+    const t = setTimeout(() => { send(persona.kick, true) }, 1200)
     return () => clearTimeout(t)
   }, [send, persona])
 
@@ -583,33 +539,27 @@ export default function TalkingBuddy({
   const renderMd = (s='') => s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br/>')
 
   const FONT = "'Nunito', system-ui, sans-serif"
-  const stageW = isNarrow ? 150 : 210
-  const stageH = isNarrow ? 300 : 400
+  const stageW = isNarrow ? 148 : 188
+  const stageH = stageW            // square portrait
 
   return (
     <>
-      <div style={{ position:'fixed', right:isNarrow?4:18, bottom:0, width:stageW, height:stageH, zIndex:1000, pointerEvents:'none' }}>
+      <div style={{ position:'fixed', right:isNarrow?8:18, bottom:18, width:stageW, zIndex:1000, pointerEvents:'none' }}>
         {bubble && (
-          <div style={{ position:'absolute', bottom:stageH-18, left:'50%', transform:'translateX(-50%)', width:isNarrow?200:250, maxWidth:'78vw', background:'#fff', color:'#1e293b', borderRadius:14, padding:'10px 13px', fontSize:13, lineHeight:1.55, fontFamily:FONT, boxShadow:'0 12px 34px rgba(15,23,42,.22)', border:'1px solid rgba(15,23,42,.08)', animation:'tbBub .25s ease-out', pointerEvents:'auto' }}>
+          <div style={{ position:'absolute', bottom:stageH + 44, left:'50%', transform:'translateX(-50%)', width:isNarrow?210:250, maxWidth:'78vw', background:'#fff', color:'#1e293b', borderRadius:14, padding:'10px 13px', fontSize:13, lineHeight:1.55, fontFamily:FONT, boxShadow:'0 12px 34px rgba(70,40,120,.22)', border:'1px solid rgba(15,23,42,.08)', animation:'tbBub .25s ease-out', pointerEvents:'auto' }}>
             {bubble}
             <span style={{ position:'absolute', bottom:-7, left:'50%', transform:'translateX(-50%) rotate(45deg)', width:14, height:14, background:'#fff', borderRight:'1px solid rgba(15,23,42,.08)', borderBottom:'1px solid rgba(15,23,42,.08)' }} />
           </div>
         )}
-        <Canvas shadows dpr={[1,2]} camera={{ position:[0,0.95,3.25], fov:30 }} gl={{ alpha:true, antialias:true }} style={{ width:'100%', height:'100%', background:'transparent' }}>
-          <ambientLight intensity={0.85} />
-          <hemisphereLight intensity={0.5} groundColor={'#b9b9c9'} />
-          <directionalLight position={[2.5,4,3]} intensity={1.5} castShadow shadow-mapSize={[1024,1024]} />
-          <directionalLight position={[-2.5,2,1.5]} intensity={0.5} />
-          <Suspense fallback={<Loader />}>
-            {restMode === 'sit' && <Stool />}
-            <Avatar url={modelUrl} speechRef={speechRef} gestureRef={gestureRef} restMode={restMode} />
-            <ContactShadows position={[0,0.01,0]} opacity={0.35} scale={3} blur={2.4} far={2} resolution={512} color="#1e293b" />
-          </Suspense>
-          <Rig />
-        </Canvas>
-        <button onClick={toggleMute} title={muted?'Unmute voice':'Mute voice'} style={{ position:'absolute', top:4, right:0, width:30, height:30, borderRadius:9, background:'rgba(255,255,255,.92)', border:'1px solid rgba(15,23,42,.1)', cursor:'pointer', fontSize:13, pointerEvents:'auto', boxShadow:'0 2px 8px rgba(15,23,42,.12)' }}>{muted?'🔇':'🔊'}</button>
+
+        {/* avatar portrait card */}
+        <div style={{ position:'relative', width:stageW, height:stageH, borderRadius:24, overflow:'hidden', boxShadow:'0 16px 44px -18px rgba(70,40,120,.55), inset 0 0 0 1px rgba(255,255,255,.4)', pointerEvents:'auto' }}>
+          <Avatar2D speechRef={speechRef} />
+          <button onClick={toggleMute} title={muted?'Unmute voice':'Mute voice'} style={{ position:'absolute', top:8, right:8, width:30, height:30, borderRadius:9, background:'rgba(255,255,255,.92)', border:'1px solid rgba(15,23,42,.1)', cursor:'pointer', fontSize:13, boxShadow:'0 2px 8px rgba(70,40,120,.18)' }}>{muted?'🔇':'🔊'}</button>
+        </div>
+
         {!open && (
-          <button onClick={() => setOpen(true)} style={{ position:'absolute', bottom:isNarrow?26:34, left:'50%', transform:'translateX(-50%)', pointerEvents:'auto', display:'inline-flex', alignItems:'center', gap:6, whiteSpace:'nowrap', padding:'8px 15px', borderRadius:24, border:'none', cursor:'pointer', background:`linear-gradient(135deg, ${accent}, ${accent2})`, color:'#fff', fontFamily:FONT, fontWeight:800, fontSize:12.5, boxShadow:`0 6px 18px ${accent}55`, animation:'tbPulse 2.4s infinite' }}>
+          <button onClick={() => setOpen(true)} style={{ position:'relative', marginTop:10, left:'50%', transform:'translateX(-50%)', pointerEvents:'auto', display:'inline-flex', alignItems:'center', gap:6, whiteSpace:'nowrap', padding:'8px 15px', borderRadius:24, border:'none', cursor:'pointer', background:`linear-gradient(135deg, ${accent}, ${accent2})`, color:'#fff', fontFamily:FONT, fontWeight:800, fontSize:12.5, boxShadow:`0 6px 18px ${accent}55`, animation:'tbPulse 2.4s infinite' }}>
             💬 Chat with me
             <span style={{ position:'absolute', top:-5, right:-5, width:11, height:11, borderRadius:'50%', background:'#22c55e', border:'2px solid #fff' }} />
           </button>
@@ -617,7 +567,7 @@ export default function TalkingBuddy({
       </div>
 
       {open && (
-        <div style={{ position:'fixed', zIndex:1001, display:'flex', flexDirection:'column', ...(isNarrow ? { left:12, right:12, bottom:stageH-16, maxHeight:'calc(100vh - 320px)' } : { right:stageW+28, bottom:24, width:350, height:'min(500px, calc(100vh - 120px))' }), borderRadius:18, overflow:'hidden', fontFamily:FONT, animation:'tbPop .22s ease-out', background:'var(--bg2, #ffffff)', border:'1px solid var(--border, rgba(15,23,42,.1))', boxShadow:'0 24px 70px rgba(15,23,42,.28)' }}>
+        <div style={{ position:'fixed', zIndex:1001, display:'flex', flexDirection:'column', ...(isNarrow ? { left:12, right:12, bottom:stageH+70, maxHeight:'calc(100vh - 320px)' } : { right:stageW+28, bottom:24, width:350, height:'min(500px, calc(100vh - 120px))' }), borderRadius:18, overflow:'hidden', fontFamily:FONT, animation:'tbPop .22s ease-out', background:'var(--bg2, #ffffff)', border:'1px solid var(--border, rgba(15,23,42,.1))', boxShadow:'0 24px 70px rgba(70,40,120,.28)' }}>
           <div style={{ flexShrink:0, padding:'12px 14px', display:'flex', alignItems:'center', gap:10, background:`linear-gradient(135deg, ${accent}, ${accent2})` }}>
             <div style={{ width:34, height:34, borderRadius:'50%', background:'rgba(255,255,255,.22)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:17 }}>{persona.avatarEmoji}</div>
             <div style={{ flex:1, minWidth:0, color:'#fff' }}>
@@ -652,5 +602,3 @@ export default function TalkingBuddy({
     </>
   )
 }
-
-useGLTF.preload(MODEL_URL)
