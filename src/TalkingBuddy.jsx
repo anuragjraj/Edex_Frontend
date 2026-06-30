@@ -21,7 +21,7 @@
  *     to keep him standing calmly instead.
  *   • Speaks the FULL reply (no truncation), lip-synced to the words.
  *   • Persona: audience="student" (warm buddy voice/tone) | "teacher" (senior mentor).
- *   • VOICE: a friendly small-boy voice (high pitch, bright/bouncy delivery).
+ *   • VOICE: a friendly teenage (≈10th-grade) voice — light and youthful but not childish.
  *
  * REQUIRES:  npm install three @react-three/fiber @react-three/drei
  * USAGE:     {user && <TalkingBuddy user={user} audience="student" restMode="sit" />}
@@ -53,19 +53,19 @@ const DEFAULT_API =
 
 /* -----------------------------------------------------------------
    PERSONAS — voice + tone per audience
-   VOICE TUNING: a small boy. The single biggest lever on the Web Speech API
-   is PITCH (0–2, default 1). Children sit high — ~1.6–1.8 reads clearly as a
-   young boy. Keep rate near-normal so words stay intelligible; a touch quick
-   makes it feel bright and kid-like.
+   VOICE TUNING: a ≈10th-grade teenager (15–16). PITCH (0–2, default 1) is the
+   main lever on the Web Speech API. A small child sits ~1.6–1.8 and sounds
+   squeaky; a teen sits just above normal — ~1.15–1.30 reads as youthful but
+   not childish. Keep rate near-normal so it stays natural.
    ----------------------------------------------------------------- */
 const PERSONAS = {
   student: {
-    pitch: 1.75, rate: 1.06,
-    // prefer voices that already sound young/bright; pitch does the rest
-    voiceMatch: /child|kid|junior|boy|google us english|guy|aaron|eric|ryan/i,
+    pitch: 1.28, rate: 1.02,
+    // prefer clear, lighter young-sounding voices; pitch does the rest
+    voiceMatch: /google us english|guy|aaron|eric|ryan|jenny|aria/i,
     style:
-      "\n\n[Speak like a friendly little boy study buddy: warm, excited, playful peer tone, " +
-      "simple everyday words and contractions, super encouraging, never lecture. Keep it natural and bright.]",
+      "\n\n[Speak like a friendly teenage study buddy (about 10th grade): warm, upbeat, " +
+      "casual peer tone, simple everyday words and contractions, encouraging, never lecture. Keep it natural.]",
     label: 'Spark', sub: 'your study buddy', avatarEmoji: '🙂',
     kick: "Greet me by my first name in ONE short, warm, buddy-style sentence, then suggest ONE fun thing to study next. Casual and friendly.",
     quick: [
@@ -75,12 +75,12 @@ const PERSONAS = {
     ],
   },
   teacher: {
-    // still a small boy, just a little calmer/steadier than the student persona
-    pitch: 1.6, rate: 1.0,
-    voiceMatch: /child|kid|junior|boy|google us english|guy|aaron|eric|ryan/i,
+    // still a teenager, just a little calmer/steadier than the student persona
+    pitch: 1.18, rate: 0.98,
+    voiceMatch: /google us english|guy|aaron|eric|ryan|jenny|aria/i,
     style:
-      "\n\n[Speak like a bright, polite young boy helper: clear, cheerful, simple words, " +
-      "respectful and warm, a little careful and tidy in how you explain things.]",
+      "\n\n[Speak like a bright, polite teenage helper (about 10th grade): clear, cheerful, " +
+      "simple words, respectful and warm, a little careful and tidy in how you explain things.]",
     label: 'Mentor', sub: 'your teaching assistant', avatarEmoji: '🧑‍🏫',
     kick: "Greet me by my first name in ONE concise, friendly sentence, then note ONE specific thing worth focusing on next.",
     quick: [
@@ -437,20 +437,18 @@ export default function TalkingBuddy({
   useEffect(() => { if (open) bottomRef.current?.scrollIntoView({ behavior:'smooth' }) }, [messages, open, loading])
   useEffect(() => { const fn = () => setIsNarrow(window.innerWidth < 640); fn(); window.addEventListener('resize', fn); return () => window.removeEventListener('resize', fn) }, [])
 
-  // Score every installed voice and pick the brightest, most natural one that
-  // suits a SMALL BOY. There are very few true child voices in browser TTS, so
-  // the real lever is PITCH (set high in the persona). Here we just pick a clear,
-  // natural English voice and lightly favour young/boy-ish names where present.
+  // Score every installed voice and pick the clearest, most natural one that
+  // suits a ≈10th-grade TEENAGER. The real lever is PITCH (set in the persona,
+  // a little above normal). Here we pick a clear, lighter English voice and
+  // avoid very deep/booming timbres that read as a grown man.
   const pickVoice = useCallback(() => {
     const synth = window.speechSynthesis; if (!synth) return null
     const voices = synth.getVoices() || []
     if (!voices.length) return null
-    // strongly adult/deep timbres read badly even when pitched up — avoid them
-    const DEEP = /\b(deep|bass|baritone)\b|barry|brian|george|fred|bruce|lee|reed|paul|rocko/i
-    // genuine child / youthful voices if the platform ships any
-    const CHILD = /child|kid|junior|\bboy\b|junior|jimmy|tommy|noah|leo|max\b/i
-    // bright, lighter voices that pitch up nicely into a young range
-    const BRIGHT = /samantha|aria|jenny|google us english|guy|aaron|eric|ryan|kid|child/i
+    // very deep/booming timbres read as an adult man even pitched up — avoid
+    const DEEP = /\b(deep|bass|baritone)\b|barry|brian|george|fred|bruce|rocko/i
+    // lighter, brighter voices that suit a youthful range
+    const BRIGHT = /samantha|aria|jenny|google us english|guy|aaron|eric|ryan|zoe|ava/i
     const score = v => {
       const n = v.name || '', l = (v.lang || '').toLowerCase()
       let s = 0
@@ -459,10 +457,9 @@ export default function TalkingBuddy({
       if (/enhanced|premium|siri/i.test(n))             s += 60   // iOS/macOS downloaded HQ voice
       if (/google/i.test(n))                            s += 45   // Google network voices (Android/Chrome)
       if (v.localService === false)                     s += 25   // network voice ≈ higher fidelity
-      // ── child / brightness fit ──
-      if (CHILD.test(n))  s += 130   // a real child voice wins outright if it exists
-      if (BRIGHT.test(n)) s += 40    // light/bright timbres pitch up cleanly
-      if (DEEP.test(n))   s -= 120   // deep voices sound wrong even at high pitch
+      // ── youthful fit ──
+      if (BRIGHT.test(n)) s += 45    // lighter timbres read younger
+      if (DEEP.test(n))   s -= 70    // deep voices sound too grown-up
       // ── language: prefer plain English, mild preference for US ──
       if      (l.startsWith('en-us')) s += 30
       else if (l.startsWith('en-gb')) s += 18
@@ -525,8 +522,8 @@ export default function TalkingBuddy({
       else if (typeof source === 'string') buf = await (await fetch(source)).arrayBuffer()
       const audioBuf = await ctx.decodeAudioData(buf)
       const src = ctx.createBufferSource(); src.buffer = audioBuf
-      // nudge playback up a little so external/synth audio also reads younger
-      src.playbackRate.value = 1.12
+      // a slight nudge keeps external/synth audio youthful without sounding sped-up
+      src.playbackRate.value = 1.04
       const analyser = ctx.createAnalyser(); analyser.fftSize = 512
       const data = new Uint8Array(analyser.frequencyBinCount)
       src.connect(analyser); analyser.connect(ctx.destination)
