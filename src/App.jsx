@@ -1297,36 +1297,24 @@ function BSInput({ value, onChange, placeholder, type='text', required, disabled
       onFocus={()=>setFocused(true)} onBlur={()=>setFocused(false)}/>
   )
 }
-function BSSelect({ value, onChange, options, style = {} }) {
+function BSSelect({ value, onChange, options, disabled = false, style = {} }) {
   const [focused, setFocused] = useState(false)
   return (
     <select
-      value={value}
+      value={value} disabled={disabled}
       onChange={e => onChange(e.target.value)}
-      onFocus={() => setFocused(true)}
-      onBlur={() => setFocused(false)}
+      onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
       style={{
-        width: '100%',
-        padding: '10px 14px',
-        borderRadius: '10px',
+        width: '100%', padding: '10px 14px', borderRadius: '10px',
         border: `1.5px solid ${focused ? 'var(--accent)' : 'var(--border)'}`,
-        background: '#ffffff',
-        color: '#1e293b',                // ← always light text
-        fontSize: '14px',
-        fontFamily: "'Nunito', sans-serif",
-        appearance: 'auto',
-        outline: 'none',
-        cursor: 'pointer',
-        transition: 'border-color .2s',
-        ...style,
-      }}
-    >
+        background: disabled ? '#f1f5f9' : '#ffffff',
+        color: disabled ? '#94a3b8' : '#1e293b',
+        fontSize: '14px', fontFamily: "'Nunito', sans-serif", appearance: 'auto',
+        outline: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
+        transition: 'border-color .2s', ...style,
+      }}>
       {options.map(o => (
-        <option
-          key={o.value ?? o}
-          value={o.value ?? o}
-          style={{ background: '#ffffff', color: '#1e293b' }}   // ← fixes option visibility
-        >
+        <option key={o.value ?? o} value={o.value ?? o} style={{ background: '#ffffff', color: '#1e293b' }}>
           {o.label ?? o}
         </option>
       ))}
@@ -1343,6 +1331,126 @@ function BSTextarea({ value, onChange, placeholder, rows=4, style={} }) {
 }
 function Spinner({ size=16 }) {
   return <div style={{ width:size, height:size, border:`2px solid rgba(255,255,255,.15)`, borderTopColor:'white', borderRadius:'50%', animation:'spin .7s linear infinite', flexShrink:0 }}/>
+}
+
+
+// Only the subjects that actually have chapters for this class
+const getSubjectsForClass = cls => Object.keys(ALL_CHAPTERS[cls] || {})
+
+// AI-backed sub-topic fetch, cached in memory so re-picking is instant
+const _subCache = {}
+async function fetchSubtopics(subject, cls, chapter) {
+  const k = `${cls}|${subject}|${chapter}`
+  if (_subCache[k]) return _subCache[k]
+  try {
+    const r = await api.post('/api/subtopics', { subject, cls, chapter })
+    const list = Array.isArray(r?.subtopics) ? r.subtopics : []
+    _subCache[k] = list
+    return list
+  } catch { return [] }
+}
+
+// Is the picker filled in enough to generate?
+const isPickerReady = sel =>
+  sel.mode === 'custom' ? !!sel.customTopic.trim() : !!(sel.subject && sel.chapter)
+
+// Short label used in titles
+const pickerTopic = sel =>
+  sel.mode === 'custom' ? sel.customTopic.trim()
+  : sel.subtopic ? sel.subtopic
+  : sel.chapter
+
+// Full scope line fed into AI prompts
+const pickerContext = sel => {
+  if (sel.mode === 'custom') return `Custom topic: "${sel.customTopic.trim()}" (not tied to any specific chapter)`
+  const scope = sel.subtopic
+    ? `ONLY the sub-topic "${sel.subtopic}" within the chapter "${sel.chapter}"`
+    : `the full chapter "${sel.chapter}"`
+  return `${sel.subject}, ${sel.cls}, covering ${scope}`
+}
+
+// The one reusable selector: Class → Subject → Chapter → Sub-topic (or Custom)
+function LessonPicker({ value, onChange, accent = 'var(--accent)', subtopicHint = 'Pick a sub-topic to focus, or keep “Full chapter”.' }) {
+  const { cls, subject, chapter, subtopic, mode, customTopic } = value
+  const subjects = getSubjectsForClass(cls)
+  const chapters = getChapters(subject, cls)
+  const [subs, setSubs] = useState([])
+  const [loadingSubs, setLoadingSubs] = useState(false)
+  const set = patch => onChange({ ...value, ...patch })
+
+  useEffect(() => {
+    if (mode !== 'syllabus' || !chapter || !subject) { setSubs([]); return }
+    let dead = false
+    setLoadingSubs(true); setSubs([])
+    fetchSubtopics(subject, cls, chapter).then(list => { if (!dead) { setSubs(list); setLoadingSubs(false) } })
+    return () => { dead = true }
+  }, [chapter, subject, cls, mode])
+
+  // keep current subject visible even if a prefill set one outside this class list
+  const subjectOpts = [
+    { value: '', label: '── Select subject ──' },
+    ...subjects.map(s => ({ value: s, label: s })),
+    ...(subject && !subjects.includes(subject) ? [{ value: subject, label: subject }] : []),
+  ]
+
+  return (
+    <div>
+      {/* Mode toggle */}
+      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
+        {[['syllabus', '📚 From my syllabus'], ['custom', '✏️ Custom topic']].map(([m, l]) => (
+          <button key={m} type="button" onClick={() => set({ mode: m })}
+            style={{
+              flex: 1, padding: '9px 12px', borderRadius: 10, cursor: 'pointer',
+              fontFamily: "'Nunito',sans-serif", fontWeight: 700, fontSize: 13,
+              border: `2px solid ${mode === m ? accent : 'var(--border)'}`,
+              background: mode === m ? 'var(--accent-bg)' : 'transparent',
+              color: mode === m ? accent : 'var(--text)',
+            }}>{l}</button>
+        ))}
+      </div>
+
+      {mode === 'custom' ? (
+        <>
+          <Field label="Your topic (anything you like)">
+            <BSInput value={customTopic} onChange={v => set({ customTopic: v })}
+              placeholder="e.g. Pythagoras theorem, Water cycle, Mughal administration…" />
+          </Field>
+          <div style={{ fontSize: 12, color: 'var(--text)', background: 'var(--code-bg)', border: '1px dashed var(--border)', borderRadius: 8, padding: '8px 12px' }}>
+            🎲 A custom topic isn’t tied to a chapter — type whatever you want to study.
+          </div>
+        </>
+      ) : (
+        <>
+          <Field label="① Class">
+            <BSSelect value={cls} onChange={v => set({ cls: v, subject: '', chapter: '', subtopic: '' })} options={CLASSES} />
+          </Field>
+          <Field label="② Subject">
+            <BSSelect value={subject} onChange={v => set({ subject: v, chapter: '', subtopic: '' })} options={subjectOpts} />
+          </Field>
+          <Field label="③ Chapter">
+            <BSSelect value={chapter} disabled={!subject}
+              onChange={v => set({ chapter: v, subtopic: '' })}
+              options={[{ value: '', label: subject ? '── Select chapter ──' : 'Pick a subject first' }, ...chapters.map(c => ({ value: c, label: c }))]} />
+          </Field>
+          <Field label="④ Sub-topic">
+            <BSSelect value={subtopic} disabled={!chapter}
+              onChange={v => set({ subtopic: v })}
+              options={[{ value: '', label: '📖 Full chapter (cover everything)' }, ...subs.map(s => ({ value: s, label: s }))]} />
+            {chapter && loadingSubs && (
+              <div style={{ fontSize: 12, color: accent, marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+                <Spinner size={11} /> Loading sub-topics from NCERT…
+              </div>
+            )}
+            {chapter && !loadingSubs && (
+              <div style={{ fontSize: 12, color: 'var(--text)', marginTop: 6 }}>
+                {subs.length ? subtopicHint : 'No sub-topics found — “Full chapter” will be used.'}
+              </div>
+            )}
+          </Field>
+        </>
+      )}
+    </div>
+  )
 }
 function PageSpinner() {
   return (
@@ -4673,44 +4781,35 @@ MINIMUM 1500 words. This must be genuinely useful and specific.
 //  QUIZ GENERATOR
 // ══════════════════════════════════════════════════════════════
 function QuizGenerator({ user, prefill, onClearPrefill }) {
-  const [subject,   setSubject]   = useState('Mathematics')
-  const [cls,       setCls]       = useState('Class 10')
-  const [chapter,   setChapter]   = useState('')
-  const [customTopic, setCustomTopic] = useState('')
-  const [diff,      setDiff]      = useState('Medium')
-  const [num,       setNum]       = useState('5')
-  const [quiz,      setQuiz]      = useState(null)
-  const [answers,   setAnswers]   = useState({})
+  const [sel, setSel]     = useState({ cls: 'Class 10', subject: '', chapter: '', subtopic: '', mode: 'syllabus', customTopic: '' })
+  const [diff, setDiff]   = useState('Medium')
+  const [num, setNum]     = useState('5')
+  const [quiz, setQuiz]   = useState(null)
+  const [answers, setAnswers]     = useState({})
   const [submitted, setSubmitted] = useState(false)
-  const [loading,   setLoading]   = useState(false)
-  const [err,       setErr]       = useState('')
-  const [timeLeft,  setTimeLeft]  = useState(null)
-  const [timerId,   setTimerId]   = useState(null)
-  const [timeUp,    setTimeUp]    = useState(false)
+  const [loading, setLoading]     = useState(false)
+  const [err, setErr]             = useState('')
+  const [timeLeft, setTimeLeft]   = useState(null)
+  const [timerId, setTimerId]     = useState(null)
+  const [timeUp, setTimeUp]       = useState(false)
   const [finalScore, setFinalScore] = useState(null)
 
-  const chapters = getChapters(subject, cls)
-  const topic    = chapter || customTopic
-
-  // seconds per question based on difficulty
+  const topic          = pickerTopic(sel)
+  const ready          = isPickerReady(sel)
+  const subjectForSave = sel.mode === 'custom' ? 'General' : sel.subject
   const SECS_PER_Q = { Easy: 30, Medium: 45, Hard: 60, Mixed: 45 }
 
   useEffect(() => {
     if (!quiz) return
     const totalSecs = parseInt(num) * (SECS_PER_Q[diff] || 45)
-    setTimeLeft(totalSecs)
-    setTimeUp(false)
+    setTimeLeft(totalSecs); setTimeUp(false)
     const id = setInterval(() => {
       setTimeLeft(prev => {
         if (prev <= 1) {
-          clearInterval(id)
-          setTimeUp(true)
-          // auto-submit
-          setSubmitted(true)
+          clearInterval(id); setTimeUp(true); setSubmitted(true)
           const correct = quiz.questions.filter((q, i) => answers[i] === q.answer).length
-          const xpEarned = Math.round((correct / quiz.questions.length) * 50) + 5
-          setFinalScore({ correct, xpEarned })
-          saveSessionContent({ tool:'quiz', subject, chapter:topic, classLevel:cls, content:{ ...quiz, score:correct, total:quiz.questions.length, timeUp:true } })
+          setFinalScore({ correct, xpEarned: Math.round((correct / quiz.questions.length) * 50) + 5 })
+          saveSessionContent({ tool: 'quiz', subject: subjectForSave, chapter: topic, classLevel: sel.cls, content: { ...quiz, score: correct, total: quiz.questions.length, timeUp: true } })
           return 0
         }
         return prev - 1
@@ -4720,56 +4819,49 @@ function QuizGenerator({ user, prefill, onClearPrefill }) {
     return () => clearInterval(id)
   }, [quiz])
 
-  useEffect(() => { return () => { if (timerId) clearInterval(timerId) } }, [timerId]) // what gets sent to the AI
+  useEffect(() => () => { if (timerId) clearInterval(timerId) }, [timerId])
 
   useEffect(() => {
     if (!prefill) return
-    if (prefill.subject) setSubject(prefill.subject)
-    if (prefill.chapter) setChapter(prefill.chapter)
+    setSel(s => ({ ...s, mode: 'syllabus', subject: prefill.subject || s.subject, chapter: prefill.chapter || s.chapter, cls: prefill.cls || s.cls, subtopic: '' }))
     onClearPrefill?.()
   }, [prefill])
 
   async function generate() {
-    if (!topic.trim()) return alert('Please select or enter a chapter/topic')
-    const PROMPT = `You are a CBSE examiner creating a ${num}-question multiple-choice quiz on "${topic}" in ${subject} for ${cls}. Difficulty: ${diff}.
+    if (!ready) return
+    const subject = subjectForSave, cls = sel.cls
+    const PROMPT = `You are a CBSE examiner creating a ${num}-question multiple-choice quiz.
+SCOPE: ${pickerContext(sel)}
+Difficulty: ${diff}.
 
 RULES — follow every one:
-1. Solve each question completely in your head BEFORE writing anything. Decide the single correct answer first.
-2. Write ONLY the final, polished explanation. State the method and result directly in 1-2 sentences.
-3. NEVER show your working process. FORBIDDEN words/phrases anywhere in "explanation": "wait", "let me", "recalculate", "rechecking", "actually", "however", "revising", "correcting", "hmm", "but checking", "option 0", "option 1", "answer should be", "let me reconsider". If you catch yourself writing these, delete the whole explanation and write a fresh clean one.
-4. "answer" is the 0-based index (0,1,2,3) of the correct option. It MUST match your solved result exactly.
-5. Exactly ONE option is correct; the other three are plausible but wrong.
-6. Output VALID JSON ONLY — no markdown, no text before or after.
+1. Solve each question completely BEFORE writing. Decide the correct answer first.
+2. Write ONLY the final, polished explanation in 1-2 sentences. Never show your working.
+3. FORBIDDEN in "explanation": "wait","let me","recalculate","rechecking","actually","however","revising","correcting","hmm","answer should be","reconsider".
+4. "answer" is the 0-based index (0,1,2,3) of the correct option and MUST match your solved result.
+5. Exactly ONE option correct; three plausible distractors.
+6. If SCOPE names a sub-topic, keep every question inside that sub-topic only.
+7. Output VALID JSON ONLY — no markdown.
 
 Format:
-{"title":"${topic} Quiz","questions":[{"q":"Question text?","options":["A","B","C","D"],"answer":0,"explanation":"The discriminant b²-4ac determines the nature of roots; here it equals 16, so roots are real and distinct."}]}`
-    setErr(''); setLoading(true); setQuiz(null); 
+{"title":"${topic} Quiz","questions":[{"q":"Question text?","options":["A","B","C","D"],"answer":0,"explanation":"Short reason."}]}`
+    setErr(''); setLoading(true); setQuiz(null)
     try {
       const r = await api.post('/api/ai/quiz', { messages: [{ role: 'user', content: PROMPT }], subject, chapter: topic })
       const raw = typeof r.content === 'string' ? r.content : r.content[0]?.text || ''
       const parsed = JSON.parse(raw.replace(/```[\w]*\n?/gi, '').trim())
-
-      // Strip any self-correcting ramble from explanations (small-model safety net)
-      const BAD = /\b(wait|let me|recalculat|recheck|recheckin|actually|however|revising|correcting|reconsider|hmm|option [0-9]|answer should be|but checking)\b/i
+      const BAD = /\b(wait|let me|recalculat|recheck|actually|however|revising|correcting|reconsider|hmm|option [0-9]|answer should be)\b/i
       parsed.questions = (parsed.questions || []).map(q => {
         if (q.explanation && BAD.test(q.explanation)) {
-          const clean = q.explanation
-            .split(/(?<=[.!?])\s+/)
-            .filter(s => !BAD.test(s))
-            .join(' ')
-            .trim()
+          const clean = q.explanation.split(/(?<=[.!?])\s+/).filter(s => !BAD.test(s)).join(' ').trim()
           q.explanation = clean || 'See the correct option marked above.'
         }
         return q
       })
-
       setQuiz(parsed)
-      saveSessionContent({ tool:'quiz', subject, chapter:topic, classLevel:cls, content:parsed })
+      saveSessionContent({ tool: 'quiz', subject: subjectForSave, chapter: topic, classLevel: sel.cls, content: parsed })
       setAnswers({}); setSubmitted(false)
-    } catch (e) {
-      if (e.status === 402) setErr('Free trial ended. Please subscribe.')
-      else setErr('Failed to generate quiz. Try again.')
-    }
+    } catch (e) { setErr(e.status === 402 ? 'Free trial ended. Please subscribe.' : 'Failed to generate quiz. Try again.') }
     setLoading(false)
   }
 
@@ -4777,11 +4869,9 @@ Format:
     if (timerId) clearInterval(timerId)
     setSubmitted(true)
     const correct = quiz.questions.filter((q, i) => answers[i] === q.answer).length
-    const xpEarned = Math.round((correct / quiz.questions.length) * 50) + 5
-    setFinalScore({ correct, xpEarned })
-    // Save score into session so history can show it
-    saveSessionContent({ tool:'quiz', subject, chapter:topic, classLevel:cls, content:{ ...quiz, score:correct, total:quiz.questions.length, timeTaken: (parseInt(num) * (SECS_PER_Q[diff]||45)) - timeLeft } })
-    try { await api.post('/api/user/quiz-history', { subject, topic, difficulty: diff, totalQuestions: quiz.questions.length, correctAnswers: correct, xpEarned, isPerfect: correct === quiz.questions.length }) } catch {}
+    setFinalScore({ correct, xpEarned: Math.round((correct / quiz.questions.length) * 50) + 5 })
+    saveSessionContent({ tool: 'quiz', subject: subjectForSave, chapter: topic, classLevel: sel.cls, content: { ...quiz, score: correct, total: quiz.questions.length } })
+    try { await api.post('/api/user/quiz-history', { subject: subjectForSave, topic, difficulty: diff, totalQuestions: quiz.questions.length, correctAnswers: correct, xpEarned: Math.round((correct / quiz.questions.length) * 50) + 5, isPerfect: correct === quiz.questions.length }) } catch {}
   }
 
   const score = submitted ? quiz.questions.filter((q, i) => answers[i] === q.answer).length : 0
@@ -4789,73 +4879,43 @@ Format:
 
   return (
     <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
-      <PageHeader icon="🎯" title="Quiz Generator" subtitle="Auto-generate MCQ quizzes with instant scoring and explanations" color="#F59E0B" />
+      <PageHeader icon="🎯" title="Quiz Generator" subtitle="Pick your class, subject, chapter (and a sub-topic if you like) — get a timed MCQ quiz with instant scoring" color="#F59E0B" />
 
       {!quiz ? (
         <Card>
-          {/* Row 1: Subject + Class + Question count */}
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 14, marginBottom: 4 }}>
-            <Field label="Subject">
-              <BSSelect value={subject} onChange={v => { setSubject(v); setChapter('') }} options={SUBJECTS} />
-            </Field>
-            <Field label="Class">
-              <BSSelect value={cls} onChange={v => { setCls(v); setChapter('') }} options={CLASSES} />
-            </Field>
-            <Field label="Questions">
-              <BSSelect value={num} onChange={setNum} options={['5','8','10','15']} />
-            </Field>
-            <Field label="Difficulty">
-              <BSSelect value={diff} onChange={setDiff} options={['Easy','Medium','Hard','Mixed']} />
-            </Field>
+          <LessonPicker value={sel} onChange={setSel} accent="#F59E0B" subtopicHint="The quiz will stick to this sub-topic." />
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 4 }}>
+            <Field label="Questions"><BSSelect value={num} onChange={setNum} options={['5', '8', '10', '15']} /></Field>
+            <Field label="Difficulty"><BSSelect value={diff} onChange={setDiff} options={['Easy', 'Medium', 'Hard', 'Mixed']} /></Field>
           </div>
-
-          {/* Chapter dropdown */}
-          <Field label="Chapter">
-            <BSSelect
-              value={chapter}
-              onChange={setChapter}
-              options={[{ value: '', label: '── Select a Chapter ──' }, ...chapters.map(c => ({ value: c, label: c }))]}
-            />
-          </Field>
-
-          {/* Custom topic fallback */}
-          {!chapter && (
-            <Field label="Or enter a custom topic">
-              <BSInput value={customTopic} onChange={setCustomTopic} placeholder="e.g. Pythagorean Theorem- How confident are you on the sub-topic?    Test your knowledge!" />
-            </Field>
-          )}
-
           <ErrMsg msg={err} />
-          <PrimaryBtn onClick={generate} disabled={loading || !topic.trim()} color="#F59E0B" style={{ marginTop: 4 }}>
+          <PrimaryBtn onClick={generate} disabled={loading || !ready} color="#F59E0B" style={{ marginTop: 4 }}>
             {loading ? <><Spinner /> Generating…</> : '✨ Generate Quiz'}
           </PrimaryBtn>
         </Card>
       ) : (
         <div>
-          {/* ── Timer bar ── */}
           {!submitted && timeLeft !== null && (
             <div style={{ marginBottom: 16, background: 'var(--bg2)', border: `1px solid ${timeLeft <= 30 ? 'rgba(239,68,68,.4)' : 'var(--border)'}`, borderRadius: 12, padding: '10px 16px' }}>
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 }}>
-                <span style={{ fontSize: 13, fontWeight: 700, color: timeLeft <= 30 ? '#fca5a5' : 'var(--text-h)' }}>
-                  {timeLeft <= 30 ? '⚠️' : '⏱'} Time Remaining
-                </span>
+                <span style={{ fontSize: 13, fontWeight: 700, color: timeLeft <= 30 ? '#fca5a5' : 'var(--text-h)' }}>{timeLeft <= 30 ? '⚠️' : '⏱'} Time Remaining</span>
                 <span style={{ fontFamily: "'Sora', monospace", fontWeight: 900, fontSize: 20, color: timeLeft <= 30 ? '#ef4444' : 'var(--accent)', animation: timeLeft <= 10 ? 'pulse 1s infinite' : 'none', letterSpacing: 1 }}>
                   {String(Math.floor(timeLeft / 60)).padStart(2, '0')}:{String(timeLeft % 60).padStart(2, '0')}
                 </span>
               </div>
               <div style={{ background: 'var(--border)', borderRadius: 999, height: 6 }}>
-                <div style={{ background: timeLeft <= 30 ? '#ef4444' : timeLeft <= 60 ? '#f59e0b' : 'var(--accent)', width: `${(timeLeft / (parseInt(num) * (SECS_PER_Q[diff] || 45))) * 100}%`, height: '100%', borderRadius: 999, transition: 'width 1s linear, background .3s' }}/>
+                <div style={{ background: timeLeft <= 30 ? '#ef4444' : timeLeft <= 60 ? '#f59e0b' : 'var(--accent)', width: `${(timeLeft / (parseInt(num) * (SECS_PER_Q[diff] || 45))) * 100}%`, height: '100%', borderRadius: 999, transition: 'width 1s linear, background .3s' }} />
               </div>
               <div style={{ display: 'flex', justifyContent: 'space-between', marginTop: 5, fontSize: 11, color: 'var(--text)' }}>
                 <span>{Object.keys(answers).length}/{quiz.questions.length} answered</span>
-                <span>{parseInt(num) * (SECS_PER_Q[diff] || 45)}s total · {SECS_PER_Q[diff] || 45}s per question</span>
+                <span>{SECS_PER_Q[diff] || 45}s per question</span>
               </div>
             </div>
           )}
 
           {timeUp && !submitted && (
-            <div style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 12, padding: '12px 16px', marginBottom: 14, textAlign: 'center', color: '#fca5a5', fontWeight: 700, fontSize: 14 }}>
-              ⏰ Time's up! Your answers have been submitted automatically.
+            <div style={{ background: 'rgba(239,68,68,.1)', border: '1px solid rgba(239,68,68,.3)', borderRadius: 12, padding: '12px 16px', marginBottom: 14, textAlign: 'center', color: '#fca5a5', fontWeight: 700 }}>
+              ⏰ Time’s up! Your answers were submitted automatically.
             </div>
           )}
 
@@ -4872,17 +4932,17 @@ Format:
           <h3 style={{ marginBottom: 18, fontFamily: "'Sora', sans-serif", color: 'var(--text-h)' }}>{quiz.title}</h3>
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(400px,1fr))', gap: 14 }}>
             {quiz.questions.map((q, i) => {
-              const sel = answers[i], correct = q.answer, isRight = submitted && sel === correct, isWrong = submitted && sel !== undefined && sel !== correct
+              const sel_ = answers[i], correct = q.answer, isRight = submitted && sel_ === correct, isWrong = submitted && sel_ !== undefined && sel_ !== correct
               return (
                 <Card key={i} style={{ borderLeft: submitted ? `4px solid ${isRight ? '#22c55e' : isWrong ? '#ef4444' : 'var(--border)'}` : '' }}>
                   <p style={{ margin: '0 0 12px', fontWeight: 700, fontSize: 14.5, color: 'var(--text-h)' }}><span style={{ color: 'var(--accent)' }}>Q{i + 1}.</span> {q.q}</p>
                   <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 8 }}>
                     {q.options.map((opt, j) => {
-                      const isSelected = sel === j, isAnswer = j === correct
+                      const isSelected = sel_ === j, isAnswer = j === correct
                       let bg = 'var(--social-bg)', border = 'var(--border)', color = 'var(--text-h)'
-                      if (submitted) { if (isAnswer) { bg = 'rgba(16,185,129,.1)'; border = '#6ee7b7'; color = '#6ee7b7' } else if (isSelected && !isAnswer) { bg = 'rgba(239,68,68,.1)'; border = '#fca5a5'; color = '#fca5a5' } }
+                      if (submitted) { if (isAnswer) { bg = 'rgba(16,185,129,.1)'; border = '#6ee7b7'; color = '#6ee7b7' } else if (isSelected) { bg = 'rgba(239,68,68,.1)'; border = '#fca5a5'; color = '#fca5a5' } }
                       else if (isSelected) { bg = 'var(--accent-bg)'; border = 'var(--accent)'; color = 'var(--accent)' }
-                      return <button key={j} disabled={submitted} onClick={() => setAnswers(a => ({ ...a, [i]: j }))} style={{ padding: '9px 12px', borderRadius: 9, border: `1.5px solid ${border}`, background: bg, color, cursor: submitted ? 'default' : 'pointer', textAlign: 'left', fontSize: 13.5, fontFamily: "'Nunito', sans-serif", fontWeight: 600, transition: 'all .15s' }}><span style={{ fontWeight: 800, marginRight: 4 }}>{String.fromCharCode(65 + j)}.</span>{opt}{submitted && isAnswer ? ' ✓' : ''}</button>
+                      return <button key={j} disabled={submitted} onClick={() => setAnswers(a => ({ ...a, [i]: j }))} style={{ padding: '9px 12px', borderRadius: 9, border: `1.5px solid ${border}`, background: bg, color, cursor: submitted ? 'default' : 'pointer', textAlign: 'left', fontSize: 13.5, fontFamily: "'Nunito', sans-serif", fontWeight: 600 }}><span style={{ fontWeight: 800, marginRight: 4 }}>{String.fromCharCode(65 + j)}.</span>{opt}{submitted && isAnswer ? ' ✓' : ''}</button>
                     })}
                   </div>
                   {submitted && q.explanation && <div style={{ marginTop: 11, padding: '9px 13px', background: 'var(--accent-bg)', borderRadius: 9, fontSize: 13, color: 'var(--accent)' }}>💡 {q.explanation}</div>}
@@ -4902,44 +4962,40 @@ Format:
 //  FLASHCARDS
 // ══════════════════════════════════════════════════════════════
 function FlashCards({ user, prefill, onClearPrefill }) {
-  const [subject,     setSubject]     = useState('Mathematics')
-  const [cls,         setCls]         = useState('Class 10')
-  const [chapter,     setChapter]     = useState('')
-  const [customTopic, setCustomTopic] = useState('')
-  const [cards,       setCards]       = useState([])
-  const [current,     setCurrent]     = useState(0)
-  const [flipped,     setFlipped]     = useState({})
-  const [mode,        setMode]        = useState('grid')
-  const [loading,     setLoading]     = useState(false)
-  const [err,         setErr]         = useState('')
+  const [sel, setSel]   = useState({ cls: 'Class 10', subject: '', chapter: '', subtopic: '', mode: 'syllabus', customTopic: '' })
+  const [cards, setCards] = useState([])
+  const [current, setCurrent] = useState(0)
+  const [flipped, setFlipped] = useState({})
+  const [mode, setMode] = useState('grid')
+  const [loading, setLoading] = useState(false)
+  const [err, setErr]   = useState('')
 
-  const chapters = getChapters(subject, cls)
-  const topic    = chapter || customTopic
+  const topic          = pickerTopic(sel)
+  const ready          = isPickerReady(sel)
+  const subjectForSave = sel.mode === 'custom' ? 'General' : sel.subject
 
   useEffect(() => {
     if (!prefill) return
-    if (prefill.subject) setSubject(prefill.subject)
-    if (prefill.chapter) setChapter(prefill.chapter)
+    setSel(s => ({ ...s, mode: 'syllabus', subject: prefill.subject || s.subject, chapter: prefill.chapter || s.chapter, cls: prefill.cls || s.cls, subtopic: '' }))
     onClearPrefill?.()
   }, [prefill])
 
   async function generate() {
-    if (!topic.trim()) return alert('Please select or enter a chapter/topic')
-    const PROMPT = `Create 8 high-quality flashcards for "${topic}" in ${subject} ${cls} CBSE. Cover the most important terms, formulas, and concepts.
+    if (!ready) return
+    const PROMPT = `Create 8 high-quality flashcards.
+SCOPE: ${pickerContext(sel)}
+Cover the most important terms, formulas and concepts within that scope. If a sub-topic is named, stay inside it.
 Return ONLY valid JSON:
-{"cards":[{"front":"Key term or concept","back":"Clear, concise definition or explanation (1-2 sentences max)"}]}`
+{"cards":[{"front":"Key term or concept","back":"Clear, concise definition (1-2 sentences max)"}]}`
     setErr(''); setLoading(true); setCurrent(0); setFlipped({})
     try {
-      const r = await api.post('/api/ai/flashcards', { messages: [{ role: 'user', content: PROMPT }], subject, chapter: topic })
+      const r = await api.post('/api/ai/flashcards', { messages: [{ role: 'user', content: PROMPT }], subject: subjectForSave, chapter: topic })
       const raw = typeof r.content === 'string' ? r.content : r.content[0]?.text || ''
       const parsed = JSON.parse(raw.replace(/```[\w]*\n?/gi, '').trim())
-      if (!parsed.cards?.length) throw new Error('No cards in response')
+      if (!parsed.cards?.length) throw new Error('No cards')
       setCards(parsed.cards)
-    saveSessionContent({ tool:'flashcards', subject, chapter:topic, classLevel:cls, content:parsed.cards })
-    } catch (e) {
-      if (e.status === 402) setErr('Free trial ended. Please subscribe.')
-      else setErr('Failed to generate flashcards. Try again.')
-    }
+      saveSessionContent({ tool: 'flashcards', subject: subjectForSave, chapter: topic, classLevel: sel.cls, content: parsed.cards })
+    } catch (e) { setErr(e.status === 402 ? 'Free trial ended. Please subscribe.' : 'Failed to generate flashcards. Try again.') }
     setLoading(false)
   }
 
@@ -4947,36 +5003,12 @@ Return ONLY valid JSON:
 
   return (
     <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
-      <PageHeader icon="🃏" title="Flashcards" subtitle="Grid mode & Study mode for fast revision" color="#EF4444" />
+      <PageHeader icon="🃏" title="Flashcards" subtitle="Class → Subject → Chapter → Sub-topic → flip-cards for fast revision" color="#EF4444" />
 
       <Card style={{ marginBottom: 18 }}>
-        {/* Subject + Class */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 14, marginBottom: 4 }}>
-          <Field label="Subject">
-            <BSSelect value={subject} onChange={v => { setSubject(v); setChapter('') }} options={SUBJECTS} />
-          </Field>
-          <Field label="Class">
-            <BSSelect value={cls} onChange={v => { setCls(v); setChapter('') }} options={CLASSES} />
-          </Field>
-        </div>
-
-        {/* Chapter dropdown */}
-        <Field label="Chapter">
-          <BSSelect
-            value={chapter}
-            onChange={setChapter}
-            options={[{ value: '', label: '── Select a Chapter ──' }, ...chapters.map(c => ({ value: c, label: c }))]}
-          />
-        </Field>
-
-        {!chapter && (
-          <Field label="Or enter a custom topic">
-            <BSInput value={customTopic} onChange={setCustomTopic} placeholder="Lets discuss the important concepts of subtopics..." />
-          </Field>
-        )}
-
+        <LessonPicker value={sel} onChange={setSel} accent="#EF4444" subtopicHint="Cards will focus on this sub-topic." />
         <ErrMsg msg={err} />
-        <PrimaryBtn onClick={generate} disabled={loading || !topic.trim()} color="#EF4444">
+        <PrimaryBtn onClick={generate} disabled={loading || !ready} color="#EF4444">
           {loading ? <><Spinner /> Creating cards…</> : '🃏 Generate Flashcards'}
         </PrimaryBtn>
       </Card>
@@ -4987,7 +5019,7 @@ Return ONLY valid JSON:
             <h3 style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 16, color: 'var(--text-h)', margin: 0 }}>{topic} — {cards.length} Cards</h3>
             <div style={{ display: 'flex', gap: 7 }}>
               {[['grid', '⊞ Grid'], ['study', '▶ Study']].map(([m, l]) => (
-                <button key={m} onClick={() => setMode(m)} style={{ padding: '6px 14px', borderRadius: 8, border: 'none', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", background: mode === m ? '#EF4444' : 'var(--social-bg)', color: mode === m ? '#fff' : 'var(--text-h)', transition: 'all .15s' }}>{l}</button>
+                <button key={m} onClick={() => setMode(m)} style={{ padding: '6px 14px', borderRadius: 8, border: 'none', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", background: mode === m ? '#EF4444' : 'var(--social-bg)', color: mode === m ? '#fff' : 'var(--text-h)' }}>{l}</button>
               ))}
             </div>
           </div>
@@ -5444,13 +5476,15 @@ useEffect(() => {
       <Card style={{ marginBottom: 18 }}>
         {/* Row 1: Subject + Class */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 14, marginBottom: 4 }}>
-          <Field label="Subject">
-            <BSSelect value={subj} onChange={handleSubjChange} options={SUBJECTS} />
-          </Field>
-          <Field label="Class">
-            <BSSelect value={cls} onChange={handleClsChange} options={CLASSES} />
-          </Field>
-        </div>
+  <Field label="① Class">
+    <BSSelect value={cls} onChange={v => { setCls(v); setSubj(''); setChapter('') }} options={CLASSES} />
+  </Field>
+  <Field label="② Subject">
+    <BSSelect value={subj} disabled={!cls}
+      onChange={v => { setSubj(v); setChapter('') }}
+      options={[{ value: '', label: '── Select subject ──' }, ...getSubjectsForClass(cls).map(s => ({ value: s, label: s }))]} />
+  </Field>
+</div>
 
         {/* Row 2: Chapter dropdown */}
         <Field label="Chapter">
