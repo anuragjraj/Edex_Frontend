@@ -157,8 +157,89 @@ const ALL_CHAPTERS = {
   },
 }
 
-const getChapters = (subject, cls) =>
-  ALL_CHAPTERS[cls]?.[subject] || []
+
+// ══════════════════════════════════════════════════════════════
+//  NCERT SUB-TOPICS  (you maintain this — not AI-generated)
+//  Shape:  CHAPTER_SUBTOPICS[class][subject][chapter] = [ "sub-topic", ... ]
+//  Any chapter you omit just shows: Full chapter + custom options.
+// ══════════════════════════════════════════════════════════════
+const CHAPTER_SUBTOPICS = {
+  "Class 10": {
+    "Science": {
+      "Chemical Reactions and Equations": [
+        "Chemical Equations",
+        "Balancing Chemical Equations",
+        "Combination Reactions",
+        "Decomposition Reactions",
+        "Displacement Reactions",
+        "Double Displacement Reactions",
+        "Oxidation and Reduction",
+        "Corrosion and Rancidity",
+      ],
+      "Light – Reflection and Refraction": [
+        "Reflection of Light",
+        "Spherical Mirrors",
+        "Image Formation by Spherical Mirrors",
+        "Mirror Formula and Magnification",
+        "Refraction of Light",
+        "Refractive Index",
+        "Refraction by Spherical Lenses",
+        "Lens Formula and Magnification",
+        "Power of a Lens",
+      ],
+    },
+    "Mathematics": {
+      "Real Numbers": [
+        "Euclid's Division Lemma",
+        "The Fundamental Theorem of Arithmetic",
+        "Revisiting Irrational Numbers",
+        "Revisiting Rational Numbers and Decimal Expansions",
+      ],
+    },
+  },
+  // …add more classes / subjects / chapters here…
+}
+
+const getSubtopics = (cls, subject, chapter) =>
+  CHAPTER_SUBTOPICS?.[cls]?.[subject]?.[chapter] || []
+
+// Only subjects that actually have chapters for this class
+const getSubjectsForClass = cls => Object.keys(ALL_CHAPTERS[cls] || {})
+
+// Default state each tool starts with
+const emptyPicker = (cls = 'Class 10') => ({
+  cls, subject: '', chapter: '',
+  subMode: 'full',   // 'full' | 'subtopic' | 'custom' | 'random'
+  subtopic: '',
+  customText: '',
+})
+
+// Ready to generate?
+const isPickerReady = sel => {
+  if (!sel.subject || !sel.chapter) return false
+  if (sel.subMode === 'custom' || sel.subMode === 'random') return !!sel.customText.trim()
+  return true
+}
+
+// Short label for titles
+const pickerTopic = sel => {
+  if (sel.subMode === 'random') return sel.customText.trim()
+  if (sel.subMode === 'custom') return sel.customText.trim()
+  if (sel.subMode === 'subtopic') return sel.subtopic
+  return sel.chapter
+}
+
+// Full scope line fed into AI prompts
+const pickerContext = sel => {
+  if (sel.subMode === 'random')
+    return `the topic "${sel.customText.trim()}" (a free topic chosen by the student, NOT tied to any chapter). Answer at ${sel.cls} level.`
+  const base = `${sel.subject}, ${sel.cls}`
+  if (sel.subMode === 'custom')
+    return `${base}, focusing on "${sel.customText.trim()}" within the chapter "${sel.chapter}"`
+  if (sel.subMode === 'subtopic')
+    return `${base}, covering ONLY the sub-topic "${sel.subtopic}" within the chapter "${sel.chapter}"`
+  return `${base}, covering the full chapter "${sel.chapter}"`
+}
 
 // ══════════════════════════════════════════════════════════════
 //  SESSION STORAGE  (saves generated content for history replay)
@@ -1370,85 +1451,84 @@ const pickerContext = sel => {
 }
 
 // The one reusable selector: Class → Subject → Chapter → Sub-topic (or Custom)
-function LessonPicker({ value, onChange, accent = 'var(--accent)', subtopicHint = 'Pick a sub-topic to focus, or keep “Full chapter”.' }) {
-  const { cls, subject, chapter, subtopic, mode, customTopic } = value
+function LessonPicker({ value, onChange, accent = 'var(--accent)' }) {
+  const { cls, subject, chapter, subMode, subtopic, customText } = value
   const subjects = getSubjectsForClass(cls)
   const chapters = getChapters(subject, cls)
-  const [subs, setSubs] = useState([])
-  const [loadingSubs, setLoadingSubs] = useState(false)
+  const subs = getSubtopics(cls, subject, chapter)
   const set = patch => onChange({ ...value, ...patch })
 
-  useEffect(() => {
-    if (mode !== 'syllabus' || !chapter || !subject) { setSubs([]); return }
-    let dead = false
-    setLoadingSubs(true); setSubs([])
-    fetchSubtopics(subject, cls, chapter).then(list => { if (!dead) { setSubs(list); setLoadingSubs(false) } })
-    return () => { dead = true }
-  }, [chapter, subject, cls, mode])
+  const subValue =
+    subMode === 'custom' ? '__custom__' :
+    subMode === 'random' ? '__random__' :
+    subMode === 'subtopic' ? subtopic :
+    '__full__'
 
-  // keep current subject visible even if a prefill set one outside this class list
+  const onSubChange = v => {
+    if (v === '__full__')        set({ subMode: 'full', subtopic: '', customText: '' })
+    else if (v === '__custom__') set({ subMode: 'custom', subtopic: '', customText: '' })
+    else if (v === '__random__') set({ subMode: 'random', subtopic: '', customText: '' })
+    else                         set({ subMode: 'subtopic', subtopic: v, customText: '' })
+  }
+
   const subjectOpts = [
     { value: '', label: '── Select subject ──' },
     ...subjects.map(s => ({ value: s, label: s })),
     ...(subject && !subjects.includes(subject) ? [{ value: subject, label: subject }] : []),
   ]
 
+  const subtopicOpts = [
+    { value: '__full__', label: '📖 Full chapter (cover everything)' },
+    ...subs.map(s => ({ value: s, label: s })),
+    { value: '__custom__', label: '✏️ Custom sub-topic (type your own)…' },
+    { value: '__random__', label: '🎲 Anything else (not from this chapter)…' },
+  ]
+
   return (
     <div>
-      {/* Mode toggle */}
-      <div style={{ display: 'flex', gap: 8, marginBottom: 16 }}>
-        {[['syllabus', '📚 From my syllabus'], ['custom', '✏️ Custom topic']].map(([m, l]) => (
-          <button key={m} type="button" onClick={() => set({ mode: m })}
-            style={{
-              flex: 1, padding: '9px 12px', borderRadius: 10, cursor: 'pointer',
-              fontFamily: "'Nunito',sans-serif", fontWeight: 700, fontSize: 13,
-              border: `2px solid ${mode === m ? accent : 'var(--border)'}`,
-              background: mode === m ? 'var(--accent-bg)' : 'transparent',
-              color: mode === m ? accent : 'var(--text)',
-            }}>{l}</button>
-        ))}
-      </div>
+      <Field label="① Class">
+        <BSSelect value={cls} onChange={v => set({ ...emptyPicker(v) })} options={CLASSES} />
+      </Field>
 
-      {mode === 'custom' ? (
-        <>
-          <Field label="Your topic (anything you like)">
-            <BSInput value={customTopic} onChange={v => set({ customTopic: v })}
-              placeholder="e.g. Pythagoras theorem, Water cycle, Mughal administration…" />
-          </Field>
-          <div style={{ fontSize: 12, color: 'var(--text)', background: 'var(--code-bg)', border: '1px dashed var(--border)', borderRadius: 8, padding: '8px 12px' }}>
-            🎲 A custom topic isn’t tied to a chapter — type whatever you want to study.
+      <Field label="② Subject">
+        <BSSelect value={subject}
+          onChange={v => set({ subject: v, chapter: '', subMode: 'full', subtopic: '', customText: '' })}
+          options={subjectOpts} />
+      </Field>
+
+      <Field label="③ Chapter">
+        <BSSelect value={chapter} disabled={!subject}
+          onChange={v => set({ chapter: v, subMode: 'full', subtopic: '', customText: '' })}
+          options={[{ value: '', label: subject ? '── Select chapter ──' : 'Pick a subject first' }, ...chapters.map(c => ({ value: c, label: c }))]} />
+      </Field>
+
+      <Field label="④ What to focus on">
+        <BSSelect value={subValue} disabled={!chapter} onChange={onSubChange} options={subtopicOpts} />
+
+        {chapter && subMode === 'custom' && (
+          <div style={{ marginTop: 8 }}>
+            <BSInput value={customText} onChange={v => set({ customText: v })}
+              placeholder={`A specific topic inside "${chapter}"…`} />
+            <div style={{ fontSize: 12, color: 'var(--text)', marginTop: 5 }}>✏️ Studies just this part of the chapter.</div>
           </div>
-        </>
-      ) : (
-        <>
-          <Field label="① Class">
-            <BSSelect value={cls} onChange={v => set({ cls: v, subject: '', chapter: '', subtopic: '' })} options={CLASSES} />
-          </Field>
-          <Field label="② Subject">
-            <BSSelect value={subject} onChange={v => set({ subject: v, chapter: '', subtopic: '' })} options={subjectOpts} />
-          </Field>
-          <Field label="③ Chapter">
-            <BSSelect value={chapter} disabled={!subject}
-              onChange={v => set({ chapter: v, subtopic: '' })}
-              options={[{ value: '', label: subject ? '── Select chapter ──' : 'Pick a subject first' }, ...chapters.map(c => ({ value: c, label: c }))]} />
-          </Field>
-          <Field label="④ Sub-topic">
-            <BSSelect value={subtopic} disabled={!chapter}
-              onChange={v => set({ subtopic: v })}
-              options={[{ value: '', label: '📖 Full chapter (cover everything)' }, ...subs.map(s => ({ value: s, label: s }))]} />
-            {chapter && loadingSubs && (
-              <div style={{ fontSize: 12, color: accent, marginTop: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
-                <Spinner size={11} /> Loading sub-topics from NCERT…
-              </div>
-            )}
-            {chapter && !loadingSubs && (
-              <div style={{ fontSize: 12, color: 'var(--text)', marginTop: 6 }}>
-                {subs.length ? subtopicHint : 'No sub-topics found — “Full chapter” will be used.'}
-              </div>
-            )}
-          </Field>
-        </>
-      )}
+        )}
+
+        {chapter && subMode === 'random' && (
+          <div style={{ marginTop: 8 }}>
+            <BSInput value={customText} onChange={v => set({ customText: v })}
+              placeholder="Any topic you like — e.g. Pythagoras theorem, Water cycle…" />
+            <div style={{ fontSize: 12, color: 'var(--text)', background: 'var(--code-bg)', border: '1px dashed var(--border)', borderRadius: 8, padding: '7px 11px', marginTop: 6 }}>
+              🎲 This ignores the chapter above and studies whatever you type.
+            </div>
+          </div>
+        )}
+
+        {chapter && subMode === 'full' && subs.length === 0 && (
+          <div style={{ fontSize: 12, color: 'var(--text)', marginTop: 6 }}>
+            No sub-topics listed for this chapter yet — the full chapter will be used, or pick a custom option above.
+          </div>
+        )}
+      </Field>
     </div>
   )
 }
@@ -4126,21 +4206,30 @@ function NotesDocument({ content, title, onDownload }) {
 //  NOTES MAKER
 // ══════════════════════════════════════════════════════════════
 function NotesMaker({ user, prefill, onClearPrefill }) {
-  const [subject,setSubject]=useState('Mathematics'); const [cls,setCls]=useState('Class 10')
-  const [chapter,setChapter]=useState(''); const [customCh,setCustomCh]=useState(''); const [style_,setStyle_]=useState('Detailed')
-  const [result,setResult]=useState(''); const [loading,setLoading]=useState(false); const [saved,setSaved]=useState(false); const [err,setErr]=useState('')
-  const chapters=getChapters(subject,cls); const finalChapter=chapter||customCh||chapters[0]
+  const [sel, setSel]       = useState(emptyPicker())
+  const [style_, setStyle_] = useState('Detailed')
+  const [result, setResult] = useState('')
+  const [loading, setLoading] = useState(false)
+  const [saved, setSaved]   = useState(false)
+  const [err, setErr]       = useState('')
+
+  // Bridge the picker → the identity vars your prompt already uses
+  const subject      = sel.subMode === 'random' ? 'General' : sel.subject
+  const cls          = sel.cls
+  const finalChapter = pickerTopic(sel)          // full chapter, sub-topic, custom, or random
+  const ready        = isPickerReady(sel)
 
   const STYLE_INSTRUCTIONS = {
-  'Detailed': `Write in thorough prose under every heading. Explain the "why" behind every concept, not just the "what". Every sub-topic gets its own ### heading with at least 3-4 full paragraphs of explanation.`,
-  'Concise': `Write in tight, information-dense paragraphs. No filler. Every sentence must carry a fact, definition, or insight useful for exams.`,
-  'Bullet Points': `Use nested bullet points throughout. Main bullets = concepts. Sub-bullets = explanation, example, formula. Every bullet must be a complete, exam-useful thought — not just a label.`,
-  'Q&A Format': `Present every concept as a Question followed by a detailed Answer. Use the format:\n**Q: [question]**\nA: [full answer with examples]. Minimum 20 Q&A pairs covering all sub-topics.`,
-  'Mind Map Style': `Organize as a hierarchy: Chapter → Topics → Sub-topics → Key facts/formulas/examples. Use indentation and bold headings to show relationships clearly. Still write full explanatory sentences under each node.`,
-}
+    'Detailed': `Write in thorough prose under every heading. Explain the "why" behind every concept, not just the "what". Every sub-topic gets its own ### heading with at least 3-4 full paragraphs of explanation.`,
+    'Concise': `Write in tight, information-dense paragraphs. No filler. Every sentence must carry a fact, definition, or insight useful for exams.`,
+    'Bullet Points': `Use nested bullet points throughout. Main bullets = concepts. Sub-bullets = explanation, example, formula. Every bullet must be a complete, exam-useful thought — not just a label.`,
+    'Q&A Format': `Present every concept as a Question followed by a detailed Answer. Use the format:\n**Q: [question]**\nA: [full answer with examples]. Minimum 20 Q&A pairs covering all sub-topics.`,
+    'Mind Map Style': `Organize as a hierarchy: Chapter → Topics → Sub-topics → Key facts/formulas/examples. Use indentation and bold headings to show relationships clearly. Still write full explanatory sentences under each node.`,
+  }
 
-const buildPrompt = () => `You are a world-class CBSE textbook author and examiner with 20+ years of experience. Your task is to write EXHAUSTIVE, publication-quality study notes.
+  const buildPrompt = () => `You are a world-class CBSE textbook author and examiner with 20+ years of experience. Your task is to write EXHAUSTIVE, publication-quality study notes.
 
+SCOPE: ${pickerContext(sel)}
 SUBJECT: ${subject} | CLASS: ${cls} | CHAPTER: "${finalChapter}" | BOARD: CBSE
 STYLE: ${style_}
 
@@ -4149,6 +4238,7 @@ STYLE INSTRUCTION: ${STYLE_INSTRUCTIONS[style_] || STYLE_INSTRUCTIONS['Detailed'
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 STRICT REQUIREMENTS — YOU MUST FOLLOW ALL OF THESE:
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+✦ If SCOPE names a single sub-topic, cover ONLY that sub-topic in complete depth — do NOT summarise the whole chapter. If SCOPE says "full chapter", cover every sub-topic.
 ✦ MINIMUM LENGTH: 3500 words. Do NOT stop writing until you have covered every single sub-topic completely.
 ✦ COVER EVERYTHING: List every sub-topic of this chapter from the CBSE textbook and cover each one in depth.
 ✦ DO NOT SKIP: If you are running out of content, that means you have not gone deep enough. Go deeper.
@@ -4247,80 +4337,65 @@ For each: describe the mistake, explain why it is wrong, show the correct approa
 
 FINAL REMINDER: You must write AT LEAST 3500 words. Every section above must be fully populated with real, detailed, exam-relevant content. Do not write placeholder text or headings without content.`
 
-
-
   useEffect(() => {
     if (!prefill) return
-    if (prefill.subject) setSubject(prefill.subject)
-    if (prefill.chapter) { setChapter(prefill.chapter); setCustomCh('') }
+    setSel(s => ({ ...s, subject: prefill.subject || s.subject, chapter: prefill.chapter || s.chapter, cls: prefill.cls || s.cls, subMode: 'full', subtopic: '', customText: '' }))
     onClearPrefill?.()
-    // Try to load previously saved note
     loadSavedContent('notes', prefill.subject, prefill.chapter, []).then(content => {
       if (content) { setResult(content); setSaved(true) }
     })
   }, [prefill])
 
-  // Shared cache key — everyone who picks this same subject+class+chapter+style shares one note
+  // Shared cache key — everyone who picks the same scope + style shares one note
   const notesCacheKey = () => {
     const safe = s => String(s || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase().slice(0, 24)
     return `bsnotes-${safe(subject)}-${safe(cls)}-${safe(finalChapter)}-${safe(style_)}`
   }
 
   async function generate() {
-    if(!finalChapter) return; setErr(''); setLoading(true); setSaved(false)
-    try{
-      // ── Check the SHARED cache first — if ANY user already made this, reuse it ──
-      const shared = await api.get(`/api/shared-notes/${notesCacheKey()}`).catch(()=>null)
-      if (shared?.content) {
-        setResult(shared.content); setLoading(false); return
-      }
-      // ── Not cached anywhere — generate fresh ──
-      const r=await api.post('/api/ai/notes',{messages:[{role:'user',content:buildPrompt()}],subject,chapter:finalChapter})
+    if (!ready) return
+    setErr(''); setLoading(true); setSaved(false)
+    try {
+      const shared = await api.get(`/api/shared-notes/${notesCacheKey()}`).catch(() => null)
+      if (shared?.content) { setResult(shared.content); setLoading(false); return }
+      const r = await api.post('/api/ai/notes', { messages: [{ role: 'user', content: buildPrompt() }], subject, chapter: finalChapter })
       setResult(r.content)
-      // Save to the SHARED cache so the next person (anyone) gets it instantly
-      try { await api.post('/api/shared-notes',{subject,classLevel:cls,chapter:finalChapter,style:style_,content:r.content}) } catch{}
-      saveSessionContent({ tool:'notes', subject, chapter:finalChapter, classLevel:cls, content:r.content })
-    }
-    catch(e){ if(e.status===402){setErr('Free trial ended. Please subscribe.')}else{setErr(e.message)} }
+      try { await api.post('/api/shared-notes', { subject, classLevel: cls, chapter: finalChapter, style: style_, content: r.content }) } catch {}
+      saveSessionContent({ tool: 'notes', subject, chapter: finalChapter, classLevel: cls, content: r.content })
+    } catch (e) { if (e.status === 402) { setErr('Free trial ended. Please subscribe.') } else { setErr(e.message) } }
     setLoading(false)
   }
-  async function saveNote() { try{await api.post('/api/user/notes',{subject,classLevel:cls,chapter:finalChapter,style:style_,content:result});setSaved(true)}catch(e){alert(e.message)} }
+
+  async function saveNote() { try { await api.post('/api/user/notes', { subject, classLevel: cls, chapter: finalChapter, style: style_, content: result }); setSaved(true) } catch (e) { alert(e.message) } }
 
   return (
-    <div style={{ padding:24, width:'100%', boxSizing:'border-box', fontFamily:"'Nunito',sans-serif", animation:'slideUp .25s ease-out' }}>
-      <PageHeader icon="📖" title="Chapter Notes Maker" subtitle="Textbook-quality comprehensive notes — download or print as PDF" color="#10B981"/>
-      <Card style={{ marginBottom:18 }}>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:16, marginBottom:4 }}>
-          <Field label="Subject"><BSSelect value={subject} onChange={v=>{setSubject(v);setChapter('')}} options={SUBJECTS}/></Field>
-          <Field label="Class"><BSSelect value={cls} onChange={setCls} options={CLASSES}/></Field>
-        </div>
-        <Field label="Chapter">
-          <BSSelect value={chapter} onChange={setChapter} options={[{value:'',label:'-- Select Chapter --'},...chapters.map(c=>({value:c,label:c}))]}/>
-        </Field>
-        {!chapter&&<Field label="Or enter chapter name manually"><BSInput value={customCh} onChange={setCustomCh} placeholder="e.g. Gravitation, Mughal Empire"/></Field>}
-        <Field label="Notes Style"><BSSelect value={style_} onChange={setStyle_} options={['Detailed','Concise','Bullet Points','Q&A Format','Mind Map Style']}/></Field>
-        <PrimaryBtn onClick={generate} disabled={loading||(!chapter&&!customCh)} color="#10B981">{loading?<><Spinner/> Generating notes...</>:'📖 Generate Comprehensive Notes'}</PrimaryBtn>
+    <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito',sans-serif", animation: 'slideUp .25s ease-out' }}>
+      <PageHeader icon="📖" title="Chapter Notes Maker" subtitle="Class → Subject → Chapter → focus → textbook-quality notes — download or print as PDF" color="#10B981" />
+      <Card style={{ marginBottom: 18 }}>
+        <LessonPicker value={sel} onChange={setSel} accent="#10B981" />
+        <Field label="Notes Style"><BSSelect value={style_} onChange={setStyle_} options={['Detailed', 'Concise', 'Bullet Points', 'Q&A Format', 'Mind Map Style']} /></Field>
+        <PrimaryBtn onClick={generate} disabled={loading || !ready} color="#10B981">{loading ? <><Spinner /> Generating notes...</> : '📖 Generate Comprehensive Notes'}</PrimaryBtn>
         {loading && (
-          <div style={{ marginTop:12, padding:'10px 14px', borderRadius:10, background:'rgba(16,185,129,.08)', border:'1px solid rgba(16,185,129,.25)', display:'flex', alignItems:'center', gap:10, fontFamily:"'Nunito', sans-serif" }}>
-            <Spinner size={16}/>
-            <span style={{ fontSize:13, color:'#10B981', fontWeight:700 }}>
+          <div style={{ marginTop: 12, padding: '10px 14px', borderRadius: 10, background: 'rgba(16,185,129,.08)', border: '1px solid rgba(16,185,129,.25)', display: 'flex', alignItems: 'center', gap: 10, fontFamily: "'Nunito', sans-serif" }}>
+            <Spinner size={16} />
+            <span style={{ fontSize: 13, color: '#10B981', fontWeight: 700 }}>
               ⏳ Please wait 30–40 seconds — we're writing comprehensive, exam-ready notes for you. Don't close or switch tabs.
             </span>
           </div>
         )}
       </Card>
-      <ErrMsg msg={err}/>
-      {result&&<>
-  <NotesDocument
-    content={result}
-    title={`${finalChapter} Notes — ${subject} ${cls}`}
-    onDownload={()=>downloadText(result,`${finalChapter}-notes.txt`)}
-  />
-  <div style={{ display:'flex', gap:8, marginTop:12 }}>
-    {!saved?<GhostBtn small onClick={saveNote}>💾 Save to Library</GhostBtn>:<SuccessMsg msg="Saved to Library!"/>}
-  </div>
-</>}
-      <XPBadge amount={20} label="per notes generated"/>
+      <ErrMsg msg={err} />
+      {result && <>
+        <NotesDocument
+          content={result}
+          title={`${finalChapter} Notes — ${subject} ${cls}`}
+          onDownload={() => downloadText(result, `${finalChapter}-notes.txt`)}
+        />
+        <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
+          {!saved ? <GhostBtn small onClick={saveNote}>💾 Save to Library</GhostBtn> : <SuccessMsg msg="Saved to Library!" />}
+        </div>
+      </>}
+      <XPBadge amount={20} label="per notes generated" />
     </div>
   )
 }
@@ -4781,7 +4856,7 @@ MINIMUM 1500 words. This must be genuinely useful and specific.
 //  QUIZ GENERATOR
 // ══════════════════════════════════════════════════════════════
 function QuizGenerator({ user, prefill, onClearPrefill }) {
-  const [sel, setSel]     = useState({ cls: 'Class 10', subject: '', chapter: '', subtopic: '', mode: 'syllabus', customTopic: '' })
+  const [sel, setSel]     = useState(emptyPicker())
   const [diff, setDiff]   = useState('Medium')
   const [num, setNum]     = useState('5')
   const [quiz, setQuiz]   = useState(null)
@@ -4796,7 +4871,7 @@ function QuizGenerator({ user, prefill, onClearPrefill }) {
 
   const topic          = pickerTopic(sel)
   const ready          = isPickerReady(sel)
-  const subjectForSave = sel.mode === 'custom' ? 'General' : sel.subject
+  const subjectForSave = sel.subMode === 'random' ? 'General' : sel.subject
   const SECS_PER_Q = { Easy: 30, Medium: 45, Hard: 60, Mixed: 45 }
 
   useEffect(() => {
@@ -4823,13 +4898,13 @@ function QuizGenerator({ user, prefill, onClearPrefill }) {
 
   useEffect(() => {
     if (!prefill) return
-    setSel(s => ({ ...s, mode: 'syllabus', subject: prefill.subject || s.subject, chapter: prefill.chapter || s.chapter, cls: prefill.cls || s.cls, subtopic: '' }))
+    setSel(s => ({ ...s, subject: prefill.subject || s.subject, chapter: prefill.chapter || s.chapter, cls: prefill.cls || s.cls, subMode: 'full', subtopic: '', customText: '' }))
     onClearPrefill?.()
   }, [prefill])
 
   async function generate() {
     if (!ready) return
-    const subject = subjectForSave, cls = sel.cls
+    const subject = subjectForSave
     const PROMPT = `You are a CBSE examiner creating a ${num}-question multiple-choice quiz.
 SCOPE: ${pickerContext(sel)}
 Difficulty: ${diff}.
@@ -4879,11 +4954,11 @@ Format:
 
   return (
     <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
-      <PageHeader icon="🎯" title="Quiz Generator" subtitle="Pick your class, subject, chapter (and a sub-topic if you like) — get a timed MCQ quiz with instant scoring" color="#F59E0B" />
+      <PageHeader icon="🎯" title="Quiz Generator" subtitle="Pick class, subject, chapter (and a focus) — get a timed MCQ quiz with instant scoring" color="#F59E0B" />
 
       {!quiz ? (
         <Card>
-          <LessonPicker value={sel} onChange={setSel} accent="#F59E0B" subtopicHint="The quiz will stick to this sub-topic." />
+          <LessonPicker value={sel} onChange={setSel} accent="#F59E0B" />
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 4 }}>
             <Field label="Questions"><BSSelect value={num} onChange={setNum} options={['5', '8', '10', '15']} /></Field>
             <Field label="Difficulty"><BSSelect value={diff} onChange={setDiff} options={['Easy', 'Medium', 'Hard', 'Mixed']} /></Field>
@@ -4962,7 +5037,7 @@ Format:
 //  FLASHCARDS
 // ══════════════════════════════════════════════════════════════
 function FlashCards({ user, prefill, onClearPrefill }) {
-  const [sel, setSel]   = useState({ cls: 'Class 10', subject: '', chapter: '', subtopic: '', mode: 'syllabus', customTopic: '' })
+  const [sel, setSel]   = useState(emptyPicker())
   const [cards, setCards] = useState([])
   const [current, setCurrent] = useState(0)
   const [flipped, setFlipped] = useState({})
@@ -4972,11 +5047,11 @@ function FlashCards({ user, prefill, onClearPrefill }) {
 
   const topic          = pickerTopic(sel)
   const ready          = isPickerReady(sel)
-  const subjectForSave = sel.mode === 'custom' ? 'General' : sel.subject
+  const subjectForSave = sel.subMode === 'random' ? 'General' : sel.subject
 
   useEffect(() => {
     if (!prefill) return
-    setSel(s => ({ ...s, mode: 'syllabus', subject: prefill.subject || s.subject, chapter: prefill.chapter || s.chapter, cls: prefill.cls || s.cls, subtopic: '' }))
+    setSel(s => ({ ...s, subject: prefill.subject || s.subject, chapter: prefill.chapter || s.chapter, cls: prefill.cls || s.cls, subMode: 'full', subtopic: '', customText: '' }))
     onClearPrefill?.()
   }, [prefill])
 
@@ -5003,10 +5078,10 @@ Return ONLY valid JSON:
 
   return (
     <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
-      <PageHeader icon="🃏" title="Flashcards" subtitle="Class → Subject → Chapter → Sub-topic → flip-cards for fast revision" color="#EF4444" />
+      <PageHeader icon="🃏" title="Flashcards" subtitle="Class → Subject → Chapter → focus → flip-cards for fast revision" color="#EF4444" />
 
       <Card style={{ marginBottom: 18 }}>
-        <LessonPicker value={sel} onChange={setSel} accent="#EF4444" subtopicHint="Cards will focus on this sub-topic." />
+        <LessonPicker value={sel} onChange={setSel} accent="#EF4444" />
         <ErrMsg msg={err} />
         <PrimaryBtn onClick={generate} disabled={loading || !ready} color="#EF4444">
           {loading ? <><Spinner /> Creating cards…</> : '🃏 Generate Flashcards'}
@@ -5477,13 +5552,13 @@ useEffect(() => {
         {/* Row 1: Subject + Class */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(200px,1fr))', gap: 14, marginBottom: 4 }}>
   <Field label="① Class">
-    <BSSelect value={cls} onChange={v => { setCls(v); setSubj(''); setChapter('') }} options={CLASSES} />
-  </Field>
-  <Field label="② Subject">
-    <BSSelect value={subj} disabled={!cls}
-      onChange={v => { setSubj(v); setChapter('') }}
-      options={[{ value: '', label: '── Select subject ──' }, ...getSubjectsForClass(cls).map(s => ({ value: s, label: s }))]} />
-  </Field>
+  <BSSelect value={cls} onChange={v => { setCls(v); setSubj(''); setChapter('') }} options={CLASSES} />
+</Field>
+<Field label="② Subject">
+  <BSSelect value={subj} disabled={!cls}
+    onChange={v => { setSubj(v); setChapter('') }}
+    options={[{ value: '', label: '── Select subject ──' }, ...getSubjectsForClass(cls).map(s => ({ value: s, label: s }))]} />
+</Field>
 </div>
 
         {/* Row 2: Chapter dropdown */}
