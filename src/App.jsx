@@ -1417,6 +1417,81 @@ function Spinner({ size=16 }) {
   return <div style={{ width:size, height:size, border:`2px solid rgba(255,255,255,.15)`, borderTopColor:'white', borderRadius:'50%', animation:'spin .7s linear infinite', flexShrink:0 }}/>
 }
 
+function LessonPicker({ value, onChange, accent = 'var(--accent)' }) {
+  const sel = value
+  const set = patch => onChange({ ...sel, ...patch })
+
+  const subjects  = getSubjectsForClass(sel.cls)
+  const chapters  = sel.subject ? getChapters(sel.subject, sel.cls) : []
+  const subtopics = (sel.subject && sel.chapter) ? getSubtopics(sel.cls, sel.subject, sel.chapter) : []
+
+  const MODES = [
+    ['full',     'Full chapter'],
+    ['subtopic', 'Sub-topic'],
+    ['custom',   'Custom focus'],
+    ['random',   'Free topic'],
+  ]
+
+  return (
+    <div>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 14, marginBottom: 4 }}>
+        <Field label="Class">
+          <BSSelect value={sel.cls}
+            onChange={v => set({ cls: v, subject: '', chapter: '', subtopic: '' })}
+            options={CLASSES} />
+        </Field>
+        <Field label="Subject">
+          <BSSelect value={sel.subject}
+            onChange={v => set({ subject: v, chapter: '', subtopic: '' })}
+            options={[{ value: '', label: '── Select subject ──' }, ...subjects.map(s => ({ value: s, label: s }))]} />
+        </Field>
+        <Field label="Chapter">
+          <BSSelect value={sel.chapter} disabled={!sel.subject}
+            onChange={v => set({ chapter: v, subtopic: '' })}
+            options={[{ value: '', label: '── Select chapter ──' }, ...chapters.map(c => ({ value: c, label: c }))]} />
+        </Field>
+      </div>
+
+      <Field label="Focus">
+        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+          {MODES.map(([m, l]) => {
+            const active = sel.subMode === m
+            const disabled = m === 'subtopic' && subtopics.length === 0
+            return (
+              <button key={m} type="button" disabled={disabled}
+                onClick={() => set({ subMode: m })}
+                style={{ padding: '6px 14px', borderRadius: 20, fontSize: 12.5, fontWeight: 700,
+                  cursor: disabled ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif",
+                  border: `1.5px solid ${active ? accent : 'var(--border)'}`,
+                  background: active ? accent : 'transparent',
+                  color: active ? '#fff' : 'var(--text)',
+                  opacity: disabled ? 0.4 : 1, transition: 'all .15s' }}>
+                {l}
+              </button>
+            )
+          })}
+        </div>
+      </Field>
+
+      {sel.subMode === 'subtopic' && (
+        <Field label="Sub-topic">
+          <BSSelect value={sel.subtopic}
+            onChange={v => set({ subtopic: v })}
+            options={[{ value: '', label: '── Select sub-topic ──' }, ...subtopics.map(s => ({ value: s, label: s }))]} />
+        </Field>
+      )}
+
+      {(sel.subMode === 'custom' || sel.subMode === 'random') && (
+        <Field label={sel.subMode === 'random' ? 'Enter any topic' : 'What to focus on'}>
+          <BSInput value={sel.customText}
+            onChange={v => set({ customText: v })}
+            placeholder={sel.subMode === 'random' ? 'e.g. Photosynthesis basics' : 'e.g. only numerical problems'} />
+        </Field>
+      )}
+    </div>
+  )
+}
+
 
 
 function PageSpinner() {
