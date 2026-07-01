@@ -200,6 +200,9 @@ const CHAPTER_SUBTOPICS = {
   // …add more classes / subjects / chapters here…
 }
 
+// Chapters for a given subject + class, in the order defined in ALL_CHAPTERS
+const getChapters = (subject, cls) => ALL_CHAPTERS?.[cls]?.[subject] || []
+
 const getSubtopics = (cls, subject, chapter) =>
   CHAPTER_SUBTOPICS?.[cls]?.[subject]?.[chapter] || []
 
