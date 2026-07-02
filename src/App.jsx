@@ -209,40 +209,29 @@ const getSubtopics = (cls, subject, chapter) =>
 // Only subjects that actually have chapters for this class
 const getSubjectsForClass = cls => Object.keys(ALL_CHAPTERS[cls] || {})
 
+
 // Default state each tool starts with
 const emptyPicker = (cls = 'Class 10') => ({
   cls, subject: '', chapter: '',
-  subMode: 'full',   // 'full' | 'subtopic' | 'custom' | 'random'
-  subtopic: '',
-  customText: '',
+  topicText: '',   // '' = full chapter; anything else = sub-topic or custom focus (typed or picked)
 })
 
 // Ready to generate?
-const isPickerReady = sel => {
-  if (!sel.subject || !sel.chapter) return false
-  if (sel.subMode === 'custom' || sel.subMode === 'random') return !!sel.customText.trim()
-  return true
-}
+const isPickerReady = sel => !!sel.subject && !!sel.chapter
 
 // Short label for titles
-const pickerTopic = sel => {
-  if (sel.subMode === 'random') return sel.customText.trim()
-  if (sel.subMode === 'custom') return sel.customText.trim()
-  if (sel.subMode === 'subtopic') return sel.subtopic
-  return sel.chapter
-}
+const pickerTopic = sel => sel.topicText.trim() || sel.chapter
 
 // Full scope line fed into AI prompts
 const pickerContext = sel => {
-  if (sel.subMode === 'random')
-    return `the topic "${sel.customText.trim()}" (a free topic chosen by the student, NOT tied to any chapter). Answer at ${sel.cls} level.`
   const base = `${sel.subject}, ${sel.cls}`
-  if (sel.subMode === 'custom')
-    return `${base}, focusing on "${sel.customText.trim()}" within the chapter "${sel.chapter}"`
-  if (sel.subMode === 'subtopic')
-    return `${base}, covering ONLY the sub-topic "${sel.subtopic}" within the chapter "${sel.chapter}"`
-  return `${base}, covering the full chapter "${sel.chapter}"`
+  if (!sel.topicText.trim()) return `${base}, covering the full chapter "${sel.chapter}"`
+  return `${base}, focusing on "${sel.topicText.trim()}" within the chapter "${sel.chapter}"`
 }
+
+// Context builder for the separate Random Topic box (unrelated to any chapter)
+const randomTopicContext = (topic, cls) =>
+  `the topic "${topic.trim()}" (a free topic chosen by the student, NOT tied to any chapter). Answer at ${cls} level.`
 
 // ══════════════════════════════════════════════════════════════
 //  SESSION STORAGE  (saves generated content for history replay)
@@ -1421,86 +1410,64 @@ function LessonPicker({ value, onChange, accent = 'var(--accent)' }) {
   const sel = value
   const set = patch => onChange({ ...sel, ...patch })
 
-  const subjects  = getSubjectsForClass(sel.cls)
-  const chapters  = sel.subject ? getChapters(sel.subject, sel.cls) : []
-  const subtopics = (sel.subject && sel.chapter) ? getSubtopics(sel.cls, sel.subject, sel.chapter) : []
-  const isRandom  = sel.subMode === 'random'
-
-  const SUBTOPIC_OPTIONS = [
-    { value: 'full',   label: '📘 Full Chapter' },
-    ...(subtopics.length ? [{ value: 'subtopic', label: '🎯 Specific Sub-topic' }] : []),
-    { value: 'custom', label: '✍️ Write my own focus' },
-  ]
+  const subjects   = getSubjectsForClass(sel.cls)
+  const chapters   = sel.subject ? getChapters(sel.subject, sel.cls) : []
+  const subtopics  = (sel.subject && sel.chapter) ? getSubtopics(sel.cls, sel.subject, sel.chapter) : []
+  const datalistId = `subtopic-opts-${sel.cls}-${sel.subject}`.replace(/[^a-zA-Z0-9]/g, '')
 
   return (
     <div>
-      {/* Class → Subject → Chapter */}
-      <div style={{
-        display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 14, marginBottom: 4,
-        opacity: isRandom ? 0.45 : 1, pointerEvents: isRandom ? 'none' : 'auto', transition: 'opacity .2s',
-      }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 14, marginBottom: 4 }}>
         <Field label="Class">
           <BSSelect value={sel.cls}
-            onChange={v => set({ cls: v, subject: '', chapter: '', subtopic: '' })}
+            onChange={v => set({ cls: v, subject: '', chapter: '', topicText: '' })}
             options={CLASSES} />
         </Field>
         <Field label="Subject">
           <BSSelect value={sel.subject}
-            onChange={v => set({ subject: v, chapter: '', subtopic: '' })}
+            onChange={v => set({ subject: v, chapter: '', topicText: '' })}
             options={[{ value: '', label: '── Select subject ──' }, ...subjects.map(s => ({ value: s, label: s }))]} />
         </Field>
         <Field label="Chapter">
           <BSSelect value={sel.chapter} disabled={!sel.subject}
-            onChange={v => set({ chapter: v, subtopic: '', subMode: 'full' })}
+            onChange={v => set({ chapter: v, topicText: '' })}
             options={[{ value: '', label: '── Select chapter ──' }, ...chapters.map(c => ({ value: c, label: c }))]} />
         </Field>
       </div>
 
-      {/* Single "Sub Topic" dropdown — only when a chapter is picked and we're not in random mode */}
-      {!isRandom && sel.chapter && (
-        <Field label="Sub Topic">
-          <BSSelect value={sel.subMode === 'random' ? 'full' : sel.subMode}
-            onChange={v => set({ subMode: v })}
-            options={SUBTOPIC_OPTIONS} />
-        </Field>
-      )}
-
-      {!isRandom && sel.chapter && sel.subMode === 'subtopic' && (
-        <Field label="Select Sub-topic">
-          <BSSelect value={sel.subtopic}
-            onChange={v => set({ subtopic: v })}
-            options={[{ value: '', label: '── Select sub-topic ──' }, ...subtopics.map(s => ({ value: s, label: s }))]} />
-        </Field>
-      )}
-
-      {!isRandom && sel.chapter && sel.subMode === 'custom' && (
-        <Field label="What to focus on">
-          <BSInput value={sel.customText}
-            onChange={v => set({ customText: v })}
-            placeholder="e.g. only numerical problems" />
-        </Field>
-      )}
-
-      {/* Small separate area: fully random / unrelated topic */}
-      <div style={{
-        marginTop: 16, padding: '12px 14px', borderRadius: 12,
-        border: `1.5px dashed ${isRandom ? accent : 'var(--border)'}`,
-        background: isRandom ? 'var(--accent-bg)' : 'var(--code-bg)',
-        transition: 'all .15s',
-      }}>
-        <div style={{ fontSize: 12.5, fontWeight: 800, color: isRandom ? accent : 'var(--text)', marginBottom: 8 }}>
-          🎲 Or generate on a Random Topic (not tied to any chapter)
-        </div>
-        <BSInput
-          value={isRandom ? sel.customText : ''}
-          onChange={v => {
-            if (v.trim()) set({ subMode: 'random', customText: v })
-            else set({ subMode: 'full', customText: '' })
-          }}
-          placeholder="e.g. Photosynthesis, Newton's Laws, French Revolution…"
+      {/* Sub Topic combobox — always visible, editable, populated once a chapter is picked */}
+      <Field label="Sub Topic">
+        <input
+          list={datalistId}
+          value={sel.topicText}
+          disabled={!sel.chapter}
+          onChange={e => set({ topicText: e.target.value })}
+          placeholder={sel.chapter ? 'Full Chapter (default) — pick a sub-topic or type your own focus' : 'Select a chapter first'}
+          style={{ ...T.input, opacity: sel.chapter ? 1 : 0.55, cursor: sel.chapter ? 'text' : 'not-allowed' }}
         />
-      </div>
+        <datalist id={datalistId}>
+          <option value="">Full Chapter</option>
+          {subtopics.map(s => <option key={s} value={s} />)}
+        </datalist>
+      </Field>
     </div>
+  )
+}
+
+function RandomTopicBox({ value, onChange, onGenerate, loading, accent = 'var(--accent)', buttonLabel = 'Generate', placeholder = "e.g. Photosynthesis, Newton's Laws, French Revolution…" }) {
+  return (
+    <Card style={{ marginTop: 12, padding: 14 }}>
+      <div style={{ fontSize: 12, fontWeight: 800, color: accent, marginBottom: 8, display: 'flex', alignItems: 'center', gap: 6, flexWrap: 'wrap' }}>
+        🎲 Or generate on a Random Topic
+        <span style={{ color: 'var(--text)', fontWeight: 600, fontSize: 11.5 }}>(not tied to any chapter)</span>
+      </div>
+      <div style={{ display: 'flex', gap: 8 }}>
+        <BSInput value={value} onChange={onChange} placeholder={placeholder} />
+        <PrimaryBtn small onClick={onGenerate} disabled={loading || !value.trim()} color={accent}>
+          {loading ? <Spinner size={14} /> : buttonLabel}
+        </PrimaryBtn>
+      </div>
+    </Card>
   )
 }
 
@@ -4187,10 +4154,12 @@ function NotesMaker({ user, prefill, onClearPrefill }) {
   const [saved, setSaved]   = useState(false)
   const [err, setErr]       = useState('')
 
-  // Bridge the picker → the identity vars your prompt already uses
-  const subject      = sel.subMode === 'random' ? 'General' : sel.subject
+  const [randomTopic, setRandomTopic] = useState('')
+  const [randomLoading, setRandomLoading] = useState(false)
+
+  const subject      = sel.subject
   const cls          = sel.cls
-  const finalChapter = pickerTopic(sel)          // full chapter, sub-topic, custom, or random
+  const finalChapter = pickerTopic(sel)
   const ready        = isPickerReady(sel)
 
   const STYLE_INSTRUCTIONS = {
@@ -4201,10 +4170,10 @@ function NotesMaker({ user, prefill, onClearPrefill }) {
     'Mind Map Style': `Organize as a hierarchy: Chapter → Topics → Sub-topics → Key facts/formulas/examples. Use indentation and bold headings to show relationships clearly. Still write full explanatory sentences under each node.`,
   }
 
-  const buildPrompt = () => `You are a world-class CBSE textbook author and examiner with 20+ years of experience. Your task is to write EXHAUSTIVE, publication-quality study notes.
+  const buildPrompt = (contextLine, chapterLabel, subjectLabel, clsLabel) => `You are a world-class CBSE textbook author and examiner with 20+ years of experience. Your task is to write EXHAUSTIVE, publication-quality study notes.
 
-SCOPE: ${pickerContext(sel)}
-SUBJECT: ${subject} | CLASS: ${cls} | CHAPTER: "${finalChapter}" | BOARD: CBSE
+SCOPE: ${contextLine}
+SUBJECT: ${subjectLabel} | CLASS: ${clsLabel} | CHAPTER: "${chapterLabel}" | BOARD: CBSE
 STYLE: ${style_}
 
 STYLE INSTRUCTION: ${STYLE_INSTRUCTIONS[style_] || STYLE_INSTRUCTIONS['Detailed']}
@@ -4221,13 +4190,13 @@ STRICT REQUIREMENTS — YOU MUST FOLLOW ALL OF THESE:
 ✦ BOLD only key terms on their FIRST use.
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-# ${finalChapter}
-**Subject:** ${subject} | **Class:** ${cls} | **Board:** CBSE 2024-25
+# ${chapterLabel}
+**Subject:** ${subjectLabel} | **Class:** ${clsLabel} | **Board:** CBSE 2024-25
 
 ---
 
 ## 1. 📌 Chapter Overview & Importance
-- Where this chapter fits in the bigger picture of ${subject}
+- Where this chapter fits in the bigger picture of ${subjectLabel}
 - Real-world relevance and applications
 - How many marks this chapter carries in board exams and which types of questions appear
 - What you will know by the end of these notes
@@ -4313,26 +4282,27 @@ FINAL REMINDER: You must write AT LEAST 3500 words. Every section above must be 
 
   useEffect(() => {
     if (!prefill) return
-    setSel(s => ({ ...s, subject: prefill.subject || s.subject, chapter: prefill.chapter || s.chapter, cls: prefill.cls || s.cls, subMode: 'full', subtopic: '', customText: '' }))
+    setSel(s => ({ ...s, subject: prefill.subject || s.subject, chapter: prefill.chapter || s.chapter, cls: prefill.cls || s.cls, topicText: '' }))
     onClearPrefill?.()
     loadSavedContent('notes', prefill.subject, prefill.chapter, []).then(content => {
       if (content) { setResult(content); setSaved(true) }
     })
   }, [prefill])
 
-  // Shared cache key — everyone who picks the same scope + style shares one note
-  const notesCacheKey = () => {
+  const notesCacheKey = (subj, clsLabel, chapterLabel) => {
     const safe = s => String(s || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase().slice(0, 24)
-    return `bsnotes-${safe(subject)}-${safe(cls)}-${safe(finalChapter)}-${safe(style_)}`
+    return `bsnotes-${safe(subj)}-${safe(clsLabel)}-${safe(chapterLabel)}-${safe(style_)}`
   }
 
   async function generate() {
     if (!ready) return
     setErr(''); setLoading(true); setSaved(false)
     try {
-      const shared = await api.get(`/api/shared-notes/${notesCacheKey()}`).catch(() => null)
+      const key = notesCacheKey(subject, cls, finalChapter)
+      const shared = await api.get(`/api/shared-notes/${key}`).catch(() => null)
       if (shared?.content) { setResult(shared.content); setLoading(false); return }
-      const r = await api.post('/api/ai/notes', { messages: [{ role: 'user', content: buildPrompt() }], subject, chapter: finalChapter })
+      const prompt = buildPrompt(pickerContext(sel), finalChapter, subject, cls)
+      const r = await api.post('/api/ai/notes', { messages: [{ role: 'user', content: prompt }], subject, chapter: finalChapter })
       setResult(r.content)
       try { await api.post('/api/shared-notes', { subject, classLevel: cls, chapter: finalChapter, style: style_, content: r.content }) } catch {}
       saveSessionContent({ tool: 'notes', subject, chapter: finalChapter, classLevel: cls, content: r.content })
@@ -4340,12 +4310,30 @@ FINAL REMINDER: You must write AT LEAST 3500 words. Every section above must be 
     setLoading(false)
   }
 
+  async function generateRandom() {
+    if (!randomTopic.trim()) return
+    setErr(''); setRandomLoading(true); setSaved(false)
+    const topic = randomTopic.trim()
+    try {
+      const key = notesCacheKey('General', sel.cls, topic)
+      const shared = await api.get(`/api/shared-notes/${key}`).catch(() => null)
+      if (shared?.content) { setResult(shared.content); setRandomLoading(false); return }
+      const prompt = buildPrompt(randomTopicContext(topic, sel.cls), topic, 'General', sel.cls)
+      const r = await api.post('/api/ai/notes', { messages: [{ role: 'user', content: prompt }], subject: 'General', chapter: topic })
+      setResult(r.content)
+      try { await api.post('/api/shared-notes', { subject: 'General', classLevel: sel.cls, chapter: topic, style: style_, content: r.content }) } catch {}
+      saveSessionContent({ tool: 'notes', subject: 'General', chapter: topic, classLevel: sel.cls, content: r.content })
+    } catch (e) { if (e.status === 402) { setErr('Free trial ended. Please subscribe.') } else { setErr(e.message) } }
+    setRandomLoading(false)
+  }
+
   async function saveNote() { try { await api.post('/api/user/notes', { subject, classLevel: cls, chapter: finalChapter, style: style_, content: result }); setSaved(true) } catch (e) { alert(e.message) } }
 
   return (
     <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito',sans-serif", animation: 'slideUp .25s ease-out' }}>
-      <PageHeader icon="📖" title="Chapter Notes Maker" subtitle="Class → Subject → Chapter → focus → textbook-quality notes — download or print as PDF" color="#10B981" />
-      <Card style={{ marginBottom: 18 }}>
+      <PageHeader icon="📖" title="Chapter Notes Maker" subtitle="Class → Subject → Chapter → Sub Topic → textbook-quality notes — download or print as PDF" color="#10B981" />
+
+      <Card style={{ marginBottom: 4 }}>
         <LessonPicker value={sel} onChange={setSel} accent="#10B981" />
         <Field label="Notes Style"><BSSelect value={style_} onChange={setStyle_} options={['Detailed', 'Concise', 'Bullet Points', 'Q&A Format', 'Mind Map Style']} /></Field>
         <PrimaryBtn onClick={generate} disabled={loading || !ready} color="#10B981">{loading ? <><Spinner /> Generating notes...</> : '📖 Generate Comprehensive Notes'}</PrimaryBtn>
@@ -4358,11 +4346,21 @@ FINAL REMINDER: You must write AT LEAST 3500 words. Every section above must be 
           </div>
         )}
       </Card>
+
+      <RandomTopicBox
+        value={randomTopic}
+        onChange={setRandomTopic}
+        onGenerate={generateRandom}
+        loading={randomLoading}
+        accent="#10B981"
+        buttonLabel="📖 Generate"
+      />
+
       <ErrMsg msg={err} />
       {result && <>
         <NotesDocument
           content={result}
-          title={`${finalChapter} Notes — ${subject} ${cls}`}
+          title={`${finalChapter} Notes — ${subject || 'General'} ${cls}`}
           onDownload={() => downloadText(result, `${finalChapter}-notes.txt`)}
         />
         <div style={{ display: 'flex', gap: 8, marginTop: 12 }}>
@@ -4843,9 +4841,12 @@ function QuizGenerator({ user, prefill, onClearPrefill }) {
   const [timeUp, setTimeUp]       = useState(false)
   const [finalScore, setFinalScore] = useState(null)
 
+  const [randomTopic, setRandomTopic] = useState('')
+  const [randomLoading, setRandomLoading] = useState(false)
+
   const topic          = pickerTopic(sel)
   const ready          = isPickerReady(sel)
-  const subjectForSave = sel.subMode === 'random' ? 'General' : sel.subject
+  const subjectForSave = sel.subject
   const SECS_PER_Q = { Easy: 30, Medium: 45, Hard: 60, Mixed: 45 }
 
   useEffect(() => {
@@ -4858,7 +4859,7 @@ function QuizGenerator({ user, prefill, onClearPrefill }) {
           clearInterval(id); setTimeUp(true); setSubmitted(true)
           const correct = quiz.questions.filter((q, i) => answers[i] === q.answer).length
           setFinalScore({ correct, xpEarned: Math.round((correct / quiz.questions.length) * 50) + 5 })
-          saveSessionContent({ tool: 'quiz', subject: subjectForSave, chapter: topic, classLevel: sel.cls, content: { ...quiz, score: correct, total: quiz.questions.length, timeUp: true } })
+          saveSessionContent({ tool: 'quiz', subject: quiz.subjectUsed, chapter: quiz.topicUsed, classLevel: sel.cls, content: { ...quiz, score: correct, total: quiz.questions.length, timeUp: true } })
           return 0
         }
         return prev - 1
@@ -4872,9 +4873,21 @@ function QuizGenerator({ user, prefill, onClearPrefill }) {
 
   useEffect(() => {
     if (!prefill) return
-    setSel(s => ({ ...s, subject: prefill.subject || s.subject, chapter: prefill.chapter || s.chapter, cls: prefill.cls || s.cls, subMode: 'full', subtopic: '', customText: '' }))
+    setSel(s => ({ ...s, subject: prefill.subject || s.subject, chapter: prefill.chapter || s.chapter, cls: prefill.cls || s.cls, topicText: '' }))
     onClearPrefill?.()
   }, [prefill])
+
+  const cleanQuiz = parsed => {
+    const BAD = /\b(wait|let me|recalculat|recheck|actually|however|revising|correcting|reconsider|hmm|option [0-9]|answer should be)\b/i
+    parsed.questions = (parsed.questions || []).map(q => {
+      if (q.explanation && BAD.test(q.explanation)) {
+        const clean = q.explanation.split(/(?<=[.!?])\s+/).filter(s => !BAD.test(s)).join(' ').trim()
+        q.explanation = clean || 'See the correct option marked above.'
+      }
+      return q
+    })
+    return parsed
+  }
 
   async function generate() {
     if (!ready) return
@@ -4898,20 +4911,43 @@ Format:
     try {
       const r = await api.post('/api/ai/quiz', { messages: [{ role: 'user', content: PROMPT }], subject, chapter: topic })
       const raw = typeof r.content === 'string' ? r.content : r.content[0]?.text || ''
-      const parsed = JSON.parse(raw.replace(/```[\w]*\n?/gi, '').trim())
-      const BAD = /\b(wait|let me|recalculat|recheck|actually|however|revising|correcting|reconsider|hmm|option [0-9]|answer should be)\b/i
-      parsed.questions = (parsed.questions || []).map(q => {
-        if (q.explanation && BAD.test(q.explanation)) {
-          const clean = q.explanation.split(/(?<=[.!?])\s+/).filter(s => !BAD.test(s)).join(' ').trim()
-          q.explanation = clean || 'See the correct option marked above.'
-        }
-        return q
-      })
+      const parsed = cleanQuiz(JSON.parse(raw.replace(/```[\w]*\n?/gi, '').trim()))
+      parsed.subjectUsed = subject; parsed.topicUsed = topic
       setQuiz(parsed)
-      saveSessionContent({ tool: 'quiz', subject: subjectForSave, chapter: topic, classLevel: sel.cls, content: parsed })
+      saveSessionContent({ tool: 'quiz', subject, chapter: topic, classLevel: sel.cls, content: parsed })
       setAnswers({}); setSubmitted(false)
     } catch (e) { setErr(e.status === 402 ? 'Free trial ended. Please subscribe.' : 'Failed to generate quiz. Try again.') }
     setLoading(false)
+  }
+
+  async function generateRandom() {
+    if (!randomTopic.trim()) return
+    const topicR = randomTopic.trim()
+    const PROMPT = `You are a CBSE examiner creating a ${num}-question multiple-choice quiz.
+SCOPE: ${randomTopicContext(topicR, sel.cls)}
+Difficulty: ${diff}.
+
+RULES — follow every one:
+1. Solve each question completely BEFORE writing. Decide the correct answer first.
+2. Write ONLY the final, polished explanation in 1-2 sentences. Never show your working.
+3. FORBIDDEN in "explanation": "wait","let me","recalculate","rechecking","actually","however","revising","correcting","hmm","answer should be","reconsider".
+4. "answer" is the 0-based index (0,1,2,3) of the correct option and MUST match your solved result.
+5. Exactly ONE option correct; three plausible distractors.
+6. Output VALID JSON ONLY — no markdown.
+
+Format:
+{"title":"${topicR} Quiz","questions":[{"q":"Question text?","options":["A","B","C","D"],"answer":0,"explanation":"Short reason."}]}`
+    setErr(''); setRandomLoading(true); setQuiz(null)
+    try {
+      const r = await api.post('/api/ai/quiz', { messages: [{ role: 'user', content: PROMPT }], subject: 'General', chapter: topicR })
+      const raw = typeof r.content === 'string' ? r.content : r.content[0]?.text || ''
+      const parsed = cleanQuiz(JSON.parse(raw.replace(/```[\w]*\n?/gi, '').trim()))
+      parsed.subjectUsed = 'General'; parsed.topicUsed = topicR
+      setQuiz(parsed)
+      saveSessionContent({ tool: 'quiz', subject: 'General', chapter: topicR, classLevel: sel.cls, content: parsed })
+      setAnswers({}); setSubmitted(false)
+    } catch (e) { setErr(e.status === 402 ? 'Free trial ended. Please subscribe.' : 'Failed to generate quiz. Try again.') }
+    setRandomLoading(false)
   }
 
   async function submit() {
@@ -4919,8 +4955,8 @@ Format:
     setSubmitted(true)
     const correct = quiz.questions.filter((q, i) => answers[i] === q.answer).length
     setFinalScore({ correct, xpEarned: Math.round((correct / quiz.questions.length) * 50) + 5 })
-    saveSessionContent({ tool: 'quiz', subject: subjectForSave, chapter: topic, classLevel: sel.cls, content: { ...quiz, score: correct, total: quiz.questions.length } })
-    try { await api.post('/api/user/quiz-history', { subject: subjectForSave, topic, difficulty: diff, totalQuestions: quiz.questions.length, correctAnswers: correct, xpEarned: Math.round((correct / quiz.questions.length) * 50) + 5, isPerfect: correct === quiz.questions.length }) } catch {}
+    saveSessionContent({ tool: 'quiz', subject: quiz.subjectUsed, chapter: quiz.topicUsed, classLevel: sel.cls, content: { ...quiz, score: correct, total: quiz.questions.length } })
+    try { await api.post('/api/user/quiz-history', { subject: quiz.subjectUsed, topic: quiz.topicUsed, difficulty: diff, totalQuestions: quiz.questions.length, correctAnswers: correct, xpEarned: Math.round((correct / quiz.questions.length) * 50) + 5, isPerfect: correct === quiz.questions.length }) } catch {}
   }
 
   const score = submitted ? quiz.questions.filter((q, i) => answers[i] === q.answer).length : 0
@@ -4928,20 +4964,31 @@ Format:
 
   return (
     <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
-      <PageHeader icon="🎯" title="Quiz Generator" subtitle="Pick class, subject, chapter (and a focus) — get a timed MCQ quiz with instant scoring" color="#F59E0B" />
+      <PageHeader icon="🎯" title="Quiz Generator" subtitle="Pick class, subject, chapter and sub-topic — get a timed MCQ quiz with instant scoring" color="#F59E0B" />
 
       {!quiz ? (
-        <Card>
-          <LessonPicker value={sel} onChange={setSel} accent="#F59E0B" />
-          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 4 }}>
-            <Field label="Questions"><BSSelect value={num} onChange={setNum} options={['5', '8', '10', '15']} /></Field>
-            <Field label="Difficulty"><BSSelect value={diff} onChange={setDiff} options={['Easy', 'Medium', 'Hard', 'Mixed']} /></Field>
-          </div>
-          <ErrMsg msg={err} />
-          <PrimaryBtn onClick={generate} disabled={loading || !ready} color="#F59E0B" style={{ marginTop: 4 }}>
-            {loading ? <><Spinner /> Generating…</> : '✨ Generate Quiz'}
-          </PrimaryBtn>
-        </Card>
+        <>
+          <Card>
+            <LessonPicker value={sel} onChange={setSel} accent="#F59E0B" />
+            <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14, marginTop: 4 }}>
+              <Field label="Questions"><BSSelect value={num} onChange={setNum} options={['5', '8', '10', '15']} /></Field>
+              <Field label="Difficulty"><BSSelect value={diff} onChange={setDiff} options={['Easy', 'Medium', 'Hard', 'Mixed']} /></Field>
+            </div>
+            <ErrMsg msg={err} />
+            <PrimaryBtn onClick={generate} disabled={loading || !ready} color="#F59E0B" style={{ marginTop: 4 }}>
+              {loading ? <><Spinner /> Generating…</> : '✨ Generate Quiz'}
+            </PrimaryBtn>
+          </Card>
+
+          <RandomTopicBox
+            value={randomTopic}
+            onChange={setRandomTopic}
+            onGenerate={generateRandom}
+            loading={randomLoading}
+            accent="#F59E0B"
+            buttonLabel="🎯 Generate"
+          />
+        </>
       ) : (
         <div>
           {!submitted && timeLeft !== null && (
@@ -5013,24 +5060,28 @@ Format:
 function FlashCards({ user, prefill, onClearPrefill }) {
   const [sel, setSel]   = useState(emptyPicker())
   const [cards, setCards] = useState([])
+  const [cardsMeta, setCardsMeta] = useState({ subject: '', topic: '' })
   const [current, setCurrent] = useState(0)
   const [flipped, setFlipped] = useState({})
   const [mode, setMode] = useState('grid')
   const [loading, setLoading] = useState(false)
   const [err, setErr]   = useState('')
 
-  const topic          = pickerTopic(sel)
-  const ready          = isPickerReady(sel)
-  const subjectForSave = sel.subMode === 'random' ? 'General' : sel.subject
+  const [randomTopic, setRandomTopic] = useState('')
+  const [randomLoading, setRandomLoading] = useState(false)
+
+  const topic = pickerTopic(sel)
+  const ready = isPickerReady(sel)
 
   useEffect(() => {
     if (!prefill) return
-    setSel(s => ({ ...s, subject: prefill.subject || s.subject, chapter: prefill.chapter || s.chapter, cls: prefill.cls || s.cls, subMode: 'full', subtopic: '', customText: '' }))
+    setSel(s => ({ ...s, subject: prefill.subject || s.subject, chapter: prefill.chapter || s.chapter, cls: prefill.cls || s.cls, topicText: '' }))
     onClearPrefill?.()
   }, [prefill])
 
   async function generate() {
     if (!ready) return
+    const subject = sel.subject
     const PROMPT = `Create 8 high-quality flashcards.
 SCOPE: ${pickerContext(sel)}
 Cover the most important terms, formulas and concepts within that scope. If a sub-topic is named, stay inside it.
@@ -5038,34 +5089,69 @@ Return ONLY valid JSON:
 {"cards":[{"front":"Key term or concept","back":"Clear, concise definition (1-2 sentences max)"}]}`
     setErr(''); setLoading(true); setCurrent(0); setFlipped({})
     try {
-      const r = await api.post('/api/ai/flashcards', { messages: [{ role: 'user', content: PROMPT }], subject: subjectForSave, chapter: topic })
+      const r = await api.post('/api/ai/flashcards', { messages: [{ role: 'user', content: PROMPT }], subject, chapter: topic })
       const raw = typeof r.content === 'string' ? r.content : r.content[0]?.text || ''
       const parsed = JSON.parse(raw.replace(/```[\w]*\n?/gi, '').trim())
       if (!parsed.cards?.length) throw new Error('No cards')
       setCards(parsed.cards)
-      saveSessionContent({ tool: 'flashcards', subject: subjectForSave, chapter: topic, classLevel: sel.cls, content: parsed.cards })
+      setCardsMeta({ subject, topic })
+      saveSessionContent({ tool: 'flashcards', subject, chapter: topic, classLevel: sel.cls, content: parsed.cards })
     } catch (e) { setErr(e.status === 402 ? 'Free trial ended. Please subscribe.' : 'Failed to generate flashcards. Try again.') }
     setLoading(false)
+  }
+
+  async function generateRandom() {
+    if (!randomTopic.trim()) return
+    const topicR = randomTopic.trim()
+    const PROMPT = `Create 8 high-quality flashcards.
+SCOPE: ${randomTopicContext(topicR, sel.cls)}
+Cover the most important terms, formulas and concepts within that scope.
+Return ONLY valid JSON:
+{"cards":[{"front":"Key term or concept","back":"Clear, concise definition (1-2 sentences max)"}]}`
+    setErr(''); setRandomLoading(true); setCurrent(0); setFlipped({})
+    try {
+      const r = await api.post('/api/ai/flashcards', { messages: [{ role: 'user', content: PROMPT }], subject: 'General', chapter: topicR })
+      const raw = typeof r.content === 'string' ? r.content : r.content[0]?.text || ''
+      const parsed = JSON.parse(raw.replace(/```[\w]*\n?/gi, '').trim())
+      if (!parsed.cards?.length) throw new Error('No cards')
+      setCards(parsed.cards)
+      setCardsMeta({ subject: 'General', topic: topicR })
+      saveSessionContent({ tool: 'flashcards', subject: 'General', chapter: topicR, classLevel: sel.cls, content: parsed.cards })
+    } catch (e) { setErr(e.status === 402 ? 'Free trial ended. Please subscribe.' : 'Failed to generate flashcards. Try again.') }
+    setRandomLoading(false)
   }
 
   const card = cards[current]
 
   return (
     <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
-      <PageHeader icon="🃏" title="Flashcards" subtitle="Class → Subject → Chapter → focus → flip-cards for fast revision" color="#EF4444" />
+      <PageHeader icon="🃏" title="Flashcards" subtitle="Class → Subject → Chapter → Sub Topic → flip-cards for fast revision" color="#EF4444" />
 
-      <Card style={{ marginBottom: 18 }}>
-        <LessonPicker value={sel} onChange={setSel} accent="#EF4444" />
-        <ErrMsg msg={err} />
-        <PrimaryBtn onClick={generate} disabled={loading || !ready} color="#EF4444">
-          {loading ? <><Spinner /> Creating cards…</> : '🃏 Generate Flashcards'}
-        </PrimaryBtn>
-      </Card>
+      {cards.length === 0 && (
+        <>
+          <Card style={{ marginBottom: 4 }}>
+            <LessonPicker value={sel} onChange={setSel} accent="#EF4444" />
+            <ErrMsg msg={err} />
+            <PrimaryBtn onClick={generate} disabled={loading || !ready} color="#EF4444">
+              {loading ? <><Spinner /> Creating cards…</> : '🃏 Generate Flashcards'}
+            </PrimaryBtn>
+          </Card>
+
+          <RandomTopicBox
+            value={randomTopic}
+            onChange={setRandomTopic}
+            onGenerate={generateRandom}
+            loading={randomLoading}
+            accent="#EF4444"
+            buttonLabel="🃏 Generate"
+          />
+        </>
+      )}
 
       {cards.length > 0 && (
         <>
           <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 14 }}>
-            <h3 style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 16, color: 'var(--text-h)', margin: 0 }}>{topic} — {cards.length} Cards</h3>
+            <h3 style={{ fontFamily: "'Sora', sans-serif", fontWeight: 800, fontSize: 16, color: 'var(--text-h)', margin: 0 }}>{cardsMeta.topic} — {cards.length} Cards</h3>
             <div style={{ display: 'flex', gap: 7 }}>
               {[['grid', '⊞ Grid'], ['study', '▶ Study']].map(([m, l]) => (
                 <button key={m} onClick={() => setMode(m)} style={{ padding: '6px 14px', borderRadius: 8, border: 'none', fontWeight: 700, fontSize: 12.5, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", background: mode === m ? '#EF4444' : 'var(--social-bg)', color: mode === m ? '#fff' : 'var(--text-h)' }}>{l}</button>
