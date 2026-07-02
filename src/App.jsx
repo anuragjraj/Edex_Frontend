@@ -213,20 +213,32 @@ const getSubjectsForClass = cls => Object.keys(ALL_CHAPTERS[cls] || {})
 // Default state each tool starts with
 const emptyPicker = (cls = 'Class 10') => ({
   cls, subject: '', chapter: '',
-  topicText: '',   // '' = full chapter; anything else = sub-topic or custom focus (typed or picked)
+  subTopicChoice: 'full',   // 'full' | <a real sub-topic string> | 'custom'
+  customText: '',
 })
 
 // Ready to generate?
-const isPickerReady = sel => !!sel.subject && !!sel.chapter
+const isPickerReady = sel => {
+  if (!sel.subject || !sel.chapter) return false
+  if (sel.subTopicChoice === 'custom') return !!sel.customText.trim()
+  return true
+}
 
 // Short label for titles
-const pickerTopic = sel => sel.topicText.trim() || sel.chapter
+const pickerTopic = sel => {
+  if (sel.subTopicChoice === 'custom') return sel.customText.trim()
+  if (sel.subTopicChoice === 'full')   return sel.chapter
+  return sel.subTopicChoice   // a real sub-topic string
+}
 
 // Full scope line fed into AI prompts
 const pickerContext = sel => {
   const base = `${sel.subject}, ${sel.cls}`
-  if (!sel.topicText.trim()) return `${base}, covering the full chapter "${sel.chapter}"`
-  return `${base}, focusing on "${sel.topicText.trim()}" within the chapter "${sel.chapter}"`
+  if (sel.subTopicChoice === 'custom')
+    return `${base}, focusing on "${sel.customText.trim()}" within the chapter "${sel.chapter}"`
+  if (sel.subTopicChoice === 'full')
+    return `${base}, covering the full chapter "${sel.chapter}"`
+  return `${base}, covering ONLY the sub-topic "${sel.subTopicChoice}" within the chapter "${sel.chapter}"`
 }
 
 // Context builder for the separate Random Topic box (unrelated to any chapter)
@@ -1410,46 +1422,55 @@ function LessonPicker({ value, onChange, accent = 'var(--accent)' }) {
   const sel = value
   const set = patch => onChange({ ...sel, ...patch })
 
-  const subjects   = getSubjectsForClass(sel.cls)
-  const chapters   = sel.subject ? getChapters(sel.subject, sel.cls) : []
-  const subtopics  = (sel.subject && sel.chapter) ? getSubtopics(sel.cls, sel.subject, sel.chapter) : []
-  const datalistId = `subtopic-opts-${sel.cls}-${sel.subject}`.replace(/[^a-zA-Z0-9]/g, '')
+  const subjects  = getSubjectsForClass(sel.cls)
+  const chapters  = sel.subject ? getChapters(sel.subject, sel.cls) : []
+  const subtopics = (sel.subject && sel.chapter) ? getSubtopics(sel.cls, sel.subject, sel.chapter) : []
+
+  const subTopicOptions = [
+    { value: 'full', label: '📘 Full Chapter' },
+    ...subtopics.map(s => ({ value: s, label: s })),
+    { value: 'custom', label: '✍️ Write my own...' },
+  ]
 
   return (
     <div>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 14, marginBottom: 4 }}>
         <Field label="Class">
           <BSSelect value={sel.cls}
-            onChange={v => set({ cls: v, subject: '', chapter: '', topicText: '' })}
+            onChange={v => set({ cls: v, subject: '', chapter: '', subTopicChoice: 'full', customText: '' })}
             options={CLASSES} />
         </Field>
         <Field label="Subject">
           <BSSelect value={sel.subject}
-            onChange={v => set({ subject: v, chapter: '', topicText: '' })}
+            onChange={v => set({ subject: v, chapter: '', subTopicChoice: 'full', customText: '' })}
             options={[{ value: '', label: '── Select subject ──' }, ...subjects.map(s => ({ value: s, label: s }))]} />
         </Field>
         <Field label="Chapter">
           <BSSelect value={sel.chapter} disabled={!sel.subject}
-            onChange={v => set({ chapter: v, topicText: '' })}
+            onChange={v => set({ chapter: v, subTopicChoice: 'full', customText: '' })}
             options={[{ value: '', label: '── Select chapter ──' }, ...chapters.map(c => ({ value: c, label: c }))]} />
         </Field>
       </div>
 
-      {/* Sub Topic combobox — always visible, editable, populated once a chapter is picked */}
+      {/* Sub Topic dropdown — always visible; disabled until a chapter is picked */}
       <Field label="Sub Topic">
-        <input
-          list={datalistId}
-          value={sel.topicText}
+        <BSSelect
+          value={sel.subTopicChoice}
           disabled={!sel.chapter}
-          onChange={e => set({ topicText: e.target.value })}
-          placeholder={sel.chapter ? 'Full Chapter (default) — pick a sub-topic or type your own focus' : 'Select a chapter first'}
-          style={{ ...T.input, opacity: sel.chapter ? 1 : 0.55, cursor: sel.chapter ? 'text' : 'not-allowed' }}
+          onChange={v => set({ subTopicChoice: v, customText: v === 'custom' ? sel.customText : '' })}
+          options={sel.chapter ? subTopicOptions : [{ value: 'full', label: 'Select a chapter first' }]}
         />
-        <datalist id={datalistId}>
-          <option value="">Full Chapter</option>
-          {subtopics.map(s => <option key={s} value={s} />)}
-        </datalist>
       </Field>
+
+      {sel.chapter && sel.subTopicChoice === 'custom' && (
+        <Field label="Type your focus">
+          <BSInput
+            value={sel.customText}
+            onChange={v => set({ customText: v })}
+            placeholder="e.g. only numerical problems, or a specific sub-topic not listed above"
+          />
+        </Field>
+      )}
     </div>
   )
 }
@@ -4282,7 +4303,7 @@ FINAL REMINDER: You must write AT LEAST 3500 words. Every section above must be 
 
   useEffect(() => {
     if (!prefill) return
-    setSel(s => ({ ...s, subject: prefill.subject || s.subject, chapter: prefill.chapter || s.chapter, cls: prefill.cls || s.cls, topicText: '' }))
+    setSel(s => ({ ...s, subject: prefill.subject || s.subject, chapter: prefill.chapter || s.chapter, cls: prefill.cls || s.cls, subTopicChoice: 'full', customText: '' }))
     onClearPrefill?.()
     loadSavedContent('notes', prefill.subject, prefill.chapter, []).then(content => {
       if (content) { setResult(content); setSaved(true) }
@@ -4873,7 +4894,7 @@ function QuizGenerator({ user, prefill, onClearPrefill }) {
 
   useEffect(() => {
     if (!prefill) return
-    setSel(s => ({ ...s, subject: prefill.subject || s.subject, chapter: prefill.chapter || s.chapter, cls: prefill.cls || s.cls, topicText: '' }))
+    setSel(s => ({ ...s, subject: prefill.subject || s.subject, chapter: prefill.chapter || s.chapter, cls: prefill.cls || s.cls, subTopicChoice: 'full', customText: '' }))
     onClearPrefill?.()
   }, [prefill])
 
@@ -5075,7 +5096,7 @@ function FlashCards({ user, prefill, onClearPrefill }) {
 
   useEffect(() => {
     if (!prefill) return
-    setSel(s => ({ ...s, subject: prefill.subject || s.subject, chapter: prefill.chapter || s.chapter, cls: prefill.cls || s.cls, topicText: '' }))
+    setSel(s => ({ ...s, subject: prefill.subject || s.subject, chapter: prefill.chapter || s.chapter, cls: prefill.cls || s.cls, subTopicChoice: 'full', customText: '' }))
     onClearPrefill?.()
   }, [prefill])
 
