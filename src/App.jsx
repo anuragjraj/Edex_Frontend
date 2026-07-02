@@ -1424,17 +1424,21 @@ function LessonPicker({ value, onChange, accent = 'var(--accent)' }) {
   const subjects  = getSubjectsForClass(sel.cls)
   const chapters  = sel.subject ? getChapters(sel.subject, sel.cls) : []
   const subtopics = (sel.subject && sel.chapter) ? getSubtopics(sel.cls, sel.subject, sel.chapter) : []
+  const isRandom  = sel.subMode === 'random'
 
-  const MODES = [
-    ['full',     'Full chapter'],
-    ['subtopic', 'Sub-topic'],
-    ['custom',   'Custom focus'],
-    ['random',   'Free topic'],
+  const SUBTOPIC_OPTIONS = [
+    { value: 'full',   label: '📘 Full Chapter' },
+    ...(subtopics.length ? [{ value: 'subtopic', label: '🎯 Specific Sub-topic' }] : []),
+    { value: 'custom', label: '✍️ Write my own focus' },
   ]
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 14, marginBottom: 4 }}>
+      {/* Class → Subject → Chapter */}
+      <div style={{
+        display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 14, marginBottom: 4,
+        opacity: isRandom ? 0.45 : 1, pointerEvents: isRandom ? 'none' : 'auto', transition: 'opacity .2s',
+      }}>
         <Field label="Class">
           <BSSelect value={sel.cls}
             onChange={v => set({ cls: v, subject: '', chapter: '', subtopic: '' })}
@@ -1447,47 +1451,55 @@ function LessonPicker({ value, onChange, accent = 'var(--accent)' }) {
         </Field>
         <Field label="Chapter">
           <BSSelect value={sel.chapter} disabled={!sel.subject}
-            onChange={v => set({ chapter: v, subtopic: '' })}
+            onChange={v => set({ chapter: v, subtopic: '', subMode: 'full' })}
             options={[{ value: '', label: '── Select chapter ──' }, ...chapters.map(c => ({ value: c, label: c }))]} />
         </Field>
       </div>
 
-      <Field label="Focus">
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
-          {MODES.map(([m, l]) => {
-            const active = sel.subMode === m
-            const disabled = m === 'subtopic' && subtopics.length === 0
-            return (
-              <button key={m} type="button" disabled={disabled}
-                onClick={() => set({ subMode: m })}
-                style={{ padding: '6px 14px', borderRadius: 20, fontSize: 12.5, fontWeight: 700,
-                  cursor: disabled ? 'not-allowed' : 'pointer', fontFamily: "'Nunito', sans-serif",
-                  border: `1.5px solid ${active ? accent : 'var(--border)'}`,
-                  background: active ? accent : 'transparent',
-                  color: active ? '#fff' : 'var(--text)',
-                  opacity: disabled ? 0.4 : 1, transition: 'all .15s' }}>
-                {l}
-              </button>
-            )
-          })}
-        </div>
-      </Field>
+      {/* Single "Sub Topic" dropdown — only when a chapter is picked and we're not in random mode */}
+      {!isRandom && sel.chapter && (
+        <Field label="Sub Topic">
+          <BSSelect value={sel.subMode === 'random' ? 'full' : sel.subMode}
+            onChange={v => set({ subMode: v })}
+            options={SUBTOPIC_OPTIONS} />
+        </Field>
+      )}
 
-      {sel.subMode === 'subtopic' && (
-        <Field label="Sub-topic">
+      {!isRandom && sel.chapter && sel.subMode === 'subtopic' && (
+        <Field label="Select Sub-topic">
           <BSSelect value={sel.subtopic}
             onChange={v => set({ subtopic: v })}
             options={[{ value: '', label: '── Select sub-topic ──' }, ...subtopics.map(s => ({ value: s, label: s }))]} />
         </Field>
       )}
 
-      {(sel.subMode === 'custom' || sel.subMode === 'random') && (
-        <Field label={sel.subMode === 'random' ? 'Enter any topic' : 'What to focus on'}>
+      {!isRandom && sel.chapter && sel.subMode === 'custom' && (
+        <Field label="What to focus on">
           <BSInput value={sel.customText}
             onChange={v => set({ customText: v })}
-            placeholder={sel.subMode === 'random' ? 'e.g. Photosynthesis basics' : 'e.g. only numerical problems'} />
+            placeholder="e.g. only numerical problems" />
         </Field>
       )}
+
+      {/* Small separate area: fully random / unrelated topic */}
+      <div style={{
+        marginTop: 16, padding: '12px 14px', borderRadius: 12,
+        border: `1.5px dashed ${isRandom ? accent : 'var(--border)'}`,
+        background: isRandom ? 'var(--accent-bg)' : 'var(--code-bg)',
+        transition: 'all .15s',
+      }}>
+        <div style={{ fontSize: 12.5, fontWeight: 800, color: isRandom ? accent : 'var(--text)', marginBottom: 8 }}>
+          🎲 Or generate on a Random Topic (not tied to any chapter)
+        </div>
+        <BSInput
+          value={isRandom ? sel.customText : ''}
+          onChange={v => {
+            if (v.trim()) set({ subMode: 'random', customText: v })
+            else set({ subMode: 'full', customText: '' })
+          }}
+          placeholder="e.g. Photosynthesis, Newton's Laws, French Revolution…"
+        />
+      </div>
     </div>
   )
 }
