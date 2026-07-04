@@ -209,6 +209,77 @@ const getSubtopics = (cls, subject, chapter) =>
 // Only subjects that actually have chapters for this class
 const getSubjectsForClass = cls => Object.keys(ALL_CHAPTERS[cls] || {})
 
+// Reverse lookup: subtopic text -> its parent chapter
+const SUBTOPIC_TO_CHAPTER = (() => {
+  const map = {}
+  for (const cls in CHAPTER_SUBTOPICS) {
+    map[cls] = {}
+    for (const subject in CHAPTER_SUBTOPICS[cls]) {
+      map[cls][subject] = {}
+      for (const chapter in CHAPTER_SUBTOPICS[cls][subject]) {
+        for (const sub of CHAPTER_SUBTOPICS[cls][subject][chapter]) {
+          map[cls][subject][sub] = chapter
+        }
+      }
+    }
+  }
+  return map
+})()
+
+function resolveParentChapter(cls, subject, topicText) {
+  if (!topicText || subject === 'General') return null
+  const chaptersForSubj = ALL_CHAPTERS?.[cls]?.[subject] || []
+  if (chaptersForSubj.includes(topicText)) return topicText
+  return SUBTOPIC_TO_CHAPTER?.[cls]?.[subject]?.[topicText] || topicText
+}
+
+function courseListKey(subject, cls, chapter) {
+  const safe = s => String(s || '').replace(/[^a-zA-Z0-9]/g, '').toLowerCase().slice(0, 20)
+  return `bscm-list-${safe(subject)}-${safe(cls)}-${safe(chapter)}`
+}
+
+const HUB_TOOLS = ['notes', 'quiz', 'flashcards']
+
+// Groups all locally-saved sessions into "chapter boxes" for the dashboard
+function groupSessionsIntoChapters() {
+  const sessions = listAllSessions().filter(s => HUB_TOOLS.includes(s.tool))
+  const groups = {}
+  for (const s of sessions) {
+    const cls     = s.classLevel || 'Class 10'
+    const subject = s.subject || 'General'
+    const topic   = s.chapter || (s.chapters || [])[0] || ''
+    if (!topic) continue
+    const isRandom = subject === 'General'
+    const parent   = isRandom ? null : resolveParentChapter(cls, subject, topic)
+    const key = `${subject}::${cls}::${isRandom ? topic : parent}`
+    if (!groups[key]) {
+      groups[key] = { key, subject, cls, chapterName: isRandom ? topic : parent, isRandomGroup: isRandom, items: [] }
+    }
+    groups[key].items.push({
+      ...s,
+      isFull:     !isRandom && topic === parent,
+      isRandom,
+      isSubtopic: !isRandom && topic !== parent,
+    })
+  }
+  return Object.values(groups).map(g => {
+    const seen = new Map()
+    for (const it of [...g.items].sort((a, b) => new Date(b.savedAt) - new Date(a.savedAt))) {
+      const k = `${it.tool}::${it.chapter}`
+      if (!seen.has(k)) seen.set(k, it)
+    }
+    const items = [...seen.values()].sort((a, b) => {
+      const rank = it => it.isFull ? 0 : it.isSubtopic ? 1 : 2
+      const r = rank(a) - rank(b)
+      return r !== 0 ? r : new Date(b.savedAt) - new Date(a.savedAt)
+    })
+    const lastActivity = items.reduce((m, it) => Math.max(m, new Date(it.savedAt).getTime()), 0)
+    const counts = { notes: 0, quiz: 0, flashcards: 0 }
+    for (const it of items) counts[it.tool] = (counts[it.tool] || 0) + 1
+    return { ...g, items, lastActivity, counts }
+  }).sort((a, b) => b.lastActivity - a.lastActivity)
+}
+
 
 // Default state each tool starts with
 const emptyPicker = (cls = 'Class 10') => ({
@@ -2196,29 +2267,34 @@ function SubscriptionPage({ user, onSuccess, onBack }) {
 // ══════════════════════════════════════════════════════════════
 //  DASHBOARD
 // ══════════════════════════════════════════════════════════════
-function Dashboard({ user, onNavigate }) {
+function Dashboard({ user, onNavigate, onOpenChapter }) {
   const [stats,setStats]=useState(()=>{ try{ return JSON.parse(localStorage.getItem('bs_dash_stats')) }catch{ return null } })
   const [achs,setAchs]=useState(()=>{ try{ return JSON.parse(localStorage.getItem('bs_dash_achs'))||[] }catch{ return [] } })
+  const [chapterGroups, setChapterGroups] = useState([])
   useEffect(()=>{
     api.get('/api/user/stats').then(s=>{ setStats(s); try{localStorage.setItem('bs_dash_stats',JSON.stringify(s))}catch{} }).catch(()=>{})
     api.get('/api/user/achievements').then(a=>{ setAchs(a); try{localStorage.setItem('bs_dash_achs',JSON.stringify(a))}catch{} }).catch(()=>{})
+    setChapterGroups(groupSessionsIntoChapters())
   },[])
   const xp=stats?.stats?.total_xp||0; const level=getLevel(xp); const nextLevel=getNextLevel(xp)
   const pct=nextLevel?Math.round(((xp-level.min)/(nextLevel.min-level.min))*100):100
   const streak=stats?.stats?.current_streak||0; const unlocked=achs.filter(a=>a.unlocked).slice(0,3)
   const hour=new Date().getHours(); const greeting=hour<12?'Good morning':hour<17?'Good afternoon':'Good evening'
+
+  const cls = user.class_level || 'Class 10'
+  const starterSubjects = getSubjectsForClass(cls).slice(0, 4)
+  const starters = starterSubjects
+    .map(subj => ({ subject: subj, cls, chapter: getChapters(subj, cls)[0] }))
+    .filter(s => s.chapter)
+
   const quickStart = [
     {icon:'🤔',label:'Ask a Doubt',    tab:'doubt',      color:'#818CF8', desc:'Step-by-step answers'},
     {icon:'📖',label:'Generate Notes', tab:'notes',      color:'#10B981', desc:'Chapter-wise notes'},
     {icon:'🎯',label:'Take a Quiz',    tab:'quiz',       color:'#F59E0B', desc:'Timed MCQ practice'},
     {icon:'🃏',label:'Flashcards',     tab:'flashcards', color:'#EF4444', desc:'Quick revision cards'},
     {icon:'📚',label:'Youtube-Courses',tab:'courses',    color:'#8B5CF6', desc:'Video-based lessons'},
-    // HIDDEN FOR NOW — uncomment to re-enable:
     {icon:'🕘',label:'My History',     tab:'history',    color:'#6366F1', desc:'Replay past sessions'},
     {icon:'📣',label:'Study Feed',     tab:'feed',       color:'#6366F1', desc:'Share & ask peers'},
-    // ...(user.type==='school'?[{icon:'📝',label:'Assignments',tab:'assignments',color:'#F59E0B'}]:[]),
-    // ...(user.role==='student'?[{icon:'📋',label:'Exam Cheat Sheet',tab:'cheatsheet',color:'#F97316'}]:[{icon:'🎓',label:'Lesson Planner',tab:'lessonplan',color:'#7C3AED'}]),
-    // {icon:'🔍',label:'Find People',tab:'search',color:'#06b6d4'},
   ]
   return (
     <div style={{ padding:24, width:'100%', boxSizing:'border-box', fontFamily:"'Nunito',sans-serif", animation:'slideUp .25s ease-out' }}>
@@ -2231,6 +2307,23 @@ function Dashboard({ user, onNavigate }) {
           <span style={{ fontWeight:800, color:'var(--accent)', fontSize:14, fontFamily:"'Sora',sans-serif" }}>{level.emoji} {level.label}</span>
         </div>
       </div>
+
+      {/* ── Continue / Start Learning: chapter hub cards ── */}
+      <div style={{ marginBottom:26 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+          <h3 style={{ margin:0, fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:16, color:'var(--text-h)' }}>
+            {chapterGroups.length ? '📚 Continue Learning' : '📚 Start Learning'}
+          </h3>
+          {chapterGroups.length > 0 && <GhostBtn small onClick={()=>onNavigate('history')}>View All →</GhostBtn>}
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:14 }}>
+          {chapterGroups.length > 0
+            ? chapterGroups.slice(0,4).map((g,i) => <ChapterCard key={g.key} group={g} index={i} onOpen={onOpenChapter} />)
+            : starters.map((s,i) => <StarterChapterCard key={s.subject} {...s} index={i} onStart={p => onNavigate('notes', p)} />)
+          }
+        </div>
+      </div>
+
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))', gap:12, marginBottom:22 }}>
         {[{label:'Total XP',value:xp.toLocaleString(),icon:'⚡',bg:'rgba(99,102,241,.15)',color:'#818CF8'},{label:'Streak',value:`${streak}d`,icon:'🔥',bg:'rgba(249,115,22,.15)',color:'#FB923C'},{label:'Doubts',value:stats?.stats?.doubts_solved||0,icon:'🤔',bg:'rgba(16,185,129,.15)',color:'#34D399'},{label:'Quizzes',value:stats?.stats?.quizzes_done||0,icon:'🎯',bg:'rgba(139,92,246,.15)',color:'#A78BFA'},{label:'Notes',value:stats?.stats?.notes_made||0,icon:'📖',bg:'rgba(239,68,68,.15)',color:'#FCA5A5'},{label:'Papers',value:stats?.stats?.papers_made||0,icon:'📄',bg:'rgba(245,158,11,.15)',color:'#FCD34D'}].map(stat=>(
           <div key={stat.label} style={{ background:stat.bg, borderRadius:14, padding:'14px 12px', textAlign:'center', border:'1px solid rgba(255,255,255,.05)' }}>
@@ -6322,6 +6415,167 @@ function ReplayDoubt({ session }) {
   )
 }
 
+
+const CHAPTER_GRADIENTS = [
+  '135deg,#6366F1,#8B5CF6', '135deg,#F59E0B,#EF4444', '135deg,#06b6d4,#6366F1',
+  '135deg,#10B981,#06b6d4', '135deg,#EC4899,#8B5CF6', '135deg,#F97316,#F59E0B',
+]
+
+function ChapterCard({ group, onOpen, index = 0 }) {
+  const [hov, setHov] = useState(false)
+  const [hasCourse, setHasCourse] = useState(null)
+  useEffect(() => {
+    const key = courseListKey(group.subject, group.cls, group.chapterName)
+    api.get(`/api/chapter-courses/list/${key}`).then(d => setHasCourse(!!d)).catch(() => setHasCourse(false))
+  }, [group.key])
+
+  const grad = CHAPTER_GRADIENTS[index % CHAPTER_GRADIENTS.length]
+
+  return (
+    <div onClick={() => onOpen(group)} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+      style={{ position: 'relative', borderRadius: 18, padding: '20px 20px 18px', cursor: 'pointer', overflow: 'hidden',
+        background: `linear-gradient(${grad})`, color: '#fff', minHeight: 150, display: 'flex', flexDirection: 'column',
+        justifyContent: 'space-between', boxShadow: hov ? '0 14px 34px rgba(0,0,0,.22)' : '0 4px 16px rgba(0,0,0,.12)',
+        transform: hov ? 'translateY(-3px)' : 'none', transition: 'all .2s' }}>
+      <div style={{ position: 'absolute', top: -30, right: -30, width: 120, height: 120, borderRadius: '50%', background: 'rgba(255,255,255,.12)' }} />
+      <div style={{ position: 'relative', zIndex: 1 }}>
+        <div style={{ display: 'flex', gap: 6, marginBottom: 10, flexWrap: 'wrap' }}>
+          <span style={{ fontSize: 10.5, fontWeight: 800, background: 'rgba(255,255,255,.22)', borderRadius: 20, padding: '2px 10px' }}>{group.subject}</span>
+          <span style={{ fontSize: 10.5, fontWeight: 800, background: 'rgba(255,255,255,.22)', borderRadius: 20, padding: '2px 10px' }}>{group.cls}</span>
+          {group.isRandomGroup && <span style={{ fontSize: 10.5, fontWeight: 800, background: 'rgba(255,255,255,.22)', borderRadius: 20, padding: '2px 10px' }}>🎲 Topic</span>}
+        </div>
+        <div style={{ fontFamily: "'Sora',sans-serif", fontWeight: 800, fontSize: 17, lineHeight: 1.3 }}>{group.chapterName}</div>
+      </div>
+      <div style={{ position: 'relative', zIndex: 1, display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 14 }}>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <span style={{ fontSize: 12, fontWeight: 700, opacity: group.counts.notes ? 1 : .45 }}>📖 {group.counts.notes || 0}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, opacity: group.counts.quiz ? 1 : .45 }}>🎯 {group.counts.quiz || 0}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, opacity: group.counts.flashcards ? 1 : .45 }}>🃏 {group.counts.flashcards || 0}</span>
+          <span style={{ fontSize: 12, fontWeight: 700, opacity: hasCourse ? 1 : .45 }}>📚 {hasCourse ? '1' : '0'}</span>
+        </div>
+        <span style={{ fontSize: 13, fontWeight: 800 }}>{hov ? 'Open →' : '→'}</span>
+      </div>
+    </div>
+  )
+}
+
+function StarterChapterCard({ subject, chapter, cls, onStart, index = 0 }) {
+  const [hov, setHov] = useState(false)
+  const grad = CHAPTER_GRADIENTS[index % CHAPTER_GRADIENTS.length]
+  return (
+    <div onClick={() => onStart({ subject, chapter, cls })} onMouseEnter={() => setHov(true)} onMouseLeave={() => setHov(false)}
+      style={{ borderRadius: 18, padding: 20, cursor: 'pointer', border: '2px dashed rgba(255,255,255,.28)',
+        background: `linear-gradient(${grad})`, color: '#fff', minHeight: 150, display: 'flex', flexDirection: 'column',
+        justifyContent: 'space-between', opacity: hov ? 1 : .92, transform: hov ? 'translateY(-3px)' : 'none', transition: 'all .2s' }}>
+      <div>
+        <span style={{ fontSize: 10.5, fontWeight: 800, background: 'rgba(255,255,255,.22)', borderRadius: 20, padding: '2px 10px' }}>{subject} · {cls}</span>
+        <div style={{ fontFamily: "'Sora',sans-serif", fontWeight: 800, fontSize: 16, marginTop: 10, lineHeight: 1.3 }}>{chapter}</div>
+      </div>
+      <div style={{ fontSize: 12.5, fontWeight: 800 }}>✨ Start Learning →</div>
+    </div>
+  )
+}
+
+function ChapterHub({ group, onClose, onNavigate }) {
+  const [tab, setTab] = useState('notes')
+  const [hasCourse, setHasCourse] = useState(null)
+  const [selectedItem, setSelectedItem] = useState(null)
+
+  useEffect(() => {
+    const key = courseListKey(group.subject, group.cls, group.chapterName)
+    api.get(`/api/chapter-courses/list/${key}`).then(d => setHasCourse(!!d)).catch(() => setHasCourse(false))
+  }, [group.key])
+
+  const byTool = t => group.items.filter(i => i.tool === t)
+  const labelFor = it => it.isFull ? '📘 Full Chapter' : it.isRandom ? '🎲 Random Topic' : `📌 ${it.chapter}`
+
+  const TABS = [
+    ['notes', '📖 Notes', byTool('notes').length],
+    ['quiz', '🎯 Quiz', byTool('quiz').length],
+    ['flashcards', '🃏 Flashcards', byTool('flashcards').length],
+    ['courses', '📚 Course', hasCourse ? 1 : 0],
+  ]
+
+  function renderList(tool) {
+    const items = byTool(tool)
+    if (!items.length) return (
+      <div style={{ textAlign: 'center', padding: '40px 20px', color: '#94a3b8' }}>
+        <div style={{ fontSize: 38, marginBottom: 10 }}>{tool === 'notes' ? '📖' : tool === 'quiz' ? '🎯' : '🃏'}</div>
+        <p style={{ fontSize: 13.5 }}>No {tool} generated yet for this chapter.</p>
+      </div>
+    )
+    return (
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        {items.map((it, i) => (
+          <div key={i} onClick={() => setSelectedItem(it)}
+            style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '13px 16px',
+              borderRadius: 12, background: it.isFull ? 'rgba(99,102,241,.1)' : 'rgba(255,255,255,.04)',
+              border: `1px solid ${it.isFull ? 'rgba(99,102,241,.3)' : 'rgba(255,255,255,.08)'}`, cursor: 'pointer' }}>
+            <div>
+              <div style={{ fontSize: 13.5, fontWeight: 700, color: '#e2e8f0' }}>{labelFor(it)}</div>
+              <div style={{ fontSize: 11.5, color: '#64748b', marginTop: 2 }}>{new Date(it.savedAt).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' })}</div>
+            </div>
+            <span style={{ color: '#818cf8' }}>→</span>
+          </div>
+        ))}
+      </div>
+    )
+  }
+
+  function renderContent() {
+    if (!selectedItem) return null
+    const { tool, content, subject, chapter, classLevel } = selectedItem
+    if (tool === 'notes') return <NotesDocument content={content} title={`${chapter} Notes — ${subject} ${classLevel}`} onDownload={() => downloadText(content, `${chapter}-notes.txt`)} />
+    if (tool === 'quiz') return <ReplayQuiz session={selectedItem} />
+    if (tool === 'flashcards') return <ReplayFlashcards session={selectedItem} />
+    return null
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 2000, background: 'rgba(5,5,14,.96)', backdropFilter: 'blur(14px)', overflowY: 'auto' }}>
+      <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'rgba(11,11,30,.97)', backdropFilter: 'blur(20px)', borderBottom: '1px solid rgba(255,255,255,.07)', padding: '14px 24px' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: selectedItem ? 12 : 0 }}>
+          <button onClick={() => selectedItem ? setSelectedItem(null) : onClose()}
+            style={{ width: 36, height: 36, borderRadius: 10, border: '1px solid rgba(255,255,255,.1)', background: 'rgba(255,255,255,.05)', color: '#e2e8f0', fontSize: 16, cursor: 'pointer', fontFamily: "'Nunito',sans-serif" }}>←</button>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontFamily: "'Sora',sans-serif", fontWeight: 800, fontSize: 16, color: '#e2e8f0' }}>{group.chapterName}</div>
+            <div style={{ fontSize: 11.5, color: '#64748b' }}>{group.subject} · {group.cls}</div>
+          </div>
+        </div>
+        {!selectedItem && (
+          <div style={{ display: 'flex', gap: 6, overflowX: 'auto' }}>
+            {TABS.map(([id, label, count]) => (
+              <button key={id} onClick={() => setTab(id)}
+                style={{ padding: '8px 16px', borderRadius: 10, border: 'none', fontWeight: 700, fontSize: 12.5, cursor: 'pointer',
+                  fontFamily: "'Nunito',sans-serif", whiteSpace: 'nowrap',
+                  background: tab === id ? 'linear-gradient(135deg,#6366F1,#8B5CF6)' : 'rgba(255,255,255,.06)',
+                  color: tab === id ? '#fff' : '#94a3b8' }}>
+                {label}{count > 0 ? ` (${count})` : ''}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div style={{ maxWidth: 860, margin: '0 auto', padding: '26px 24px 60px' }}>
+        {selectedItem ? renderContent() : (
+          tab === 'courses' ? (
+            <div style={{ textAlign: 'center', padding: '40px 20px' }}>
+              <div style={{ fontSize: 44, marginBottom: 12 }}>📚</div>
+              <p style={{ color: '#94a3b8', marginBottom: 18, fontSize: 13.5 }}>
+                {hasCourse ? 'A video course exists for this chapter.' : 'No video course generated yet for this chapter.'}
+              </p>
+              <PrimaryBtn color="#8B5CF6" onClick={() => onNavigate('courses', { subject: group.subject, chapter: group.chapterName, cls: group.cls })}>
+                {hasCourse ? '▶ Continue Course' : '🚀 Build Course'}
+              </PrimaryBtn>
+            </div>
+          ) : renderList(tab)
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ══════════════════════════════════════════════════════════════
 //  HISTORY PAGE  (Coursera-style grid)
 // ══════════════════════════════════════════════════════════════
@@ -6543,6 +6797,7 @@ export default function App() {
   const [prefill, setPrefill]         = useState(null)
   const [unreadCount, setUnreadCount] = useState(0)
   const [menuOpen, setMenuOpen] = useState(false)
+  const [activeChapterGroup, setActiveChapterGroup] = useState(null)
 
 const fetchUnread = useCallback(() => {
   api.get('/api/messages/unread-count').then(d => setUnreadCount(d.count || 0)).catch(() => {})
@@ -6689,7 +6944,7 @@ const renderTab = t => {
         onMessage={id => { setMsgUserId(id); setTab('messages') }}
       />
     )
-    if (tab === 'dashboard')  return <Dashboard user={user} onNavigate={setTab} />
+    if (tab === 'dashboard')  return <Dashboard user={user} onNavigate={(t, pf) => { if (pf) setPrefill(pf); setTab(t) }} onOpenChapter={setActiveChapterGroup} />
     if (tab === 'feed')       return <SocialFeed user={user} />
     if (tab === 'search')     return <SearchPage currentUser={user} onViewProfile={id => { setViewProfileId(id); setTab('profile') }} onMessage={id => { setMsgUserId(id); setTab('messages') }} />
     if (tab === 'messages')   return <MessagingPage currentUser={user} startWithUserId={msgUserId} onConversationRead={fetchUnread} />
@@ -6702,7 +6957,7 @@ const renderTab = t => {
     if (tab === 'notices')    return <NoticesPage user={user} />
     if (tab === 'timetable')  return <TimetablePage user={user} />
     if (tab === 'school')     return <SchoolDashboard user={user} />
-    return <Dashboard user={user} onNavigate={setTab} />
+    return <Dashboard user={user} onNavigate={(t, pf) => { if (pf) setPrefill(pf); setTab(t) }} onOpenChapter={setActiveChapterGroup} />
   }
 
   return (
@@ -6834,6 +7089,15 @@ const renderTab = t => {
 
       {/* ── AI Buddy (all users) ─────────────────────── */}
       {user && <TalkingBuddy user={user} />}
+
+      {/* ── Chapter Hub overlay ─────────────────────── */}
+      {activeChapterGroup && (
+        <ChapterHub
+          group={activeChapterGroup}
+          onClose={() => setActiveChapterGroup(null)}
+          onNavigate={(t, pf) => { setActiveChapterGroup(null); if (pf) setPrefill(pf); setTab(t) }}
+        />
+      )}
 
     </div>
   )
