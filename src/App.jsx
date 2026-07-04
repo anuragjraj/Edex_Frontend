@@ -2308,22 +2308,6 @@ function Dashboard({ user, onNavigate, onOpenChapter }) {
         </div>
       </div>
 
-      {/* ── Continue / Start Learning: chapter hub cards ── */}
-      <div style={{ marginBottom:26 }}>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
-          <h3 style={{ margin:0, fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:16, color:'var(--text-h)' }}>
-            {chapterGroups.length ? '📚 Continue Learning' : '📚 Start Learning'}
-          </h3>
-          {chapterGroups.length > 0 && <GhostBtn small onClick={()=>onNavigate('history')}>View All →</GhostBtn>}
-        </div>
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:14 }}>
-          {chapterGroups.length > 0
-            ? chapterGroups.slice(0,4).map((g,i) => <ChapterCard key={g.key} group={g} index={i} onOpen={onOpenChapter} />)
-            : starters.map((s,i) => <StarterChapterCard key={s.subject} {...s} index={i} onStart={p => onNavigate('notes', p)} />)
-          }
-        </div>
-      </div>
-
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))', gap:12, marginBottom:22 }}>
         {[{label:'Total XP',value:xp.toLocaleString(),icon:'⚡',bg:'rgba(99,102,241,.15)',color:'#818CF8'},{label:'Streak',value:`${streak}d`,icon:'🔥',bg:'rgba(249,115,22,.15)',color:'#FB923C'},{label:'Doubts',value:stats?.stats?.doubts_solved||0,icon:'🤔',bg:'rgba(16,185,129,.15)',color:'#34D399'},{label:'Quizzes',value:stats?.stats?.quizzes_done||0,icon:'🎯',bg:'rgba(139,92,246,.15)',color:'#A78BFA'},{label:'Notes',value:stats?.stats?.notes_made||0,icon:'📖',bg:'rgba(239,68,68,.15)',color:'#FCA5A5'},{label:'Papers',value:stats?.stats?.papers_made||0,icon:'📄',bg:'rgba(245,158,11,.15)',color:'#FCD34D'}].map(stat=>(
           <div key={stat.label} style={{ background:stat.bg, borderRadius:14, padding:'14px 12px', textAlign:'center', border:'1px solid rgba(255,255,255,.05)' }}>
@@ -2344,6 +2328,23 @@ function Dashboard({ user, onNavigate, onOpenChapter }) {
         <div style={{ background:'rgba(255,255,255,.25)', borderRadius:999, height:8 }}><div style={{ background:'#fff', width:`${pct}%`, height:'100%', borderRadius:999, transition:'width 1s ease' }}/></div>
         {nextLevel&&<p style={{ fontSize:12, color:'rgba(255,255,255,.75)', margin:'8px 0 0', textAlign:'right' }}>{(nextLevel.min-xp).toLocaleString()} XP to {nextLevel.label}</p>}
       </Card>
+
+      {/* ── Continue / Start Learning: chapter hub cards ── */}
+      <div style={{ marginBottom:26 }}>
+        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:14 }}>
+          <h3 style={{ margin:0, fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:16, color:'var(--text-h)' }}>
+            {chapterGroups.length ? '📚 Continue Learning' : '📚 Start Learning'}
+          </h3>
+          {chapterGroups.length > 0 && <GhostBtn small onClick={()=>onNavigate('history')}>View All →</GhostBtn>}
+        </div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:14 }}>
+          {chapterGroups.length > 0
+            ? chapterGroups.slice(0,4).map((g,i) => <ChapterCard key={g.key} group={g} index={i} onOpen={onOpenChapter} />)
+            : starters.map((s,i) => <StarterChapterCard key={s.subject} {...s} index={i} onStart={p => onNavigate('notes', p)} />)
+          }
+        </div>
+      </div>
+
       <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(300px,1fr))', gap:16 }}>
         <Card>
           <h3 style={{ margin:'0 0 14px', fontSize:15, fontFamily:"'Sora',sans-serif", fontWeight:800, color:'var(--text-h)' }}>⚡ Quick Start</h3>
