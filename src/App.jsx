@@ -5250,12 +5250,12 @@ function LessonPicker({ value, onChange, accent = 'var(--accent)' }) {
         <Field label="Subject">
           <BSSelect value={sel.subject}
             onChange={v => set({ subject: v, chapter: '', subTopicChoice: 'full', customText: '' })}
-            options={[{ value: '', label: '── Select subject ──' }, ...subjects.map(s => ({ value: s, label: s }))]} />
+            options={[{ value: '', label: 'Select subject' }, ...subjects.map(s => ({ value: s, label: s }))]} />
         </Field>
         <Field label="Chapter">
           <BSSelect value={sel.chapter} disabled={!sel.subject}
             onChange={v => set({ chapter: v, subTopicChoice: 'full', customText: '' })}
-            options={[{ value: '', label: '── Select chapter ──' }, ...chapters.map(c => ({ value: c, label: c }))]} />
+            options={[{ value: '', label: ' Select chapter ' }, ...chapters.map(c => ({ value: c, label: c }))]} />
         </Field>
       </div>
 
@@ -5360,7 +5360,7 @@ function MultiChapterSelect({ subject, cls, selected = [], onChange, max = 20 })
   const clearAll    = () => onChange([])
 
   const triggerLabel = selected.length === 0
-    ? '── Select chapters ──'
+    ? ' Select chapters '
     : selected.length === 1
     ? selected[0]
     : `${selected.length} chapters selected`
@@ -6589,7 +6589,7 @@ function ProfilePage({ userId, currentUser, onMessage, onBack }) {
           <div style={{ marginBottom: 14 }}>
             <Label>Subjects taught</Label>
             {editMode
-  ? <MultiSelectDropdown options={SUBJECTS} selected={form.teaches_subjects || []} onChange={v => setF('teaches_subjects', v)} placeholder="── Select subjects ──" />
+  ? <MultiSelectDropdown options={SUBJECTS} selected={form.teaches_subjects || []} onChange={v => setF('teaches_subjects', v)} placeholder="Select subjects" />
   : <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
       {(prof.teaches_subjects || []).map(s => <span key={s} style={pillRO}>{s}</span>)}
       {!(prof.teaches_subjects || []).length && <span style={emptyRO}>No subjects listed</span>}
@@ -7515,7 +7515,7 @@ function TimetablePage({ user }) {
                   <div>
                     <Label>Subject</Label>
                     <BSSelect value={p.subject} onChange={v => updatePeriod(di, pi, 'subject', v)}
-                      options={[{ value: '', label: '── Select subject ──' }, ...SUBJECTS.map(s => ({ value: s, label: s })), { value: 'Break', label: 'Break / Lunch' }, { value: 'Library', label: 'Library' }, { value: 'Games', label: 'Games / PE' }]} />
+                      options={[{ value: '', label: 'Select subject' }, ...SUBJECTS.map(s => ({ value: s, label: s })), { value: 'Break', label: 'Break / Lunch' }, { value: 'Library', label: 'Library' }, { value: 'Games', label: 'Games / PE' }]} />
                   </div>
                   {/* Teacher (optional, multi-select + manual) */}
                   <div>
@@ -9468,7 +9468,7 @@ useEffect(() => {
 <Field label="② Subject">
   <BSSelect value={subj} disabled={!cls}
     onChange={v => { setSubj(v); setChapter('') }}
-    options={[{ value: '', label: '── Select subject ──' }, ...getSubjectsForClass(cls).map(s => ({ value: s, label: s }))]} />
+    options={[{ value: '', label: 'Select subject' }, ...getSubjectsForClass(cls).map(s => ({ value: s, label: s }))]} />
 </Field>
 </div>
 
