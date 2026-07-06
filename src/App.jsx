@@ -9477,7 +9477,7 @@ useEffect(() => {
           <BSSelect
             value={chapter}
             onChange={setChapter}
-            options={[{ value: '', label: '── Select a Chapter ──' }, ...chs.map(c => ({ value: c, label: c }))]}
+            options={[{ value: '', label: 'Select a Chapter' }, ...chs.map(c => ({ value: c, label: c }))]}
           />
         </Field>
 
