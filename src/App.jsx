@@ -168,7 +168,7 @@ const ALL_CHAPTERS = {
 //  Replace the existing CHAPTER_SUBTOPICS constant in App.jsx
 // ══════════════════════════════════════════════════════════════
 
-const CHAPTER_SUBTOPICS = {
+const CHAPTER_SUBTOPICS_CORE = {
 
   // ════════════════════════════════════════════
   //  CLASS 9
@@ -785,7 +785,6 @@ const CHAPTER_SUBTOPICS = {
         "Word Problems on Probability",
         "Addition Rule of Probability",
       ],
-      "Science": {},
     },
     "Science": {
       "Chemical Reactions and Equations": [
@@ -2013,11 +2012,12 @@ const CHAPTER_SUBTOPICS = {
   },
 
 
-  // ══════════════════════════════════════════════════════════════
-//  CHAPTER_SUBTOPICS — REMAINING SUBJECTS
-//  Add these entries into the existing CHAPTER_SUBTOPICS object
-//  (merge them inside the correct class keys)
+}  // ── end CHAPTER_SUBTOPICS_CORE ──
+
 // ══════════════════════════════════════════════════════════════
+//  CHAPTER_SUBTOPICS — REMAINING SUBJECTS
+// ══════════════════════════════════════════════════════════════
+const CHAPTER_SUBTOPICS_EXTRA = {
 
 // ════════════════════════════════════════════════════════════
 //  CLASS 6 — Remaining Subjects
@@ -3926,15 +3926,21 @@ const CHAPTER_SUBTOPICS = {
 },
 }
 
-// ─────────────────────────────────────────────────────────────
-// HOW TO USE:
-//
-// Replace the existing `const CHAPTER_SUBTOPICS = { ... }` in
-// App.jsx with the entire block above.
-//
-// The getSubtopics() helper already reads from CHAPTER_SUBTOPICS,
-// so no other code changes are needed.
-// ─────────────────────────────────────────────────────────────
+// Deep-merge class → subject → chapter so no subject overwrites another
+function mergeSubtopics(...objs) {
+  const out = {}
+  for (const src of objs) {
+    for (const cls in src) {
+      out[cls] = out[cls] || {}
+      for (const subject in src[cls]) {
+        out[cls][subject] = { ...(out[cls][subject] || {}), ...src[cls][subject] }
+      }
+    }
+  }
+  return out
+}
+
+const CHAPTER_SUBTOPICS = mergeSubtopics(CHAPTER_SUBTOPICS_CORE, CHAPTER_SUBTOPICS_EXTRA)
 
 // Chapters for a given subject + class, in the order defined in ALL_CHAPTERS
 const getChapters = (subject, cls) => ALL_CHAPTERS?.[cls]?.[subject] || []
