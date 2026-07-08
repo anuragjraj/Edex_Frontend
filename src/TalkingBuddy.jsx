@@ -367,7 +367,20 @@ export default function TalkingBuddy({
      .replace(/\*\*(.*?)\*\*/g,'<strong>$1</strong>').replace(/\n/g,'<br/>')
 
   const FONT = "'Nunito', system-ui, sans-serif"
-  const fabSize = 52   // px — same as the existing AI buddy FAB
+  const fabSize = 52   // px
+
+  // Responsive bottom: mobile clears the 64px nav + send row; desktop
+  // sits high enough to never cover bottom-right interactive elements.
+  const [fabVw, setFabVw] = useState(() =>
+    typeof window !== 'undefined' ? window.innerWidth : 1024)
+  useEffect(() => {
+    const onResize = () => setFabVw(window.innerWidth)
+    window.addEventListener('resize', onResize, { passive: true })
+    return () => window.removeEventListener('resize', onResize)
+  }, [])
+  const fabBottom   = fabVw <= 768 ? 160 : 180  // px above viewport bottom
+  const fabBtmCss   = `calc(env(safe-area-inset-bottom, 0px) + ${fabBottom}px)`
+  const panelBtmCss = `calc(env(safe-area-inset-bottom, 0px) + ${fabBottom + fabSize + 10}px)`
 
   /* ── FAB ring animation: idle = accent ring, speaking = green ring ── */
   const fabRingStyle = speaking
@@ -382,7 +395,7 @@ export default function TalkingBuddy({
         /* 88 px = 64 px mobile bottom-nav + 24 px padding.
            On desktop this just means the button sits comfortably
            above the doubt-solver send row. */
-        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 88px)',
+        bottom: fabBtmCss,
         right: 24, zIndex: 1000,
         display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10,
         pointerEvents: 'none',
@@ -449,7 +462,7 @@ export default function TalkingBuddy({
         <div style={{
           position: 'fixed', zIndex: 1001, right: 24,
           // aligns with the raised FAB: 88 px base + FAB height + 10 px gap
-          bottom: `calc(env(safe-area-inset-bottom, 0px) + ${88 + fabSize + 10}px)`,
+          bottom: panelBtmCss,
           width: 'min(350px, calc(100vw - 24px))',
           height: 'min(490px, calc(100vh - 120px))',
           borderRadius: 18, overflow: 'hidden',
