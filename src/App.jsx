@@ -19,32 +19,162 @@ function useFonts() {
   useEffect(() => {
     if (!document.getElementById('brainspark-fonts')) {
       const link = document.createElement('link')
-      link.id = 'brainspark-fonts'
+      link.id   = 'brainspark-fonts'
       link.href = 'https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800;900&family=Sora:wght@600;700;800;900&display=swap'
-      link.rel = 'stylesheet'
+      link.rel  = 'stylesheet'
       document.head.appendChild(link)
     }
     if (!document.getElementById('brainspark-styles')) {
       const style = document.createElement('style')
       style.id = 'brainspark-styles'
       style.textContent = `
+        /* ── Design tokens ── */
         :root {
           --bg: #f4f4f0; --bg2: #ffffff; --text: #64748b; --text-h: #1e293b;
           --border: rgba(15,23,42,.10); --accent: #4f46e5;
           --accent-bg: rgba(79,70,229,.08); --accent-border: rgba(79,70,229,.20);
           --code-bg: rgba(15,23,42,.035); --social-bg: rgba(15,23,42,.035);
+          --shadow-md: 0 4px 16px rgba(15,23,42,.07);
+          /* How tall the bottom nav is — used for padding-bottom */
+          --nav-h: 0px;
         }
-        * { box-sizing: border-box; }
+        @media (max-width: 768px) { :root { --nav-h: 64px; } }
+ 
+        /* ── Reset ── */
+        * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
         html, body { overflow-x: clip; max-width: 100%; }
         body { margin: 0; background: transparent; color: var(--text-h); }
+ 
+        /* ── Remove 300 ms tap delay everywhere ── */
+        button, a, [role="button"], label { touch-action: manipulation; }
+ 
+        /* ── Animations ── */
         @keyframes spin      { to { transform: rotate(360deg) } }
         @keyframes dotBounce { 0%,100%{opacity:.25;transform:scale(.8)} 50%{opacity:1;transform:scale(1)} }
         @keyframes slideUp   { from{opacity:0;transform:translateY(10px)} to{opacity:1;transform:none} }
         @keyframes fadeIn    { from{opacity:0} to{opacity:1} }
         @keyframes pulse     { 0%,100%{opacity:1} 50%{opacity:.5} }
+        @keyframes bsSheetIn { from{transform:translateY(100%);opacity:.5} to{transform:translateY(0);opacity:1} }
+        @keyframes bsFadeIn  { from{opacity:0} to{opacity:1} }
+ 
         .brainspark-font { font-family: 'Nunito', system-ui, sans-serif; }
+ 
+        /* ── Sidebar / old mobile nav visibility ── */
         @media (max-width: 768px) { .desktop-sidebar { display: none !important; } }
-        @media (min-width: 769px) { .mobile-top-nav  { display: none !important; } }
+        /* mobile-top-nav is no longer rendered; keep this in case anything references it */
+        .mobile-top-nav { display: none !important; }
+ 
+        /* ═══════════════════════════════════════════════
+           BOTTOM NAV BAR
+        ═══════════════════════════════════════════════ */
+        .bs-bottom-nav {
+          display: none;           /* hidden on desktop */
+          position: fixed;
+          bottom: 0; left: 0; right: 0;
+          z-index: 200;
+          background: rgba(255,255,255,.97);
+          backdrop-filter: blur(24px); -webkit-backdrop-filter: blur(24px);
+          border-top: 1px solid var(--border);
+          /* respect iPhone notch / home indicator */
+          padding-bottom: env(safe-area-inset-bottom, 0px);
+          box-shadow: 0 -2px 18px rgba(15,23,42,.07);
+        }
+        @media (max-width: 768px) { .bs-bottom-nav { display: block; } }
+ 
+        /* ═══════════════════════════════════════════════
+           MAIN CONTENT — push up so bottom nav doesn't cover last item
+        ═══════════════════════════════════════════════ */
+        @media (max-width: 768px) {
+          .bs-main {
+            padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom, 0px) + 16px) !important;
+          }
+        }
+ 
+        /* ═══════════════════════════════════════════════
+           BOTTOM SHEET (More menu, confirmations, etc.)
+        ═══════════════════════════════════════════════ */
+        .bs-backdrop {
+          position: fixed; inset: 0; z-index: 300;
+          background: rgba(0,0,0,.46);
+          backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+          animation: bsFadeIn .18s ease-out;
+        }
+        .bs-sheet {
+          position: fixed; bottom: 0; left: 0; right: 0; z-index: 301;
+          background: #fff;
+          border-radius: 22px 22px 0 0;
+          padding-bottom: calc(env(safe-area-inset-bottom, 0px) + 8px);
+          animation: bsSheetIn .27s cubic-bezier(.32,.72,0,1);
+          max-height: 92vh;
+          overflow-y: auto; -webkit-overflow-scrolling: touch;
+        }
+ 
+        /* ═══════════════════════════════════════════════
+           iOS ANTI-ZOOM: inputs must be ≥16 px on iOS,
+           otherwise the page zooms in on focus — very jarring
+        ═══════════════════════════════════════════════ */
+        @media (max-width: 768px) {
+          input[type="text"],   input[type="email"],
+          input[type="password"], input[type="number"],
+          input[type="search"], input[type="date"],
+          input[type="datetime-local"], input[type="time"],
+          select, textarea { font-size: 16px !important; }
+        }
+ 
+        /* ═══════════════════════════════════════════════
+           RESPONSIVE GRIDS
+        ═══════════════════════════════════════════════ */
+        /* Stat chips: 3 across on phones, 6 on wide screens */
+        .bs-stats-grid {
+          display: grid;
+          grid-template-columns: repeat(3, 1fr);
+          gap: 10px;
+        }
+        @media (min-width: 640px) {
+          .bs-stats-grid { grid-template-columns: repeat(6, 1fr); }
+        }
+ 
+        /* Quick-start: 2 across on phones → auto-fill on larger */
+        .bs-quick-grid {
+          display: grid;
+          grid-template-columns: repeat(2, 1fr);
+          gap: 10px;
+        }
+        @media (min-width: 480px) {
+          .bs-quick-grid { grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); }
+        }
+ 
+        /* Quiz options: 1 col on phones, 2 on tablets+ */
+        .bs-opts-grid {
+          display: grid;
+          grid-template-columns: 1fr;
+          gap: 9px;
+        }
+        @media (min-width: 520px) {
+          .bs-opts-grid { grid-template-columns: 1fr 1fr; }
+        }
+ 
+        /* Generic auto card grid */
+        .bs-card-grid {
+          display: grid;
+          grid-template-columns: repeat(auto-fill, minmax(min(100%, 280px), 1fr));
+          gap: 14px;
+        }
+ 
+        /* ═══════════════════════════════════════════════
+           CARD PADDING on small phones
+        ═══════════════════════════════════════════════ */
+        @media (max-width: 480px) {
+          .bs-card { padding: 14px !important; border-radius: 12px !important; }
+          .bs-page { padding: 14px !important; }
+        }
+ 
+        /* ═══════════════════════════════════════════════
+           SCROLLBAR — thin and unobtrusive
+        ═══════════════════════════════════════════════ */
+        ::-webkit-scrollbar { width: 4px; height: 4px; }
+        ::-webkit-scrollbar-track { background: transparent; }
+        ::-webkit-scrollbar-thumb { background: rgba(15,23,42,.15); border-radius: 2px; }
       `
       document.head.appendChild(style)
     }
@@ -10284,16 +10414,42 @@ function PageHeader({ icon, title, subtitle, color }) {
     </div>
   )
 }
-function Card({ children, style={} }) { return <div style={{ ...T.card, ...style }}>{children}</div> }
-function Label({ children }) { return <div style={T.label}>{children}</div> }
-function PrimaryBtn({ children, onClick, disabled, color='var(--accent)', small, style={}, gradient }) {
-  const bg = gradient
-    || (color.startsWith('var(') ? color : `linear-gradient(135deg, ${color}, ${color}cc)`)
+function Card({ children, style = {} }) {
   return (
-    <button onClick={onClick} disabled={disabled}
-      style={{ background:bg, color:'#fff', padding:small?'7px 14px':'11px 22px', borderRadius:small?9:11, border:'none', fontWeight:800, fontSize:small?12.5:14.5, cursor:disabled?'not-allowed':'pointer', display:'inline-flex', alignItems:'center', gap:6, fontFamily:"'Nunito', sans-serif", opacity:disabled?.6:1, transition:'opacity .15s', ...style }}
-      onMouseEnter={e=>{ if(!disabled) e.currentTarget.style.opacity='.88' }}
-      onMouseLeave={e=>{ e.currentTarget.style.opacity='1' }}>
+    <div className="bs-card" style={{
+      background: 'var(--bg2)',
+      border: '1px solid var(--border)',
+      borderRadius: 14,
+      padding: 20,
+      boxShadow: '0 1px 8px rgba(15,23,42,.05)',
+      ...style,
+    }}>
+      {children}
+    </div>
+  )
+}
+function Label({ children }) { return <div style={T.label}>{children}</div> }
+function PrimaryBtn({ children, onClick, disabled, color = 'var(--accent)', small, style = {}, gradient }) {
+  const bg = gradient || (color.startsWith('var(') ? color : `linear-gradient(135deg,${color},${color}cc)`)
+  return (
+    <button
+      onClick={onClick}
+      disabled={disabled}
+      style={{
+        background: bg, color: '#fff',
+        padding: small ? '9px 16px' : '13px 22px',
+        minHeight: small ? 42 : 48,   /* 48 px is Apple's min tap-target */
+        borderRadius: small ? 9 : 11, border: 'none',
+        fontWeight: 800, fontSize: small ? 13.5 : 15,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        display: 'inline-flex', alignItems: 'center', gap: 6,
+        fontFamily: "'Nunito', sans-serif",
+        opacity: disabled ? .6 : 1, transition: 'opacity .15s',
+        ...style,
+      }}
+      onMouseEnter={e => { if (!disabled) e.currentTarget.style.opacity = '.88' }}
+      onMouseLeave={e => { e.currentTarget.style.opacity = '1' }}
+    >
       {children}
     </button>
   )
@@ -10317,45 +10473,87 @@ function GhostBtn({ children, onClick, disabled, small, style={} }) {
 function Field({ label, children }) {
   return <div style={{ marginBottom:14 }}><Label>{label}</Label>{children}</div>
 }
-function BSInput({ value, onChange, placeholder, type='text', required, disabled, style={} }) {
+function BSInput({ value, onChange, placeholder, type = 'text', required, disabled, style = {} }) {
   const [focused, setFocused] = useState(false)
   return (
-    <input value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} type={type}
-      required={required} disabled={disabled}
-      style={{ ...T.input, borderColor:focused?'var(--accent)':'var(--border)', ...style }}
-      onFocus={()=>setFocused(true)} onBlur={()=>setFocused(false)}/>
+    <input
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      type={type}
+      required={required}
+      disabled={disabled}
+      style={{
+        width: '100%', padding: '11px 14px',
+        borderRadius: 10,
+        border: `1.5px solid ${focused ? 'var(--accent)' : 'var(--border)'}`,
+        background: '#fff', color: '#1e293b',
+        fontSize: 16,             /* ← must be ≥16 px on iOS */
+        fontFamily: "'Nunito', sans-serif",
+        boxSizing: 'border-box', outline: 'none',
+        transition: 'border-color .2s',
+        ...style,
+      }}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+    />
   )
 }
 function BSSelect({ value, onChange, options, disabled = false, style = {} }) {
   const [focused, setFocused] = useState(false)
   return (
     <select
-      value={value} disabled={disabled}
+      value={value}
+      disabled={disabled}
       onChange={e => onChange(e.target.value)}
-      onFocus={() => setFocused(true)} onBlur={() => setFocused(false)}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
       style={{
-        width: '100%', padding: '10px 14px', borderRadius: '10px',
+        width: '100%', padding: '11px 14px',
+        borderRadius: 10,
         border: `1.5px solid ${focused ? 'var(--accent)' : 'var(--border)'}`,
-        background: disabled ? '#f1f5f9' : '#ffffff',
+        background: disabled ? '#f1f5f9' : '#fff',
         color: disabled ? '#94a3b8' : '#1e293b',
-        fontSize: '14px', fontFamily: "'Nunito', sans-serif", appearance: 'auto',
-        outline: 'none', cursor: disabled ? 'not-allowed' : 'pointer',
-        transition: 'border-color .2s', ...style,
-      }}>
+        fontSize: 16,             /* ← must be ≥16 px on iOS */
+        fontFamily: "'Nunito', sans-serif",
+        appearance: 'auto', outline: 'none',
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        transition: 'border-color .2s',
+        ...style,
+      }}
+    >
       {options.map(o => (
-        <option key={o.value ?? o} value={o.value ?? o} style={{ background: '#ffffff', color: '#1e293b' }}>
+        <option key={o.value ?? o} value={o.value ?? o}
+          style={{ background: '#fff', color: '#1e293b' }}>
           {o.label ?? o}
         </option>
       ))}
     </select>
   )
 }
-function BSTextarea({ value, onChange, placeholder, rows=4, style={} }) {
+function BSTextarea({ value, onChange, placeholder, rows = 4, style = {} }) {
   const [focused, setFocused] = useState(false)
   return (
-    <textarea value={value} onChange={e=>onChange(e.target.value)} placeholder={placeholder} rows={rows}
-      style={{ ...T.input, resize:'vertical', lineHeight:1.6, borderColor:focused?'var(--accent)':'var(--border)', ...style }}
-      onFocus={()=>setFocused(true)} onBlur={()=>setFocused(false)}/>
+    <textarea
+      value={value}
+      onChange={e => onChange(e.target.value)}
+      placeholder={placeholder}
+      rows={rows}
+      style={{
+        width: '100%', padding: '11px 14px',
+        borderRadius: 10,
+        border: `1.5px solid ${focused ? 'var(--accent)' : 'var(--border)'}`,
+        background: '#fff', color: '#1e293b',
+        fontSize: 16,             /* ← must be ≥16 px on iOS */
+        fontFamily: "'Nunito', sans-serif",
+        resize: 'vertical', lineHeight: 1.6,
+        outline: 'none', boxSizing: 'border-box',
+        transition: 'border-color .2s',
+        ...style,
+      }}
+      onFocus={() => setFocused(true)}
+      onBlur={() => setFocused(false)}
+    />
   )
 }
 function Spinner({ size=16 }) {
@@ -10365,55 +10563,69 @@ function Spinner({ size=16 }) {
 function LessonPicker({ value, onChange, accent = 'var(--accent)' }) {
   const sel = value
   const set = patch => onChange({ ...sel, ...patch })
-
-  const subjects  = getSubjectsForClass(sel.cls)
-  const chapters  = sel.subject ? getChapters(sel.subject, sel.cls) : []
-  const subtopics = (sel.subject && sel.chapter) ? getSubtopics(sel.cls, sel.subject, sel.chapter) : []
-
+ 
+  // These helpers come from the parent App.jsx — keep referencing them
+  const subjects  = typeof getSubjectsForClass !== 'undefined' ? getSubjectsForClass(sel.cls) : []
+  const chapters  = (sel.subject && typeof getChapters !== 'undefined') ? getChapters(sel.subject, sel.cls) : []
+  const subtopics = (sel.subject && sel.chapter && typeof getSubtopics !== 'undefined')
+    ? getSubtopics(sel.cls, sel.subject, sel.chapter) : []
+ 
   const subTopicOptions = [
     { value: 'full', label: '📘 Full Chapter' },
     ...subtopics.map(s => ({ value: s, label: s })),
     { value: 'custom', label: '✍️ Write my own...' },
   ]
-
+ 
+  const CLASSES_LIST = typeof CLASSES !== 'undefined' ? CLASSES : []
+ 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit,minmax(160px,1fr))', gap: 14, marginBottom: 4 }}>
-        <Field label="Class">
+      {/*
+        minmax(min(100%, 180px), 1fr) → 1 column on phones,
+        up to 3 columns on wider screens.
+        This is the key responsive fix for forms.
+      */}
+      <div style={{
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 180px), 1fr))',
+        gap: 12, marginBottom: 4,
+      }}>
+        <div><label style={{ display:'block', fontSize:'10.5px', fontWeight: 800, color:'var(--text)', textTransform:'uppercase', letterSpacing:'.6px', marginBottom: 6 }}>Class</label>
           <BSSelect value={sel.cls}
             onChange={v => set({ cls: v, subject: '', chapter: '', subTopicChoice: 'full', customText: '' })}
-            options={CLASSES} />
-        </Field>
-        <Field label="Subject">
+            options={CLASSES_LIST} />
+        </div>
+        <div><label style={{ display:'block', fontSize:'10.5px', fontWeight: 800, color:'var(--text)', textTransform:'uppercase', letterSpacing:'.6px', marginBottom: 6 }}>Subject</label>
           <BSSelect value={sel.subject}
             onChange={v => set({ subject: v, chapter: '', subTopicChoice: 'full', customText: '' })}
             options={[{ value: '', label: 'Select subject' }, ...subjects.map(s => ({ value: s, label: s }))]} />
-        </Field>
-        <Field label="Chapter">
+        </div>
+        <div><label style={{ display:'block', fontSize:'10.5px', fontWeight: 800, color:'var(--text)', textTransform:'uppercase', letterSpacing:'.6px', marginBottom: 6 }}>Chapter</label>
           <BSSelect value={sel.chapter} disabled={!sel.subject}
             onChange={v => set({ chapter: v, subTopicChoice: 'full', customText: '' })}
-            options={[{ value: '', label: ' Select chapter ' }, ...chapters.map(c => ({ value: c, label: c }))]} />
-        </Field>
+            options={[{ value: '', label: 'Select chapter' }, ...chapters.map(c => ({ value: c, label: c }))]} />
+        </div>
       </div>
-
-      {/* Sub Topic dropdown — always visible; disabled until a chapter is picked */}
-      <Field label="Sub Topic">
+ 
+      <div style={{ marginBottom: 14 }}>
+        <label style={{ display:'block', fontSize:'10.5px', fontWeight: 800, color:'var(--text)', textTransform:'uppercase', letterSpacing:'.6px', marginBottom: 6 }}>Sub Topic</label>
         <BSSelect
           value={sel.subTopicChoice}
           disabled={!sel.chapter}
           onChange={v => set({ subTopicChoice: v, customText: v === 'custom' ? sel.customText : '' })}
           options={sel.chapter ? subTopicOptions : [{ value: 'full', label: 'Select a chapter first' }]}
         />
-      </Field>
-
+      </div>
+ 
       {sel.chapter && sel.subTopicChoice === 'custom' && (
-        <Field label="Type your focus">
+        <div style={{ marginBottom: 4 }}>
+          <label style={{ display:'block', fontSize:'10.5px', fontWeight: 800, color:'var(--text)', textTransform:'uppercase', letterSpacing:'.6px', marginBottom: 6 }}>Type your focus</label>
           <BSInput
             value={sel.customText}
             onChange={v => set({ customText: v })}
             placeholder="e.g. only numerical problems, or a specific sub-topic not listed above"
           />
-        </Field>
+        </div>
       )}
     </div>
   )
@@ -11181,7 +11393,7 @@ function Dashboard({ user, onNavigate, onOpenChapter }) {
         </div>
       </div>
 
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(130px,1fr))', gap:12, marginBottom:22 }}>
+      <div className="bs-stats-grid" style={{ marginBottom: 22 }}>
         {[{label:'Total XP',value:xp.toLocaleString(),icon:'⚡',bg:'rgba(99,102,241,.15)',color:'#818CF8'},{label:'Streak',value:`${streak}d`,icon:'🔥',bg:'rgba(249,115,22,.15)',color:'#FB923C'},{label:'Doubts',value:stats?.stats?.doubts_solved||0,icon:'🤔',bg:'rgba(16,185,129,.15)',color:'#34D399'},{label:'Quizzes',value:stats?.stats?.quizzes_done||0,icon:'🎯',bg:'rgba(139,92,246,.15)',color:'#A78BFA'},{label:'Notes',value:stats?.stats?.notes_made||0,icon:'📖',bg:'rgba(239,68,68,.15)',color:'#FCA5A5'},{label:'Papers',value:stats?.stats?.papers_made||0,icon:'📄',bg:'rgba(245,158,11,.15)',color:'#FCD34D'}].map(stat=>(
           <div key={stat.label} style={{ background:stat.bg, borderRadius:14, padding:'14px 12px', textAlign:'center', border:'1px solid rgba(255,255,255,.05)' }}>
             <div style={{ fontSize:24, marginBottom:4 }}>{stat.icon}</div>
@@ -12996,7 +13208,7 @@ FORMATTING — the chat renders limited markdown, follow exactly:
   return (
     <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', display: 'flex', flexDirection: 'column', height: 'calc(100vh - 100px)', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <PageHeader icon="🤔" title="AI Doubt Solver" subtitle="Ask anything — your full chat history is saved here" color="#6366F1" />
+        <PageHeader icon="🤔" title="AI Doubt Solver" subtitle="Ask anything - your full chat history is saved here" color="#6366F1" />
         {messages.length > 1 && (
           <GhostBtn small onClick={clearThread} style={{ flexShrink: 0, marginTop: 4 }}>🗑 Clear</GhostBtn>
         )}
@@ -13319,7 +13531,7 @@ FINAL REMINDER: You must write AT LEAST 3500 words. Every section above must be 
 
   return (
     <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito',sans-serif", animation: 'slideUp .25s ease-out' }}>
-      <PageHeader icon="📖" title="Chapter Notes Maker" subtitle="Class → Subject → Chapter → Sub Topic → textbook-quality notes — download or print as PDF" color="#10B981" />
+      <PageHeader icon="📖" title="Chapter Notes Maker" subtitle="Class → Subject → Chapter → Sub Topic → textbook-quality notes - download or print as PDF" color="#10B981" />
 
       <Card style={{ marginBottom: 4 }}>
         <LessonPicker value={sel} onChange={setSel} accent="#10B981" />
@@ -13952,7 +14164,7 @@ Format:
 
   return (
     <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito', sans-serif", animation: 'slideUp .25s ease-out' }}>
-      <PageHeader icon="🎯" title="Quiz Generator" subtitle="Pick class, subject, chapter and sub-topic — get a timed MCQ quiz with instant scoring" color="#F59E0B" />
+      <PageHeader icon="🎯" title="Quiz Generator" subtitle="Pick class, subject, chapter and sub-topic - get a timed MCQ quiz with instant scoring" color="#F59E0B" />
 
       {!quiz ? (
         <>
@@ -15203,7 +15415,7 @@ function ReplayQuiz({ session }) {
           return (
             <Card key={i} style={{ borderLeft: done ? `4px solid ${sel===correct?'#22c55e':'#ef4444'}` : '' }}>
               <p style={{ fontWeight:700, fontSize:14.5, color:'var(--text-h)', margin:'0 0 12px', lineHeight:1.5 }}><span style={{ color:'var(--accent)' }}>Q{i+1}.</span> {q.q||q.text}</p>
-              <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:8 }}>
+              <div className="bs-opts-grid">
                 {(q.options||q.opts||[]).map((opt,j)=>{
                   const isAns=j===correct, isSel=sel===j
                   let bg='var(--social-bg)', border='var(--border)', color='var(--text-h)'
@@ -15662,6 +15874,301 @@ function TrialBadge({ user, onUpgrade }) {
   )
 }
 
+const BOTTOM_TABS = [
+  { id: 'dashboard', icon: '🏠', label: 'Home',  color: '#4f46e5' },
+  { id: 'doubt',     icon: '🤔', label: 'Ask',   color: '#818CF8' },
+  { id: 'notes',     icon: '📖', label: 'Notes', color: '#10B981' },
+  { id: 'quiz',      icon: '🎯', label: 'Quiz',  color: '#F59E0B' },
+
+]
+
+
+function MobileBottomNav({ activeTab, onTabChange, onMoreOpen, unreadCount = 0 }) {
+  const isMoreActive = !BOTTOM_TABS.some(t => t.id === activeTab)
+  const activeColor  = BOTTOM_TABS.find(t => t.id === activeTab)?.color || '#4f46e5'
+ 
+  return (
+    <nav className="bs-bottom-nav" aria-label="Main navigation">
+      <div style={{ display: 'flex', alignItems: 'stretch', height: 58 }}>
+ 
+        {BOTTOM_TABS.map(t => {
+          const active = activeTab === t.id
+          return (
+            <button
+              key={t.id}
+              onClick={() => onTabChange(t.id)}
+              aria-label={t.label}
+              aria-current={active ? 'page' : undefined}
+              style={{
+                flex: 1, display: 'flex', flexDirection: 'column',
+                alignItems: 'center', justifyContent: 'center', gap: 3,
+                border: 'none', background: 'none', cursor: 'pointer',
+                padding: '6px 4px 5px', minHeight: 48,
+                color: active ? t.color : '#94a3b8',
+                fontFamily: "'Nunito', sans-serif",
+                position: 'relative', transition: 'color .12s',
+              }}
+            >
+              {/* Active pill indicator at top */}
+              {active && (
+                <span style={{
+                  position: 'absolute', top: 0, left: '50%',
+                  transform: 'translateX(-50%)',
+                  width: 30, height: 3, borderRadius: '0 0 4px 4px',
+                  background: t.color,
+                }} />
+              )}
+              <span style={{
+                fontSize: 22, lineHeight: 1,
+                transform: active ? 'scale(1.1) translateY(-1px)' : 'scale(1)',
+                transition: 'transform .15s',
+                display: 'block',
+              }}>{t.icon}</span>
+              <span style={{ fontSize: 9.5, fontWeight: active ? 800 : 600, letterSpacing: '.15px' }}>
+                {t.label}
+              </span>
+            </button>
+          )
+        })}
+ 
+        {/* More button */}
+        <button
+          onClick={onMoreOpen}
+          aria-label="More tools"
+          style={{
+            flex: 1, display: 'flex', flexDirection: 'column',
+            alignItems: 'center', justifyContent: 'center', gap: 3,
+            border: 'none', background: 'none', cursor: 'pointer',
+            padding: '6px 4px 5px', minHeight: 48,
+            color: isMoreActive ? '#4f46e5' : '#94a3b8',
+            fontFamily: "'Nunito', sans-serif",
+            position: 'relative', transition: 'color .12s',
+          }}
+        >
+          {isMoreActive && (
+            <span style={{
+              position: 'absolute', top: 0, left: '50%',
+              transform: 'translateX(-50%)',
+              width: 30, height: 3, borderRadius: '0 0 4px 4px', background: '#4f46e5',
+            }} />
+          )}
+          <span style={{ fontSize: 22, lineHeight: 1, position: 'relative', display: 'block' }}>
+            ⋯
+            {unreadCount > 0 && (
+              <span style={{
+                position: 'absolute', top: -5, right: -9,
+                minWidth: 14, height: 14, padding: '0 3px',
+                borderRadius: 7, background: '#ef4444', color: '#fff',
+                fontSize: 8, fontWeight: 800,
+                display: 'inline-flex', alignItems: 'center', justifyContent: 'center',
+              }}>{unreadCount > 9 ? '9+' : unreadCount}</span>
+            )}
+          </span>
+          <span style={{ fontSize: 9.5, fontWeight: isMoreActive ? 800 : 600, letterSpacing: '.15px' }}>
+            More
+          </span>
+        </button>
+ 
+      </div>
+    </nav>
+  )
+}
+ 
+// ─────────────────────────────────────────────────────────────
+//  MobileMoreSheet  —  full tool picker in a bottom sheet
+// ─────────────────────────────────────────────────────────────
+function MobileMoreSheet({ user, activeTab, onTabChange, onLogout, onClose, unreadCount = 0 }) {
+  const isSchool  = user?.type === 'school'
+  const isTeacher = user?.role === 'teacher'
+ 
+  // All non-primary tools, grouped into rows of 3
+  const ALL_TOOLS = [
+    { id: 'flashcards',  icon: '🃏', label: 'Flashcards', color: '#EF4444' },
+    { id: 'courses',     icon: '📚', label: 'Courses',    color: '#8B5CF6' },
+    { id: 'history',     icon: '🕘', label: 'History',    color: '#6366F1' },
+    { id: 'feed',        icon: '📣', label: 'Feed',       color: '#6366F1' },
+    { id: 'search',      icon: '🔍', label: 'Search',     color: '#06b6d4' },
+    { id: 'messages',    icon: '💬', label: 'Messages',   color: '#10B981', badge: unreadCount },
+    ...(isSchool ? [
+      { id: 'assignments', icon: '📝', label: 'Homework',  color: '#F59E0B' },
+      { id: 'notices',     icon: '📢', label: 'Notices',   color: '#F97316' },
+      { id: 'timetable',   icon: '📅', label: 'Timetable', color: '#06b6d4' },
+    ] : []),
+    ...(isTeacher ? [
+      { id: 'lessonplan', icon: '🎓', label: 'Lesson',   color: '#7C3AED' },
+      { id: 'paper',      icon: '📄', label: 'QP Maker', color: '#A855F7' },
+    ] : []),
+  ]
+ 
+  // Split into rows of 3 for the grid
+  const ROWS = []
+  for (let i = 0; i < ALL_TOOLS.length; i += 3) ROWS.push(ALL_TOOLS.slice(i, i + 3))
+ 
+  const goTo = id => { onTabChange(id); onClose() }
+ 
+  return (
+    <>
+      {/* Dim backdrop — tap to close */}
+      <div className="bs-backdrop" onClick={onClose} />
+ 
+      <div className="bs-sheet" style={{ fontFamily: "'Nunito', sans-serif" }}>
+ 
+        {/* Handle bar */}
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 8px' }}>
+          <div style={{ width: 36, height: 4, borderRadius: 2, background: '#e2e8f0' }} />
+        </div>
+ 
+        {/* User identity card */}
+        <div style={{
+          margin: '0 16px 16px',
+          padding: '14px 16px',
+          borderRadius: 16,
+          background: 'linear-gradient(135deg,#eef2ff,#f5f3ff)',
+          border: '1px solid #e0e7ff',
+          display: 'flex', alignItems: 'center', gap: 12,
+        }}>
+          <div style={{
+            width: 46, height: 46, borderRadius: '50%',
+            background: 'linear-gradient(135deg,#6366F1,#8B5CF6)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            color: '#fff', fontWeight: 900, fontSize: 20, flexShrink: 0, overflow: 'hidden',
+          }}>
+            {user?.avatar_url
+              ? <img src={user.avatar_url} alt="" style={{ width: '100%', height: '100%', objectFit: 'cover' }} />
+              : (user?.name?.[0]?.toUpperCase() || '?')}
+          </div>
+          <div style={{ flex: 1, minWidth: 0 }}>
+            <div style={{ fontWeight: 800, color: '#1e293b', fontSize: 15, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+              {user?.name}
+            </div>
+            <div style={{ fontSize: 12, color: '#6366F1', fontWeight: 700 }}>
+              {user?.role === 'teacher' ? '👨‍🏫 Teacher' : `🎒 ${user?.class_level || 'Student'}`}
+            </div>
+          </div>
+          <button onClick={() => goTo('profile')} style={{
+            padding: '7px 14px', borderRadius: 20,
+            border: 'none', background: '#6366F1', color: '#fff',
+            fontSize: 12.5, fontWeight: 700, cursor: 'pointer', flexShrink: 0,
+            fontFamily: "'Nunito', sans-serif",
+          }}>Profile →</button>
+        </div>
+ 
+        {/* ── Tool grid ── */}
+        <div style={{ padding: '0 16px' }}>
+          <div style={{ fontSize: 10, fontWeight: 800, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.6px', marginBottom: 10, fontFamily: "'Nunito', sans-serif" }}>
+            All Tools
+          </div>
+          {ROWS.map((row, ri) => (
+            <div key={ri} style={{
+              display: 'grid',
+              gridTemplateColumns: `repeat(${row.length}, 1fr)`,
+              gap: 10, marginBottom: 10,
+            }}>
+              {row.map(item => {
+                const active = activeTab === item.id
+                return (
+                  <button key={item.id} onClick={() => goTo(item.id)} style={{
+                    display: 'flex', flexDirection: 'column',
+                    alignItems: 'center', justifyContent: 'center',
+                    gap: 7, padding: '16px 6px', borderRadius: 16,
+                    border: `1.5px solid ${active ? item.color : '#f1f5f9'}`,
+                    background: active ? `${item.color}14` : '#f8fafc',
+                    cursor: 'pointer', position: 'relative',
+                    minHeight: 88,   /* big enough to tap easily */
+                    transition: 'all .12s',
+                    fontFamily: "'Nunito', sans-serif",
+                  }}>
+                    <span style={{ fontSize: 28, lineHeight: 1 }}>{item.icon}</span>
+                    <span style={{ fontSize: 12, fontWeight: 700, color: active ? item.color : '#475569', lineHeight: 1.2, textAlign: 'center' }}>
+                      {item.label}
+                    </span>
+                    {item.badge > 0 && (
+                      <span style={{
+                        position: 'absolute', top: 8, right: 8,
+                        minWidth: 17, height: 17, padding: '0 4px',
+                        borderRadius: 9, background: '#ef4444', color: '#fff',
+                        fontSize: 9, fontWeight: 800,
+                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                      }}>{item.badge > 9 ? '9+' : item.badge}</span>
+                    )}
+                  </button>
+                )
+              })}
+            </div>
+          ))}
+        </div>
+ 
+        {/* ── Bottom action rows ── */}
+        <div style={{ padding: '12px 16px 4px', borderTop: '1px solid #f1f5f9', display: 'flex', flexDirection: 'column', gap: 8 }}>
+          <button onClick={() => goTo('achievements')} style={{
+            display: 'flex', alignItems: 'center', gap: 14,
+            padding: '13px 16px', borderRadius: 12,
+            border: '1px solid #f1f5f9', background: '#f8fafc',
+            cursor: 'pointer', textAlign: 'left', minHeight: 50,
+            fontFamily: "'Nunito', sans-serif",
+          }}>
+            <span style={{ fontSize: 22 }}>🏆</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#1e293b' }}>Achievements</span>
+          </button>
+ 
+          {user?.type !== 'school' && (
+            <button onClick={() => goTo('subscription')} style={{
+              display: 'flex', alignItems: 'center', gap: 14,
+              padding: '13px 16px', borderRadius: 12,
+              border: '1px solid #e0e7ff',
+              background: 'linear-gradient(135deg,#eef2ff,#f5f3ff)',
+              cursor: 'pointer', textAlign: 'left', minHeight: 50,
+              fontFamily: "'Nunito', sans-serif",
+            }}>
+              <span style={{ fontSize: 22 }}>⚡</span>
+              <span style={{ fontSize: 14, fontWeight: 800, color: '#4f46e5' }}>Upgrade to Pro</span>
+              <span style={{ marginLeft: 'auto', fontSize: 12, color: '#818cf8', fontWeight: 700 }}>→</span>
+            </button>
+          )}
+ 
+          <button onClick={() => { onClose(); onLogout() }} style={{
+            display: 'flex', alignItems: 'center', gap: 14,
+            padding: '13px 16px', borderRadius: 12,
+            border: '1px solid #fee2e2', background: '#fff5f5',
+            cursor: 'pointer', textAlign: 'left', minHeight: 50,
+            fontFamily: "'Nunito', sans-serif",
+          }}>
+            <span style={{ fontSize: 22 }}>⏻</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: '#ef4444' }}>Sign Out</span>
+          </button>
+        </div>
+ 
+      </div>
+    </>
+  )
+}
+ 
+// ─────────────────────────────────────────────────────────────
+//  BottomSheet  —  reusable utility for confirms, pickers, etc.
+// ─────────────────────────────────────────────────────────────
+function BottomSheet({ isOpen, onClose, title, children }) {
+  if (!isOpen) return null
+  return (
+    <>
+      <div className="bs-backdrop" onClick={onClose} />
+      <div className="bs-sheet" style={{ fontFamily: "'Nunito', sans-serif" }}>
+        <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 6px' }}>
+          <div style={{ width: 36, height: 4, borderRadius: 2, background: '#e2e8f0' }} />
+        </div>
+        {title && (
+          <div style={{
+            padding: '4px 20px 14px',
+            fontFamily: "'Sora', sans-serif", fontWeight: 800,
+            fontSize: 17, color: '#1e293b', borderBottom: '1px solid #f1f5f9',
+          }}>{title}</div>
+        )}
+        <div style={{ padding: 20 }}>{children}</div>
+      </div>
+    </>
+  )
+}
+ 
+
 
 export default function App() {
   useFonts()
@@ -15680,18 +16187,19 @@ export default function App() {
   const [unreadCount, setUnreadCount] = useState(0)
   const [menuOpen, setMenuOpen] = useState(false)
   const [activeChapterGroup, setActiveChapterGroup] = useState(null)
+  const [moreOpen, setMoreOpen] = useState(false)
 
-const fetchUnread = useCallback(() => {
-  api.get('/api/messages/unread-count').then(d => setUnreadCount(d.count || 0)).catch(() => {})
-}, [])
+  const fetchUnread = useCallback(() => {
+    api.get('/api/messages/unread-count').then(d => setUnreadCount(d.count || 0)).catch(() => {})
+  }, [])
 
-useEffect(() => {
-  if (!user) return
-  fetchUnread()
-  const i = setInterval(fetchUnread, 15000)
-  return () => clearInterval(i)
-}, [user, fetchUnread])
-  // Refresh user on mount
+  useEffect(() => {
+    if (!user) return
+    fetchUnread()
+    const i = setInterval(fetchUnread, 15000)
+    return () => clearInterval(i)
+  }, [user, fetchUnread])
+
   useEffect(() => {
     if (!user) return
     api.get('/api/auth/me')
@@ -15718,19 +16226,8 @@ useEffect(() => {
     setUser(u); localStorage.setItem('bs_user', JSON.stringify(u))
   }
 
-  // function handleHistoryNav(item) {
-  //   setPrefill({
-  //     tool:     item.tool,
-  //     subject:  item.subject  || '',
-  //     chapter:  item.chapter  || '',
-  //     chapters: item.chapters || [],
-  //   })
-  //   setTab(item.tool)
-  // }
-
   function clearPrefill() { setPrefill(null) }
 
-  // ── Landing ──────────────────────────────────────────────────
   if (page === 'landing') return (
     <LandingPage onStart={mode => { setInitAuthMode(mode === 'signup' ? 'register' : 'login'); setPage('auth') }} />
   )
@@ -15741,7 +16238,6 @@ useEffect(() => {
     <ForgotPasswordPage onBack={() => setPage('auth')} />
   )
 
-  // ── App tabs ─────────────────────────────────────────────────
   const isStudent = user.role === 'student'
   const isTeacher = user.role === 'teacher'
   const isSchool  = user.type === 'school'
@@ -15750,15 +16246,11 @@ useEffect(() => {
     { id: 'dashboard',   icon: '🏠', label: 'Dashboard',      color: '#6366F1' },
     { id: 'doubt',       icon: '🤔', label: 'Doubt Solver',    color: '#818CF8' },
     { id: 'notes',       icon: '📖', label: 'Notes',           color: '#10B981' },
-    // { id: 'paper',       icon: '📄', label: 'Question Paper',  color: '#A855F7' },
     { id: 'quiz',        icon: '🎯', label: 'Quiz',            color: '#F59E0B' },
     { id: 'flashcards',  icon: '🃏', label: 'Flashcards',      color: '#EF4444' },
     { id: 'courses',     icon: '📚', label: 'Youtube Courses', color: '#8B5CF6' },
     { id: 'search',      icon: '🔍', label: 'Search',          color: '#06b6d4' },
     { id: 'messages',    icon: '💬', label: 'Messages',        color: '#10B981' },
-    // { id: 'video',       icon: '🎬', label: 'Video Learning',  color: '#06b6d4' },
-    // ...(isStudent ? [{ id: 'cheatsheet', icon: '📋', label: 'Cheat Sheet',   color: '#F97316' }] : []),
-    // ...(isTeacher ? [{ id: 'lessonplan', icon: '🎓', label: 'Lesson Planner', color: '#7C3AED' }] : []),
     ...(isSchool ? [
       { id: 'assignments', icon: '📝', label: 'Assignments', color: '#F59E0B' },
       { id: 'notices',     icon: '📢', label: 'Notices',     color: '#F97316' },
@@ -15769,45 +16261,32 @@ useEffect(() => {
     { id: 'history',     icon: '🕘', label: 'History',         color: '#6366F1' }
   ]
 
-//   const tabs = [
-//   { id: 'dashboard',  icon: '🏠', label: 'Dashboard',       color: '#6366F1' },
-//   { id: 'courses',    icon: '📚', label: 'Chapter Courses',  color: '#8B5CF6' },
-//   { id: 'notes',      icon: '📖', label: 'Notes',            color: '#10B981' },
-//   { id: 'paper',      icon: '📄', label: 'Question Paper',   color: '#A855F7' },
-//   { id: 'quiz',       icon: '🎯', label: 'Quiz',             color: '#F59E0B' },
-//   { id: 'flashcards', icon: '🃏', label: 'Flashcards',       color: '#EF4444' },
-//   { id: 'doubt',      icon: '🤔', label: 'Doubt Solver',     color: '#818CF8' },
-//   { id: 'history',    icon: '🕘', label: 'History',          color: '#6366F1' },
-  // { id: 'feed',       icon: '📣', label: 'Study Feed',       color: '#6366F1' },
-// ]
+  const LEARN_TAB_IDS = new Set(['dashboard', 'doubt', 'notes', 'quiz', 'flashcards', 'courses', 'history'])
 
-// Learn zone = solo study tools; everything else falls into the "My School" zone
-const LEARN_TAB_IDS = new Set(['dashboard', 'doubt', 'notes', 'quiz', 'flashcards', 'courses', 'history'])
-
-const navSectionLabel = text => (
-  <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px 4px' }}>
-    <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.7px', textTransform: 'uppercase', color: 'var(--text)', whiteSpace: 'nowrap' }}>{text}</span>
-    <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
-  </div>
-)
-
-const renderTab = t => {
-  const active = tab === t.id
-  return (
-    <button key={t.id} onClick={() => setTab(t.id)}
-      style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: "'Nunito', sans-serif", background: active ? `linear-gradient(135deg,${t.color},${t.color}bb)` : 'transparent', color: active ? '#fff' : 'var(--text-h)', fontWeight: active ? 800 : 600, fontSize: 13.5, textAlign: 'left', transition: 'all .15s' }}
-      onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,.05)' }}
-      onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}>
-      <span style={{ fontSize: 16 }}>{t.icon}</span>
-      {t.id === 'messages' && unreadCount > 0 && (
-        <span style={{ marginLeft: 'auto', minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9, background: '#ef4444', color: '#fff', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-          {unreadCount > 9 ? '9+' : unreadCount}
-        </span>
-      )}
-      {t.label}
-    </button>
+  const navSectionLabel = text => (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px 4px' }}>
+      <span style={{ fontSize: 9.5, fontWeight: 800, letterSpacing: '.7px', textTransform: 'uppercase', color: 'var(--text)', whiteSpace: 'nowrap' }}>{text}</span>
+      <span style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+    </div>
   )
-}
+
+  const renderTab = t => {
+    const active = tab === t.id
+    return (
+      <button key={t.id} onClick={() => setTab(t.id)}
+        style={{ width: '100%', display: 'flex', alignItems: 'center', gap: 9, padding: '9px 12px', borderRadius: 10, border: 'none', cursor: 'pointer', fontFamily: "'Nunito', sans-serif", background: active ? `linear-gradient(135deg,${t.color},${t.color}bb)` : 'transparent', color: active ? '#fff' : 'var(--text-h)', fontWeight: active ? 800 : 600, fontSize: 13.5, textAlign: 'left', transition: 'all .15s' }}
+        onMouseEnter={e => { if (!active) e.currentTarget.style.background = 'rgba(255,255,255,.05)' }}
+        onMouseLeave={e => { if (!active) e.currentTarget.style.background = 'transparent' }}>
+        <span style={{ fontSize: 16 }}>{t.icon}</span>
+        {t.id === 'messages' && unreadCount > 0 && (
+          <span style={{ marginLeft: 'auto', minWidth: 18, height: 18, padding: '0 5px', borderRadius: 9, background: '#ef4444', color: '#fff', fontSize: 10, fontWeight: 800, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+            {unreadCount > 9 ? '9+' : unreadCount}
+          </span>
+        )}
+        {t.label}
+      </button>
+    )
+  }
 
   const renderPage = () => {
     if (tab === 'subscription') return (
@@ -15846,7 +16325,7 @@ const renderTab = t => {
     <div style={{ minHeight: '100vh', background: 'transparent', display: 'flex', flexDirection: 'column', fontFamily: "'Nunito', sans-serif" }}>
 
       {/* ── Top header ───────────────────────────────────────── */}
-      <header style={{ borderBottom: '1px solid var(--border)', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 58, position: 'sticky', top: 0, zIndex: 100,background: 'rgba(255,255,255,.92)', backdropFilter: 'blur(20px)', boxShadow: '0 1px 12px rgba(15,23,42,.06)' }}>
+      <header style={{ borderBottom: '1px solid var(--border)', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 58, position: 'sticky', top: 0, zIndex: 100, background: 'rgba(255,255,255,.92)', backdropFilter: 'blur(20px)', boxShadow: '0 1px 12px rgba(15,23,42,.06)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={() => setTab('dashboard')}>
           <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🧠</div>
           <span style={{ fontFamily: "'Sora', sans-serif", fontWeight: 900, fontSize: 17, color: 'var(--text-h)' }}>
@@ -15884,7 +16363,7 @@ const renderTab = t => {
             <button onClick={logout} title="Sign Out" style={{ padding: '6px 13px', borderRadius: 9, border: '1px solid var(--border)', background: 'none', color: 'var(--text)', cursor: 'pointer', fontSize: 13, fontWeight: 700, fontFamily: "'Nunito', sans-serif", flexShrink: 0 }}>Sign Out</button>
           </>}
 
-          {/* ── MOBILE ONLY: avatar dropdown holds the rest ── */}
+          {/* ── MOBILE ONLY: avatar dropdown ── */}
           {isMobile && (
             <div style={{ position: 'relative' }}>
               <button onClick={() => setMenuOpen(o => !o)} title="Menu"
@@ -15919,9 +16398,6 @@ const renderTab = t => {
         </div>
       </header>
 
-      {/* ── Mobile top nav ───────────────────────────────────── */}
-      <MobileTopNav tabs={tabs} activeTab={tab} onTabChange={setTab} unreadCount={unreadCount} />
-
       <div style={{ display: 'flex', flex: 1 }}>
 
         {/* ── Desktop sidebar ──────────────────────────────────── */}
@@ -15944,26 +16420,16 @@ const renderTab = t => {
         </nav>
 
         {/* ── Main content ─────────────────────────────────────── */}
-        <main style={{ flex: 1, overflowY: 'auto', minWidth: 0 }}>
+        <main className="bs-main" style={{ flex: 1, overflowY: 'auto', minWidth: 0 }}>
           <div style={{ padding: '16px 24px 0', paddingBottom: 0 }}>
-            {/* FREE TRIAL COUNTDOWN HIDDEN FOR NOW — uncomment to re-enable:
-            <FreeTierCountdown
-              user={user}
-              onSubscribe={() => setTab('subscription')}
-              onExpired={() => { setTrialExpired(true); setTab('subscription') }}
-            />
-            */}
           </div>
 
-          {/* Tool tabs stay mounted — generation keeps running and progress
-              is preserved when you switch tabs (only reset via their own New button) */}
           <div style={{ display: tab === 'doubt'      ? 'block' : 'none', height: '100%' }}><DoubtSolver    user={user} prefill={tab === 'doubt'      ? prefill : null} onClearPrefill={clearPrefill} /></div>
           <div style={{ display: tab === 'notes'      ? 'block' : 'none', height: '100%' }}><NotesMaker     user={user} prefill={tab === 'notes'      ? prefill : null} onClearPrefill={clearPrefill} /></div>
           <div style={{ display: tab === 'quiz'       ? 'block' : 'none', height: '100%' }}><QuizGenerator  user={user} prefill={tab === 'quiz'       ? prefill : null} onClearPrefill={clearPrefill} /></div>
           <div style={{ display: tab === 'flashcards' ? 'block' : 'none', height: '100%' }}><FlashCards     user={user} prefill={tab === 'flashcards' ? prefill : null} onClearPrefill={clearPrefill} /></div>
           <div style={{ display: tab === 'courses'    ? 'block' : 'none', height: '100%' }}><ChapterCourses user={user} prefill={tab === 'courses'    ? prefill : null} onClearPrefill={clearPrefill} /></div>
 
-          {/* Everything else renders only when its tab is active */}
           {!['doubt','notes','quiz','flashcards','courses'].includes(tab) && renderPage()}
         </main>
 
@@ -15979,6 +16445,28 @@ const renderTab = t => {
           onClose={() => setActiveChapterGroup(null)}
           onNavigate={(t, pf) => { setActiveChapterGroup(null); if (pf) setPrefill(pf); setTab(t) }}
         />
+      )}
+
+      {/* ── Mobile bottom nav + More sheet ───────────── */}  {/* ← NEW */}
+      {isMobile && (
+        <>
+          <MobileBottomNav
+            activeTab={tab}
+            onTabChange={t => { setTab(t); setMoreOpen(false) }}
+            onMoreOpen={() => setMoreOpen(true)}
+            unreadCount={unreadCount}
+          />
+          {moreOpen && (
+            <MobileMoreSheet
+              user={user}
+              activeTab={tab}
+              onTabChange={t => { setTab(t); setMoreOpen(false) }}
+              onLogout={logout}
+              onClose={() => setMoreOpen(false)}
+              unreadCount={unreadCount}
+            />
+          )}
+        </>
       )}
 
     </div>
