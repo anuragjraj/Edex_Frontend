@@ -378,7 +378,12 @@ export default function TalkingBuddy({
     <>
       {/* ── Floating Action Button (the only always-visible element) ── */}
       <div style={{
-        position: 'fixed', bottom: 24, right: 24, zIndex: 1000,
+        position: 'fixed',
+        /* 88 px = 64 px mobile bottom-nav + 24 px padding.
+           On desktop this just means the button sits comfortably
+           above the doubt-solver send row. */
+        bottom: 'calc(env(safe-area-inset-bottom, 0px) + 88px)',
+        right: 24, zIndex: 1000,
         display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 10,
         pointerEvents: 'none',
       }}>
@@ -443,7 +448,8 @@ export default function TalkingBuddy({
       {open && (
         <div style={{
           position: 'fixed', zIndex: 1001, right: 24,
-          bottom: fabSize + 36,            // sits just above the FAB
+          // aligns with the raised FAB: 88 px base + FAB height + 10 px gap
+          bottom: `calc(env(safe-area-inset-bottom, 0px) + ${88 + fabSize + 10}px)`,
           width: 'min(350px, calc(100vw - 24px))',
           height: 'min(490px, calc(100vh - 120px))',
           borderRadius: 18, overflow: 'hidden',
