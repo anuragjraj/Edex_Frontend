@@ -38,6 +38,19 @@ function useFonts() {
           /* How tall the bottom nav is — used for padding-bottom */
           --nav-h: 0px;
         }
+        [data-theme="dark"] {
+          --bg: #0d0d1a;
+          --bg2: #161628;
+          --text: #8892a4;
+          --text-h: #dde1f0;
+          --border: rgba(255,255,255,.09);
+          --accent: #818cf8;
+          --accent-bg: rgba(129,140,248,.13);
+          --accent-border: rgba(129,140,248,.28);
+          --code-bg: rgba(255,255,255,.055);
+          --social-bg: rgba(255,255,255,.055);
+          --shadow-md: 0 4px 20px rgba(0,0,0,.45);
+        }
         @media (max-width: 768px) { :root { --nav-h: 64px; } }
  
         /* ── Reset ── */
