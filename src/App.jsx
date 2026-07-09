@@ -16200,16 +16200,6 @@ useEffect(() => {
   localStorage.setItem('bs_theme', darkMode ? 'dark' : 'light')
 }, [darkMode])
 
-  const [darkMode, setDarkMode] = useState(() => {
-  const saved = localStorage.getItem('bs_theme')
-  if (saved) return saved === 'dark'
-  return window.matchMedia('(prefers-color-scheme: dark)').matches
-})
-
-useEffect(() => {
-  document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light')
-  localStorage.setItem('bs_theme', darkMode ? 'dark' : 'light')
-}, [darkMode])
 
   const fetchUnread = useCallback(() => {
     api.get('/api/messages/unread-count').then(d => setUnreadCount(d.count || 0)).catch(() => {})
