@@ -16367,35 +16367,20 @@ useEffect(() => {
 
 
           <button
-  onClick={() => setDarkMode(d => !d)}
-  title="Toggle dark / light mode"
-  style={{
-    width: isMobile ? 34 : 36, height: isMobile ? 34 : 36,
-    borderRadius: 9,
-    border: '1px solid var(--border)',
-    background: 'var(--social-bg)',
-    cursor: 'pointer', fontSize: 17,
-    display: 'flex', alignItems: 'center', justifyContent: 'center',
-    flexShrink: 0,
-  }}
->
-  {darkMode ? '☀️' : '🌙'}
-</button>
-
-
-<button
-  onClick={() => setDarkMode(d => !d)}
-  title="Toggle dark / light mode"
-  style={{
-    width: isMobile ? 34 : 36, height: isMobile ? 34 : 36,
-    borderRadius: 9, border: '1px solid var(--border)',
-    background: 'var(--social-bg)', cursor: 'pointer',
-    fontSize: 17, display: 'flex', alignItems: 'center',
-    justifyContent: 'center', flexShrink: 0,
-  }}
->
-  {darkMode ? '☀️' : '🌙'}
-</button>
+            onClick={() => setDarkMode(d => !d)}
+            title="Toggle dark / light mode"
+            style={{
+              width: isMobile ? 34 : 36, height: isMobile ? 34 : 36,
+              borderRadius: 9,
+              border: '1px solid var(--border)',
+              background: 'var(--social-bg)',
+              cursor: 'pointer', fontSize: 17,
+              display: 'flex', alignItems: 'center', justifyContent: 'center',
+              flexShrink: 0,
+            }}
+          >
+            {darkMode ? '☀️' : '🌙'}
+          </button>
 
           {/* Messages — visible on both sizes */}
           <button onClick={() => setTab('messages')} title="Messages"
