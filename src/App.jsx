@@ -11040,14 +11040,14 @@ function LandingPage({ onStart }) {
     {e:'📣',t:'Study Feed',d:"Share achievements and ask questions like a social app — with anonymous mode.",c:'#6366F1'},
   ]
   return (
-    <div style={{ minHeight:'100vh', background:'#f4f4f0', fontFamily:"'Nunito',sans-serif" }}>
-      <nav style={{ padding:'0 5%', height:62, display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:100, background:'rgba(255,255,255,.85)', backdropFilter:'blur(20px)', borderBottom:'1px solid rgba(15,23,42,.08)' }}>
+    <div style={{ minHeight:'100vh', background:'var(--bg)', fontFamily:"'Nunito',sans-serif" }}>
+      <nav style={{ padding:'0 5%', height:62, display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:100, background:'var(--bg2)', backdropFilter:'blur(20px)', borderBottom:'1px solid var(--border)' }}>
         <div style={{ display:'flex', alignItems:'center', gap:9 }}>
           <div style={{ width:34, height:34, borderRadius:10, background:'linear-gradient(135deg,#6366F1,#8B5CF6)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>🧠</div>
-          <span style={{ fontFamily:"'Sora',sans-serif", fontWeight:900, fontSize:17, color:'#1e293b' }}>BrainSpark<span style={{ color:'#6366F1' }}> AI</span></span>
+          <span style={{ fontFamily:"'Sora',sans-serif", fontWeight:900, fontSize:17, color:'var(--text-h)' }}>BrainSpark<span style={{ color:'#6366F1' }}> AI</span></span>
         </div>
         <div style={{ display:'flex', gap:8 }}>
-          <button onClick={()=>onStart('signin')} style={{ padding:'7px 16px', borderRadius:9, border:'1px solid rgba(15,23,42,.12)', background:'transparent', color:'#475569', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:"'Nunito',sans-serif" }}>Sign In</button>
+          <button onClick={()=>onStart('signin')} style={{ padding:'7px 16px', borderRadius:9, border:'1px solid var(--border)', background:'transparent', color:'var(--text)', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:"'Nunito',sans-serif" }}>Sign In</button>
           <button onClick={()=>onStart('signup')} style={{ padding:'7px 16px', borderRadius:9, border:'none', background:'linear-gradient(135deg,#6366F1,#8B5CF6)', color:'#fff', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:"'Nunito',sans-serif" }}>Get Started Free →</button>
         </div>
       </nav>
@@ -11055,43 +11055,43 @@ function LandingPage({ onStart }) {
         <div style={{ position:'absolute', top:0, left:'20%', width:600, height:600, borderRadius:'50%', background:'radial-gradient(circle,rgba(99,102,241,.15),transparent 65%)', filter:'blur(80px)', pointerEvents:'none' }}/>
         <div style={{ position:'relative', zIndex:1, maxWidth:820, margin:'0 auto' }}>
           <div style={{ display:'inline-flex', alignItems:'center', gap:7, padding:'5px 14px', borderRadius:30, background:'rgba(79,70,229,.08)', border:'1px solid rgba(79,70,229,.2)', marginBottom:18, fontSize:12, color:'#4f46e5', fontWeight:700 }}>✦ AI Learning Platform Built for CBSE</div>
-          <h1 style={{ fontFamily:"'Sora',sans-serif", fontSize:'clamp(28px,5.5vw,62px)', fontWeight:900, lineHeight:1.08, color:'#1e293b', marginBottom:16 }}>
+          <h1 style={{ fontFamily:"'Sora',sans-serif", fontSize:'clamp(28px,5.5vw,62px)', fontWeight:900, lineHeight:1.08, color:'var(--text-h)', marginBottom:16 }}>
             Where Students<br/>
             <span style={{ background:'linear-gradient(135deg,#818CF8,#A855F7,#06b6d4)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text' }}>Learn, Share & Grow</span>
           </h1>
-          <p style={{ fontSize:'clamp(14px,1.8vw,17px)', color:'#64748b', lineHeight:1.8, marginBottom:30, maxWidth:520, margin:'0 auto 30px' }}>AI study tools + a student feed — one platform built for Indian students and teachers.</p>
+          <p style={{ fontSize:'clamp(14px,1.8vw,17px)', color:'var(--text)', lineHeight:1.8, marginBottom:30, maxWidth:520, margin:'0 auto 30px' }}>AI study tools + a student feed — one platform built for Indian students and teachers.</p>
           <div style={{ display:'flex', gap:10, justifyContent:'center', flexWrap:'wrap' }}>
             <button onClick={()=>onStart('signup')} style={{ padding:'13px 34px', borderRadius:10, border:'none', background:'linear-gradient(135deg,#4f46e5,#8B5CF6)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', fontFamily:"'Nunito',sans-serif" }}>🚀 Start Free — 60-Day Trial</button>
-            <button onClick={()=>onStart('school')} style={{ padding:'12px 22px', borderRadius:10, border:'1px solid rgba(79,70,229,.25)', background:'rgba(79,70,229,.08)', color:'#4f46e5', fontSize:13.5, fontWeight:700, cursor:'pointer', fontFamily:"'Nunito',sans-serif" }}>🏫 School Login</button>
+            <button onClick={()=>onStart('school')} style={{ padding:'12px 22px', borderRadius:10, border:'1px solid var(--accent-border)', background:'var(--accent-bg)', color:'var(--accent)', fontSize:13.5, fontWeight:700, cursor:'pointer', fontFamily:"'Nunito',sans-serif" }}>🏫 School Login</button>
           </div>
         </div>
       </section>
       <section style={{ padding:'64px 5%' }}>
         <div style={{ textAlign:'center', marginBottom:36 }}>
-          <h2 style={{ fontFamily:"'Sora',sans-serif", fontSize:'clamp(18px,3vw,34px)', fontWeight:800, color:'#1e293b', marginBottom:8 }}>Everything to excel</h2>
+          <h2 style={{ fontFamily:"'Sora',sans-serif", fontSize:'clamp(18px,3vw,34px)', fontWeight:800, color:'var(--text-h)', marginBottom:8 }}>Everything to excel</h2>
         </div>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))', gap:12, maxWidth:1000, margin:'0 auto' }}>
           {feats.map((f,i)=>(
-            <div key={i} onClick={()=>onStart('signup')} style={{ background:'#ffffff', border:'1px solid rgba(15,23,42,.08)', borderRadius:13, padding:20, cursor:'pointer', boxShadow:'0 1px 10px rgba(15,23,42,.05)', transition:'border-color .2s,transform .2s' }}
+            <div key={i} onClick={()=>onStart('signup')} style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:13, padding:20, cursor:'pointer', boxShadow:'var(--shadow-sm)', transition:'border-color .2s,transform .2s' }}
               onMouseEnter={e=>{e.currentTarget.style.borderColor=f.c+'55';e.currentTarget.style.transform='translateY(-2px)'}}
-              onMouseLeave={e=>{e.currentTarget.style.borderColor='rgba(15,23,42,.08)';e.currentTarget.style.transform='none'}}>
+              onMouseLeave={e=>{e.currentTarget.style.borderColor='var(--border)';e.currentTarget.style.transform='none'}}>
               <div style={{ width:44, height:44, borderRadius:11, background:`${f.c}18`, border:`1px solid ${f.c}28`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:21, marginBottom:11 }}>{f.e}</div>
-              <div style={{ fontFamily:"'Sora',sans-serif", fontSize:13.5, fontWeight:700, color:'#1e293b', marginBottom:5 }}>{f.t}</div>
-              <p style={{ fontSize:12, color:'#64748b', lineHeight:1.65, margin:0 }}>{f.d}</p>
+              <div style={{ fontFamily:"'Sora',sans-serif", fontSize:13.5, fontWeight:700, color:'var(--text-h)', marginBottom:5 }}>{f.t}</div>
+              <p style={{ fontSize:12, color:'var(--text)', lineHeight:1.65, margin:0 }}>{f.d}</p>
             </div>
           ))}
         </div>
       </section>
       <section style={{ padding:'52px 5%', textAlign:'center' }}>
-        <h2 style={{ fontFamily:"'Sora',sans-serif", fontSize:'clamp(20px,4vw,42px)', fontWeight:900, color:'#1e293b', marginBottom:10 }}>
-          Ready to study <span style={{ background:'linear-gradient(135deg,#f59e0b,#ef4444)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text' }}>smarter?</span>
+        <h2 style={{ fontFamily:"'Sora',sans-serif", fontSize:'clamp(20px,4vw,42px)', fontWeight:900, color:'var(--text-h)', marginBottom:10 }}>
+              Ready to study <span style={{ background:'linear-gradient(135deg,#f59e0b,#ef4444)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text' }}>smarter?</span>
         </h2>
-        <p style={{ color:'#64748b', fontSize:13.5, marginBottom:26 }}>60-day free trial · AI-powered · CBSE aligned · Built for India</p>
+        <p style={{ color:'var(--text)', fontSize:13.5, marginBottom:26 }}>60-day free trial · AI-powered · CBSE aligned · Built for India</p>
         <button onClick={()=>onStart('signup')} style={{ padding:'14px 42px', borderRadius:10, border:'none', background:'linear-gradient(135deg,#4f46e5,#8B5CF6)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', fontFamily:"'Nunito',sans-serif" }}>🚀 Get Started Free</button>
       </section>
-      <footer style={{ padding:'18px 5%', borderTop:'1px solid rgba(15,23,42,.06)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-        <span style={{ fontFamily:"'Sora',sans-serif", color:'#475569', fontSize:12, fontWeight:700 }}>BrainSpark AI © 2026</span>
-        <span style={{ fontSize:10.5, color:'#1e293b' }}>Powered by Claude · OpenAI · Groq · Built for CBSE</span>
+      <footer style={{ padding:'18px 5%', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
+        <span style={{ fontFamily:"'Sora',sans-serif", color:'var(--text)', fontSize:12, fontWeight:700 }}>BrainSpark AI © 2026</span>
+        <span style={{ fontSize:10.5, color:'var(--text-h)' }}>Powered by Claude · OpenAI · Groq · Built for CBSE</span>
       </footer>
     </div>
   )
@@ -11174,16 +11174,16 @@ function AuthPage({ onAuth, initMode }) {
   const onOtpStep = mode === 'register' && regStep === 'otp'
 
   return (
-    <div style={{ minHeight:'100vh', background:'linear-gradient(135deg,#eef2ff,#f4f4f0)', display:'flex', alignItems:'center', justifyContent:'center', padding:20, fontFamily:"'Nunito',sans-serif" }}>
-      <div style={{ background:'#ffffff', border:'1px solid rgba(15,23,42,.08)', borderRadius:18, padding:28, width:'100%', maxWidth:430, boxShadow:'0 20px 60px rgba(15,23,42,.12)' }}>
+    <div style={{ minHeight:'100vh', background:'var(--bg)', display:'flex', alignItems:'center', justifyContent:'center', padding:20, fontFamily:"'Nunito',sans-serif" }}>
+      <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:18, padding:28, width:'100%', maxWidth:430, boxShadow:'var(--shadow-md)' }}>
         <div style={{ textAlign:'center', marginBottom:24 }}>
           <div style={{ width:52, height:52, borderRadius:14, background:'linear-gradient(135deg,#6366F1,#8B5CF6)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 10px', fontSize:26 }}>🧠</div>
-          <h1 style={{ margin:0, fontFamily:"'Sora',sans-serif", fontWeight:900, fontSize:22, color:'#1e293b' }}>BrainSpark<span style={{ color:'#6366F1' }}> AI</span></h1>
-          <p style={{ color:'#64748b', fontSize:13, marginTop:4 }}>Your AI-powered study companion</p>
+          <h1 style={{ margin:0, fontFamily:"'Sora',sans-serif", fontWeight:900, fontSize:22, color:'var(--text-h)' }}>BrainSpark<span style={{ color:'#6366F1' }}> AI</span></h1>
+          <p style={{ color:'var(--text)', fontSize:13, marginTop:4 }}>Your AI-powered study companion</p>
         </div>
-        <div style={{ display:'flex', background:'rgba(15,23,42,.04)', borderRadius:11, padding:3, marginBottom:18 }}>
+        <div style={{ display:'flex', background:'var(--code-bg)', borderRadius:11, padding:3, marginBottom:18 }}>
           {[['personal','Personal'],['school','🏫 School']].map(([t,l])=>(
-            <button key={t} onClick={()=>{setTab(t);setErr('')}} style={{ flex:1, padding:'8px', borderRadius:9, border:'none', fontWeight:700, fontSize:13.5, cursor:'pointer', fontFamily:"'Nunito',sans-serif", background:tab===t?'#ffffff':'transparent', color:tab===t?'#1e293b':'#64748b', boxShadow:tab===t?'0 1px 4px rgba(15,23,42,.1)':'none', transition:'all .2s' }}>{l}</button>
+            <button key={t} onClick={()=>{setTab(t);setErr('')}} style={{ flex:1, padding:'8px', borderRadius:9, border:'none', fontWeight:700, fontSize:13.5, cursor:'pointer', fontFamily:"'Nunito',sans-serif", background:tab===t?'var(--bg2)':'transparent', color:tab===t?'var(--text-h)':'var(--text)', boxShadow:tab===t?'var(--shadow-sm)':'none', transition:'all .2s' }}>{l}</button>
           ))}
         </div>
         <div style={{ display:'flex', gap:8, marginBottom:18 }}>
@@ -11232,10 +11232,10 @@ function AuthPage({ onAuth, initMode }) {
             <span onClick={()=>onAuth('forgot')} style={{ color:'var(--accent)', cursor:'pointer', fontWeight:700 }}>Forgot password?</span>
           </p>}
           <div style={{ display:'flex', alignItems:'center', gap:8, margin:'18px 0' }}>
-            <div style={{ flex:1, height:1, background:'var(--border)' }}/><span style={{ fontSize:12, color:'#64748b', fontWeight:600 }}>OR</span><div style={{ flex:1, height:1, background:'rgba(255,255,255,.08)' }}/>
+            <div style={{ flex:1, height:1, background:'var(--border)' }}/><span style={{ fontSize:12, color:'var(--text)', fontWeight:600 }}>OR</span><div style={{ flex:1, height:1, background:'rgba(255,255,255,.08)' }}/>
           </div>
           <div ref={gBtnRef} style={{ display:'flex', justifyContent:'center', marginBottom:10 }}/>
-          <p style={{ textAlign:'center', fontSize:11.5, color:'#64748b', marginTop:8 }}>⏱ 60-day free trial · then ₹{role==='teacher'?'100':'100'}/month</p>
+          <p style={{ textAlign:'center', fontSize:11.5, color:'var(--text)', marginTop:8 }}>⏱ 60-day free trial · then ₹{role==='teacher'?'100':'100'}/month</p>
         </>}
         {tab==='school'&&(
           <form onSubmit={handleSchool} style={{ display:'flex', flexDirection:'column', gap:12 }}>
@@ -11267,9 +11267,9 @@ function ForgotPasswordPage({ onBack }) {
   const [email,setEmail]=useState(''); const [sent,setSent]=useState(false); const [err,setErr]=useState(''); const [busy,setBusy]=useState(false)
   async function handleSubmit(e){ e.preventDefault();setErr('');setBusy(true);try{await api.post('/api/auth/forgot-password',{email});setSent(true)}catch(e){setErr(e.message)}finally{setBusy(false)} }
   return (
-    <div style={{ minHeight:'100vh', background:'linear-gradient(135deg,#eef2ff,#f4f4f0)', display:'flex', alignItems:'center', justifyContent:'center', padding:20, fontFamily:"'Nunito',sans-serif" }}>
-      <div style={{ background:'#ffffff', border:'1px solid rgba(15,23,42,.08)', borderRadius:18, padding:28, maxWidth:400, width:'100%', boxShadow:'0 20px 60px rgba(15,23,42,.12)' }}>
-        <div style={{ textAlign:'center', marginBottom:24 }}><div style={{ fontSize:40, marginBottom:8 }}>🔐</div><h2 style={{ margin:0, fontFamily:"'Sora',sans-serif", fontWeight:900, color:'#1e293b' }}>Reset Password</h2></div>
+    <div style={{ minHeight:'100vh', background:'var(--bg)', display:'flex', alignItems:'center', justifyContent:'center', padding:20, fontFamily:"'Nunito',sans-serif" }}>
+      <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:18, padding:28, maxWidth:400, width:'100%', boxShadow:'var(--shadow-md)' }}>
+        <div style={{ textAlign:'center', marginBottom:24 }}><div style={{ fontSize:40, marginBottom:8 }}>🔐</div><h2 style={{ margin:0, fontFamily:"'Sora',sans-serif", fontWeight:900, color:'var(--text-h)' }}>Reset Password</h2></div>
         {sent?<SuccessMsg msg="Check your inbox for the reset link. It expires in 1 hour."/>:(
           <form onSubmit={handleSubmit} style={{ display:'flex', flexDirection:'column', gap:12 }}>
             <Field label="Email Address"><BSInput value={email} onChange={setEmail} type="email" placeholder="your@email.com"/></Field>
