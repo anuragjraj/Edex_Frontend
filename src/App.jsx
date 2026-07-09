@@ -11188,13 +11188,13 @@ function AuthPage({ onAuth, initMode }) {
         </div>
         <div style={{ display:'flex', gap:8, marginBottom:18 }}>
           {[['student','🎒 Student'],['teacher','👨‍🏫 Teacher']].map(([r,l])=>(
-            <button key={r} onClick={()=>setRole(r)} style={{ flex:1, padding:'8px 12px', borderRadius:9, border:`2px solid ${role===r?'var(--accent)':'var(--border'}`, fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:"'Nunito',sans-serif", background:role===r?'var(--accent-bg)':'transparent', color:role===r?'var(--accent)':'#64748b', transition:'all .2s' }}>{l}</button>
+            <button key={r} onClick={()=>setRole(r)} style={{ flex:1, padding:'8px 12px', borderRadius:9, border:`2px solid ${role===r?'var(--accent)':'var(--border)'}`, fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:"'Nunito',sans-serif", background:role===r?'var(--accent-bg)':'transparent', color:role===r?'var(--accent)':'#64748b', transition:'all .2s' }}>{l}</button>
           ))}
         </div>
         {tab==='personal'&&<>
           <div style={{ display:'flex', gap:8, marginBottom:18 }}>
             {[['login','Sign In'],['register','Register']].map(([m,l])=>(
-              <button key={m} onClick={()=>{setMode(m);setErr('')}} style={{ flex:1, padding:'8px', borderRadius:9, border:`2px solid ${mode===m?'var(--accent)':'var(--border'}`, fontWeight:700, fontSize:13.5, cursor:'pointer', fontFamily:"'Nunito',sans-serif", background:mode===m?'var(--accent-bg)':'transparent', color:mode===m?'var(--accent)':'#64748b', transition:'all .2s' }}>{l}</button>
+              <button key={m} onClick={()=>{setMode(m);setErr('')}} style={{ flex:1, padding:'8px', borderRadius:9, border:`2px solid ${mode===m?'var(--accent)':'var(--border)'}`, fontWeight:700, fontSize:13.5, cursor:'pointer', fontFamily:"'Nunito',sans-serif", background:mode===m?'var(--accent-bg)':'transparent', color:mode===m?'var(--accent)':'#64748b', transition:'all .2s' }}>{l}</button>
             ))}
           </div>
           <form onSubmit={handlePersonal} style={{ display:'flex', flexDirection:'column', gap:12 }}>
@@ -11232,7 +11232,7 @@ function AuthPage({ onAuth, initMode }) {
             <span onClick={()=>onAuth('forgot')} style={{ color:'var(--accent)', cursor:'pointer', fontWeight:700 }}>Forgot password?</span>
           </p>}
           <div style={{ display:'flex', alignItems:'center', gap:8, margin:'18px 0' }}>
-            <div style={{ flex:1, height:1, background:'rgba(255,255,255,.08)' }}/><span style={{ fontSize:12, color:'#64748b', fontWeight:600 }}>OR</span><div style={{ flex:1, height:1, background:'rgba(255,255,255,.08)' }}/>
+            <div style={{ flex:1, height:1, background:'var(--border)' }}/><span style={{ fontSize:12, color:'#64748b', fontWeight:600 }}>OR</span><div style={{ flex:1, height:1, background:'rgba(255,255,255,.08)' }}/>
           </div>
           <div ref={gBtnRef} style={{ display:'flex', justifyContent:'center', marginBottom:10 }}/>
           <p style={{ textAlign:'center', fontSize:11.5, color:'#64748b', marginTop:8 }}>⏱ 60-day free trial · then ₹{role==='teacher'?'100':'100'}/month</p>
