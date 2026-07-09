@@ -10487,8 +10487,8 @@ function BSInput({ value, onChange, placeholder, type = 'text', required, disabl
         width: '100%', padding: '11px 14px',
         borderRadius: 10,
         border: `1.5px solid ${focused ? 'var(--accent)' : 'var(--border)'}`,
-        background: '#fff', color: '#1e293b',
-        fontSize: 16,             /* ← must be ≥16 px on iOS */
+        background: 'var(--bg2)', color: 'var(--text-h)',
+fontSize: 16,             /* ← must be ≥16 px on iOS */
         fontFamily: "'Nunito', sans-serif",
         boxSizing: 'border-box', outline: 'none',
         transition: 'border-color .2s',
@@ -10512,8 +10512,8 @@ function BSSelect({ value, onChange, options, disabled = false, style = {} }) {
         width: '100%', padding: '11px 14px',
         borderRadius: 10,
         border: `1.5px solid ${focused ? 'var(--accent)' : 'var(--border)'}`,
-        background: disabled ? '#f1f5f9' : '#fff',
-        color: disabled ? '#94a3b8' : '#1e293b',
+        background: disabled ? 'var(--code-bg)' : 'var(--bg2)',
+        color: disabled ? 'var(--text)' : 'var(--text-h)',
         fontSize: 16,             /* ← must be ≥16 px on iOS */
         fontFamily: "'Nunito', sans-serif",
         appearance: 'auto', outline: 'none',
@@ -10543,8 +10543,8 @@ function BSTextarea({ value, onChange, placeholder, rows = 4, style = {} }) {
         width: '100%', padding: '11px 14px',
         borderRadius: 10,
         border: `1.5px solid ${focused ? 'var(--accent)' : 'var(--border)'}`,
-        background: '#fff', color: '#1e293b',
-        fontSize: 16,             /* ← must be ≥16 px on iOS */
+        background: 'var(--bg2)', color: 'var(--text-h)',
+fontSize: 16,             /* ← must be ≥16 px on iOS */
         fontFamily: "'Nunito', sans-serif",
         resize: 'vertical', lineHeight: 1.6,
         outline: 'none', boxSizing: 'border-box',
@@ -16189,6 +16189,28 @@ export default function App() {
   const [activeChapterGroup, setActiveChapterGroup] = useState(null)
   const [moreOpen, setMoreOpen] = useState(false)
 
+  const [darkMode, setDarkMode] = useState(() => {
+  const saved = localStorage.getItem('bs_theme')
+  if (saved) return saved === 'dark'
+  return window.matchMedia('(prefers-color-scheme: dark)').matches
+})
+
+useEffect(() => {
+  document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light')
+  localStorage.setItem('bs_theme', darkMode ? 'dark' : 'light')
+}, [darkMode])
+
+  const [darkMode, setDarkMode] = useState(() => {
+  const saved = localStorage.getItem('bs_theme')
+  if (saved) return saved === 'dark'
+  return window.matchMedia('(prefers-color-scheme: dark)').matches
+})
+
+useEffect(() => {
+  document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light')
+  localStorage.setItem('bs_theme', darkMode ? 'dark' : 'light')
+}, [darkMode])
+
   const fetchUnread = useCallback(() => {
     api.get('/api/messages/unread-count').then(d => setUnreadCount(d.count || 0)).catch(() => {})
   }, [])
@@ -16325,7 +16347,7 @@ export default function App() {
     <div style={{ minHeight: '100vh', background: 'transparent', display: 'flex', flexDirection: 'column', fontFamily: "'Nunito', sans-serif" }}>
 
       {/* ── Top header ───────────────────────────────────────── */}
-      <header style={{ borderBottom: '1px solid var(--border)', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 58, position: 'sticky', top: 0, zIndex: 100, background: 'rgba(255,255,255,.92)', backdropFilter: 'blur(20px)', boxShadow: '0 1px 12px rgba(15,23,42,.06)' }}>
+      <header style={{ borderBottom: '1px solid var(--border)', padding: '0 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', height: 58, position: 'sticky', top: 0, zIndex: 100, background: 'var(--bg2)', backdropFilter: 'blur(20px)', boxShadow: '0 1px 12px rgba(15,23,42,.06)' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={() => setTab('dashboard')}>
           <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🧠</div>
           <span style={{ fontFamily: "'Sora', sans-serif", fontWeight: 900, fontSize: 17, color: 'var(--text-h)' }}>
@@ -16339,6 +16361,38 @@ export default function App() {
         </div>
 
         <div style={{ display: 'flex', gap: isMobile ? 6 : 8, alignItems: 'center', minWidth: 0 }}>
+
+
+          <button
+  onClick={() => setDarkMode(d => !d)}
+  title="Toggle dark / light mode"
+  style={{
+    width: isMobile ? 34 : 36, height: isMobile ? 34 : 36,
+    borderRadius: 9,
+    border: '1px solid var(--border)',
+    background: 'var(--social-bg)',
+    cursor: 'pointer', fontSize: 17,
+    display: 'flex', alignItems: 'center', justifyContent: 'center',
+    flexShrink: 0,
+  }}
+>
+  {darkMode ? '☀️' : '🌙'}
+</button>
+
+
+<button
+  onClick={() => setDarkMode(d => !d)}
+  title="Toggle dark / light mode"
+  style={{
+    width: isMobile ? 34 : 36, height: isMobile ? 34 : 36,
+    borderRadius: 9, border: '1px solid var(--border)',
+    background: 'var(--social-bg)', cursor: 'pointer',
+    fontSize: 17, display: 'flex', alignItems: 'center',
+    justifyContent: 'center', flexShrink: 0,
+  }}
+>
+  {darkMode ? '☀️' : '🌙'}
+</button>
 
           {/* Messages — visible on both sizes */}
           <button onClick={() => setTab('messages')} title="Messages"
@@ -16401,7 +16455,7 @@ export default function App() {
       <div style={{ display: 'flex', flex: 1 }}>
 
         {/* ── Desktop sidebar ──────────────────────────────────── */}
-        <nav className="desktop-sidebar" style={{ width: 210, borderRight: '1px solid var(--border)', padding: '12px 8px', background: 'rgba(255,255,255,.7)', flexShrink: 0, position: 'sticky', top: 58, height: 'calc(100vh - 58px)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
+        <nav className="desktop-sidebar" style={{ width: 210, borderRight: '1px solid var(--border)', padding: '12px 8px', background: 'var(--bg2)', flexShrink: 0, position: 'sticky', top: 58, height: 'calc(100vh - 58px)', overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 2 }}>
           {isSchool ? (
             <>
               {navSectionLabel('Learn')}

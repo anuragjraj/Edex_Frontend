@@ -1,4 +1,6 @@
-/* ── Light mode (default) ── */
+/* ══════════════════════════════════════════════
+   LIGHT MODE (default)
+══════════════════════════════════════════════ */
 :root {
   color-scheme: light dark;
 
@@ -19,62 +21,63 @@
   --shadow-md: 0 2px 6px rgba(15,23,42,.05), 0 8px 24px rgba(15,23,42,.06);
 
   --page:
-    radial-gradient(1100px 560px at 12% -8%,  rgba(99,102,241,.07), transparent 60%),
-    radial-gradient(1000px 520px at 108% 4%,  rgba(139,92,246,.06), transparent 55%),
-    radial-gradient(900px 700px  at 50% 120%, rgba(6,182,212,.045), transparent 60%),
+    radial-gradient(1100px 560px at 12% -8%,  rgba(99,102,241,.07),  transparent 60%),
+    radial-gradient(1000px 520px at 108% 4%,  rgba(139,92,246,.06),  transparent 55%),
+    radial-gradient(900px  700px at 50% 120%, rgba(6,182,212,.045),  transparent 60%),
     linear-gradient(180deg, #f6f5f1 0%, #eef0f4 100%);
 }
 
-/* ── Dark mode — system preference ── */
+/* ══════════════════════════════════════════════
+   DARK MODE — follows system preference
+══════════════════════════════════════════════ */
 @media (prefers-color-scheme: dark) {
   :root {
-    --bg:            #0f1117;
-    --bg2:           #1a1d27;
-    --text:          #8892a4;
-    --text-h:        #e2e8f0;
-    --border:        rgba(255,255,255,.08);
+    --bg:            #0d0e17;
+    --bg2:           #15172a;
+    --text:          #8b92a8;
+    --text-h:        #d0d4e8;
+    --border:        rgba(255,255,255,.07);
 
-    --accent:        #818cf8;
+    --accent:        #7c7ff7;
     --accent-2:      #a78bfa;
-    --accent-bg:     rgba(129,140,248,.10);
-    --accent-border: rgba(129,140,248,.22);
-    --code-bg:       rgba(255,255,255,.04);
+    --accent-bg:     rgba(124,127,247,.12);
+    --accent-border: rgba(124,127,247,.28);
+    --code-bg:       rgba(255,255,255,.045);
     --social-bg:     rgba(255,255,255,.04);
 
-    --shadow-sm: 0 1px 2px rgba(0,0,0,.3),  0 1px 3px rgba(0,0,0,.4);
-    --shadow-md: 0 2px 6px rgba(0,0,0,.25), 0 8px 24px rgba(0,0,0,.35);
+    --shadow-sm: 0 1px 3px rgba(0,0,0,.4),  0 2px 6px rgba(0,0,0,.35);
+    --shadow-md: 0 4px 12px rgba(0,0,0,.35), 0 12px 32px rgba(0,0,0,.4);
 
     --page:
-      radial-gradient(1100px 560px at 12% -8%,  rgba(99,102,241,.08), transparent 60%),
-      radial-gradient(1000px 520px at 108% 4%,  rgba(139,92,246,.07), transparent 55%),
-      radial-gradient(900px 700px  at 50% 120%, rgba(6,182,212,.05),  transparent 60%),
-      linear-gradient(180deg, #0f1117 0%, #12151e 100%);
+      radial-gradient(1100px 560px at 12% -8%,  rgba(99,102,241,.12),  transparent 60%),
+      radial-gradient(1000px 520px at 108% 4%,  rgba(139,92,246,.10),  transparent 55%),
+      radial-gradient(900px  700px at 50% 120%, rgba(6,182,212,.07),   transparent 60%),
+      linear-gradient(180deg, #0d0e17 0%, #10111e 100%);
   }
 }
 
-/* ── Manual toggle: add data-theme="dark" to <html> ── */
+/* ══════════════════════════════════════════════
+   MANUAL TOGGLE — data-theme attribute
+══════════════════════════════════════════════ */
 [data-theme="dark"] {
-  --bg:            #0f1117;
-  --bg2:           #1a1d27;
-  --text:          #8892a4;
-  --text-h:        #e2e8f0;
-  --border:        rgba(255,255,255,.08);
-
-  --accent:        #818cf8;
+  --bg:            #0d0e17;
+  --bg2:           #15172a;
+  --text:          #8b92a8;
+  --text-h:        #d0d4e8;
+  --border:        rgba(255,255,255,.07);
+  --accent:        #7c7ff7;
   --accent-2:      #a78bfa;
-  --accent-bg:     rgba(129,140,248,.10);
-  --accent-border: rgba(129,140,248,.22);
-  --code-bg:       rgba(255,255,255,.04);
+  --accent-bg:     rgba(124,127,247,.12);
+  --accent-border: rgba(124,127,247,.28);
+  --code-bg:       rgba(255,255,255,.045);
   --social-bg:     rgba(255,255,255,.04);
-
-  --shadow-sm: 0 1px 2px rgba(0,0,0,.3),  0 1px 3px rgba(0,0,0,.4);
-  --shadow-md: 0 2px 6px rgba(0,0,0,.25), 0 8px 24px rgba(0,0,0,.35);
-
+  --shadow-sm: 0 1px 3px rgba(0,0,0,.4),  0 2px 6px rgba(0,0,0,.35);
+  --shadow-md: 0 4px 12px rgba(0,0,0,.35), 0 12px 32px rgba(0,0,0,.4);
   --page:
-    radial-gradient(1100px 560px at 12% -8%,  rgba(99,102,241,.08), transparent 60%),
-    radial-gradient(1000px 520px at 108% 4%,  rgba(139,92,246,.07), transparent 55%),
-    radial-gradient(900px 700px  at 50% 120%, rgba(6,182,212,.05),  transparent 60%),
-    linear-gradient(180deg, #0f1117 0%, #12151e 100%);
+    radial-gradient(1100px 560px at 12% -8%,  rgba(99,102,241,.12),  transparent 60%),
+    radial-gradient(1000px 520px at 108% 4%,  rgba(139,92,246,.10),  transparent 55%),
+    radial-gradient(900px  700px at 50% 120%, rgba(6,182,212,.07),   transparent 60%),
+    linear-gradient(180deg, #0d0e17 0%, #10111e 100%);
 }
 
 [data-theme="light"] {
@@ -92,13 +95,33 @@
   --shadow-sm: 0 1px 2px rgba(15,23,42,.04), 0 1px 3px rgba(15,23,42,.05);
   --shadow-md: 0 2px 6px rgba(15,23,42,.05), 0 8px 24px rgba(15,23,42,.06);
   --page:
-    radial-gradient(1100px 560px at 12% -8%,  rgba(99,102,241,.07), transparent 60%),
-    radial-gradient(1000px 520px at 108% 4%,  rgba(139,92,246,.06), transparent 55%),
-    radial-gradient(900px 700px  at 50% 120%, rgba(6,182,212,.045), transparent 60%),
+    radial-gradient(1100px 560px at 12% -8%,  rgba(99,102,241,.07),  transparent 60%),
+    radial-gradient(1000px 520px at 108% 4%,  rgba(139,92,246,.06),  transparent 55%),
+    radial-gradient(900px  700px at 50% 120%, rgba(6,182,212,.045),  transparent 60%),
     linear-gradient(180deg, #f6f5f1 0%, #eef0f4 100%);
 }
 
-/* ── Reset ── */
+/* ══════════════════════════════════════════════
+   OVERRIDES — fix hardcoded inline styles in
+   the JSX that ignore CSS variables
+══════════════════════════════════════════════ */
+@media (prefers-color-scheme: dark) {
+  header                  { background: rgba(13,14,23,.96) !important; border-bottom-color: rgba(255,255,255,.07) !important; }
+  .desktop-sidebar        { background: rgba(11,12,20,.85) !important; border-right-color: rgba(255,255,255,.07) !important; }
+  .bs-bottom-nav          { background: rgba(13,14,23,.97) !important; border-top-color:   rgba(255,255,255,.07) !important; }
+  input, select, textarea { background: var(--bg2)         !important; color: var(--text-h) !important; border-color: var(--border) !important; }
+}
+
+[data-theme="dark"] header                  { background: rgba(13,14,23,.96) !important; border-bottom-color: rgba(255,255,255,.07) !important; }
+[data-theme="dark"] .desktop-sidebar        { background: rgba(11,12,20,.85) !important; border-right-color: rgba(255,255,255,.07) !important; }
+[data-theme="dark"] .bs-bottom-nav          { background: rgba(13,14,23,.97) !important; border-top-color:   rgba(255,255,255,.07) !important; }
+[data-theme="dark"] input,
+[data-theme="dark"] select,
+[data-theme="dark"] textarea                { background: var(--bg2) !important; color: var(--text-h) !important; border-color: var(--border) !important; }
+
+/* ══════════════════════════════════════════════
+   RESET + BASE
+══════════════════════════════════════════════ */
 *, *::before, *::after { box-sizing: border-box; }
 
 html {
@@ -114,11 +137,11 @@ body, #root {
   color: var(--text-h);
 }
 
-/* ── Custom scrollbar ── */
+/* Scrollbar */
 ::-webkit-scrollbar       { width: 6px; height: 6px; }
 ::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: rgba(15,23,42,.15); border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(15,23,42,.28); }
+::-webkit-scrollbar-thumb { background: rgba(99,102,241,.25); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(99,102,241,.45); }
 .hide-scrollbar::-webkit-scrollbar { display: none; }
 
 * { -webkit-font-smoothing: antialiased; -moz-osx-font-smoothing: grayscale; }
