@@ -16202,16 +16202,7 @@ export default function App() {
   const [activeChapterGroup, setActiveChapterGroup] = useState(null)
   const [moreOpen, setMoreOpen] = useState(false)
 
-  const [darkMode, setDarkMode] = useState(() => {
-  const saved = localStorage.getItem('bs_theme')
-  return saved === 'dark'
-})
-
-useEffect(() => {
-  document.documentElement.setAttribute('data-theme', darkMode ? 'dark' : 'light')
-  localStorage.setItem('bs_theme', darkMode ? 'dark' : 'light')
-}, [darkMode])
-
+  
 
   const fetchUnread = useCallback(() => {
     api.get('/api/messages/unread-count').then(d => setUnreadCount(d.count || 0)).catch(() => {})
@@ -16365,21 +16356,7 @@ useEffect(() => {
         <div style={{ display: 'flex', gap: isMobile ? 6 : 8, alignItems: 'center', minWidth: 0 }}>
 
 
-          <button
-            onClick={() => setDarkMode(d => !d)}
-            title="Toggle dark / light mode"
-            style={{
-              width: isMobile ? 34 : 36, height: isMobile ? 34 : 36,
-              borderRadius: 9,
-              border: '1px solid var(--border)',
-              background: 'var(--social-bg)',
-              cursor: 'pointer', fontSize: 17,
-              display: 'flex', alignItems: 'center', justifyContent: 'center',
-              flexShrink: 0,
-            }}
-          >
-            {darkMode ? '☀️' : '🌙'}
-          </button>
+        
 
           {/* Messages — visible on both sizes */}
           <button onClick={() => setTab('messages')} title="Messages"
