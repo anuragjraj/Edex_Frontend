@@ -12604,7 +12604,7 @@ function NoticesPage({ user }) {
 
   const canCreate = ['admin','principal','teacher'].includes(user.role)
   const canManageNotice = n =>
-    ['admin','principal'].includes(user.role) || n.created_by === user.id || n.author_id === user.id
+  ['admin','principal'].includes(user.role) || n.posted_by === user.id
   const TYPES = [{v:'general',l:'📢 General'},{v:'exam',l:'📝 Exam'},{v:'event',l:'🎉 Event'},{v:'holiday',l:'🏖️ Holiday'},{v:'sports',l:'⚽ Sports'},{v:'cultural',l:'🎭 Cultural'}]
 
   function resetForm(){ setForm({title:'',content:'',notice_type:'general',target_audience:'all',is_pinned:false}); setEditingId(null); setCreating(false); setErr('') }
