@@ -12231,28 +12231,41 @@ function MessagingPage({ currentUser, startWithUserId, onConversationRead }) {
 //  ASSIGNMENTS (Teacher create + Student view)
 // ══════════════════════════════════════════════════════════════
 function AssignmentsPage({ user }) {
-  const [assignments,setAssignments]=useState([]); const [loading,setLoading]=useState(true); const [creating,setCreating]=useState(false); const [selected,setSelected]=useState(null)
+  const [assignments,setAssignments]=useState([]); const [loading,setLoading]=useState(true)
+  const [creating,setCreating]=useState(false); const [editing,setEditing]=useState(null); const [selected,setSelected]=useState(null)
   useEffect(()=>{
     api.get('/api/assignments').then(setAssignments).catch(()=>{}).finally(()=>setLoading(false))
   },[])
+
+  const isTeacher = ['teacher','admin','principal'].includes(user.role)
+  const canManage = a => isTeacher && (['admin','principal'].includes(user.role) || a.created_by === user.id || a.teacher_id === user.id)
+
+  async function del(a) {
+    if (!window.confirm(`Delete "${a.title}"? This removes it and all student submissions. This cannot be undone.`)) return
+    try { await api.del(`/api/assignments/${a.id}`); setAssignments(p => p.filter(x => x.id !== a.id)) }
+    catch (e) { alert(e.message) }
+  }
+
   if(loading) return <PageSpinner/>
-  if(creating) return <AssignmentCreator user={user} onCreated={a=>{setAssignments(p=>[a,...p]);setCreating(false)}} onBack={()=>setCreating(false)}/>
+  if(creating||editing) return <AssignmentCreator user={user} assignment={editing} onSaved={a=>{setAssignments(p=>editing?p.map(x=>x.id===a.id?a:x):[a,...p]);setCreating(false);setEditing(null)}} onBack={()=>{setCreating(false);setEditing(null)}}/>
   if(selected) return <AssignmentDetail assignment={selected} user={user} onBack={()=>setSelected(null)}/>
+
   return (
     <div style={{ padding:24, fontFamily:"'Nunito',sans-serif" }}>
       <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:22 }}>
-        <PageHeader icon="📝" title="Assignments" subtitle={user.role==='teacher'?'Create and manage assignments':'Your assignments'} color="#F59E0B"/>
-        {user.role==='teacher'&&<PrimaryBtn onClick={()=>setCreating(true)} color="#F59E0B">+ New Assignment</PrimaryBtn>}
+        <PageHeader icon="📝" title="Assignments" subtitle={isTeacher?'Create and manage assignments':'Your assignments'} color="#F59E0B"/>
+        {isTeacher&&<PrimaryBtn onClick={()=>setCreating(true)} color="#F59E0B">+ New Assignment</PrimaryBtn>}
       </div>
       {assignments.length===0&&<div style={{ textAlign:'center', padding:44, color:'var(--text)' }}>No assignments yet.</div>}
       <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
         {assignments.map(a=>{
           const isPast=new Date(a.deadline)<new Date(); const isUrgent=!isPast&&(new Date(a.deadline)-Date.now())<86400000*2
+          const mine = canManage(a)
           return (
             <div key={a.id} onClick={()=>setSelected(a)} style={{ ...T.card, cursor:'pointer', borderLeft:`4px solid ${isPast?'#64748b':isUrgent?'#ef4444':'var(--accent)'}`, transition:'transform .15s' }}
               onMouseEnter={e=>e.currentTarget.style.transform='translateX(3px)'}
               onMouseLeave={e=>e.currentTarget.style.transform='none'}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8, gap:10 }}>
                 <div>
                   <div style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:15, color:'var(--text-h)', marginBottom:3 }}>{a.title}</div>
                   <div style={{ fontSize:12.5, color:'var(--text)' }}>{a.subject} · {a.class_level} {a.section?`(Sec ${a.section})`:''}</div>
@@ -12264,9 +12277,15 @@ function AssignmentsPage({ user }) {
                   <div style={{ fontSize:11.5, color:'var(--text)' }}>Due: {new Date(a.deadline).toLocaleDateString('en-IN',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'})}</div>
                 </div>
               </div>
-              <div style={{ display:'flex', gap:8, flexWrap:'wrap' }}>
+              <div style={{ display:'flex', gap:8, flexWrap:'wrap', alignItems:'center' }}>
                 <span style={{ background:'var(--code-bg)', border:'1px solid var(--border)', borderRadius:20, padding:'2px 10px', fontSize:11.5, color:'var(--text)', fontWeight:600 }}>📊 {a.total_marks} marks</span>
                 <span style={{ background:'var(--code-bg)', border:'1px solid var(--border)', borderRadius:20, padding:'2px 10px', fontSize:11.5, color:'var(--text)', fontWeight:600 }}>{a.answer_type==='pdf'?'📄 PDF only':a.answer_type==='text'?'⌨️ Text only':'🔄 Text or PDF'}</span>
+                {mine && (
+                  <div style={{ display:'flex', gap:6, marginLeft:'auto' }}>
+                    <button onClick={e=>{e.stopPropagation();setEditing(a)}} title="Edit" style={{ padding:'4px 12px', borderRadius:7, border:'1px solid var(--border)', background:'var(--code-bg)', color:'var(--text-h)', fontSize:12, cursor:'pointer', fontFamily:"'Nunito',sans-serif", fontWeight:600 }}>✏️ Edit</button>
+                    <button onClick={e=>{e.stopPropagation();del(a)}} title="Delete" style={{ padding:'4px 12px', borderRadius:7, border:'1px solid rgba(239,68,68,.3)', background:'rgba(239,68,68,.08)', color:'#ef4444', fontSize:12, cursor:'pointer', fontFamily:"'Nunito',sans-serif", fontWeight:600 }}>🗑 Delete</button>
+                  </div>
+                )}
               </div>
             </div>
           )
@@ -12276,9 +12295,17 @@ function AssignmentsPage({ user }) {
   )
 }
 
-function AssignmentCreator({ user, onCreated, onBack }) {
-  const [form,setForm]=useState({title:'',description:'',subject:'Mathematics',class_level:'Class 10',section:'',total_marks:20,deadline:'',answer_type:'both',grading_notes:''})
-  const [qMode,setQMode]=useState('generate'); const [qPaper,setQPaper]=useState(''); const [qFile,setQFile]=useState(null)
+function AssignmentCreator({ user, assignment, onSaved, onBack }) {
+  const isEdit = !!assignment
+  const [form,setForm]=useState(()=> isEdit ? {
+    title:assignment.title||'', description:assignment.description||'', subject:assignment.subject||'Mathematics',
+    class_level:assignment.class_level||'Class 10', section:assignment.section||'', total_marks:assignment.total_marks||20,
+    deadline:assignment.deadline?new Date(assignment.deadline).toISOString().slice(0,16):'',
+    answer_type:assignment.answer_type||'both', grading_notes:assignment.grading_notes||'',
+  } : {title:'',description:'',subject:'Mathematics',class_level:'Class 10',section:'',total_marks:20,deadline:'',answer_type:'both',grading_notes:''})
+  const [qMode,setQMode]=useState('generate')
+  const [qPaper,setQPaper]=useState(assignment?.question_paper_text||'')
+  const [qFile,setQFile]=useState(assignment?.question_paper_url||null)
   const [generating,setGenerating]=useState(false); const [saving,setSaving]=useState(false); const [err,setErr]=useState('')
   const set=k=>v=>setForm(f=>({...f,[k]:v}))
   const generatePaper=async()=>{
@@ -12290,14 +12317,19 @@ function AssignmentCreator({ user, onCreated, onBack }) {
   const submit=async()=>{
     if(!form.title||!form.deadline) return setErr('Title and deadline required')
     setSaving(true); setErr('')
-    try{ const data=await api.post('/api/assignments',{...form,question_paper_text:qPaper,question_paper_url:qFile}); onCreated?.(data) }
-    catch(e){ setErr(e.message) }
+    try{
+      const body={...form,question_paper_text:qPaper,question_paper_url:qFile}
+      const data = isEdit
+        ? await api.put(`/api/assignments/${assignment.id}`, body)
+        : await api.post('/api/assignments', body)
+      onSaved?.(isEdit ? { ...assignment, ...body, ...data } : data)
+    } catch(e){ setErr(e.message) }
     setSaving(false)
   }
   return (
     <div style={{ padding:24, maxWidth:720, margin:'0 auto', fontFamily:"'Nunito',sans-serif" }}>
       {onBack&&<GhostBtn small onClick={onBack} style={{ marginBottom:16 }}>← Back</GhostBtn>}
-      <PageHeader icon="📝" title="Create Assignment" subtitle="AI-powered assignment creation with automatic grading after deadline" color="#F59E0B"/>
+      <PageHeader icon="📝" title={isEdit?'Edit Assignment':'Create Assignment'} subtitle="AI-powered assignment creation with automatic grading after deadline" color="#F59E0B"/>
       <Card style={{ marginBottom:14 }}>
         <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))', gap:14, marginBottom:14 }}>
           <Field label="Title"><BSInput value={form.title} onChange={set('title')} placeholder="e.g. Chapter 5 Practice"/></Field>
@@ -12315,7 +12347,7 @@ function AssignmentCreator({ user, onCreated, onBack }) {
           </div>
         </Field>
         <Field label="Grading Preferences (AI uses this to grade)">
-          <BSTextarea value={form.grading_notes} onChange={set('grading_notes')} rows={2} placeholder="e.g. Focus on method, not just answer. Award partial marks for correct working. Presentation matters."/>
+          <BSTextarea value={form.grading_notes} onChange={set('grading_notes')} rows={2} placeholder="e.g. Focus on method, not just answer. Award partial marks for correct working."/>
         </Field>
       </Card>
       <Card style={{ marginBottom:14 }}>
@@ -12334,27 +12366,50 @@ function AssignmentCreator({ user, onCreated, onBack }) {
         {qMode==='upload'&&<MediaUploader accept="application/pdf" label="Upload Question Paper PDF" onUpload={url=>setQFile(url)} onClear={()=>setQFile(null)} current={qFile?{url:qFile,type:'pdf'}:null}/>}
       </Card>
       <ErrMsg msg={err}/>
-      <PrimaryBtn onClick={submit} disabled={saving} color="#F59E0B" style={{ width:'100%', justifyContent:'center', fontSize:15 }}>{saving?<><Spinner/> Publishing...</>:'📤 Publish Assignment'}</PrimaryBtn>
+      <PrimaryBtn onClick={submit} disabled={saving} color="#F59E0B" style={{ width:'100%', justifyContent:'center', fontSize:15 }}>{saving?<><Spinner/> {isEdit?'Saving...':'Publishing...'}</>:(isEdit?'💾 Save Changes':'📤 Publish Assignment')}</PrimaryBtn>
     </div>
   )
 }
 
 function AssignmentDetail({ assignment, user, onBack }) {
-  const [submission,setSubmission]=useState(null); const [analysis,setAnalysis]=useState(null); const [answers,setAnswers]=useState({}); const [pdfFile,setPdfFile]=useState(null); const [submitting,setSubmitting]=useState(false); const [submitted,setSubmitted]=useState(false); const [teacherAnalysis,setTeacherAnalysis]=useState(null); const [loading,setLoading]=useState(true)
+  const [submission,setSubmission]=useState(null)        // student's own submission
+  const [analysis,setAnalysis]=useState(null)
+  const [answers,setAnswers]=useState({})
+  const [pdfFile,setPdfFile]=useState(null)
+  const [editing,setEditing]=useState(false)             // student editing their submission
+  const [submitting,setSubmitting]=useState(false)
+  const [teacherAnalysis,setTeacherAnalysis]=useState(null)
+  const [loading,setLoading]=useState(true)
   const isPast=new Date(assignment.deadline)<new Date()
+  const isStudent = user.role==='student'
+
   useEffect(()=>{
     Promise.all([
-      api.get(`/api/assignments/${assignment.id}/analysis/me`),
-      user.role==='teacher'?api.get(`/api/assignments/${assignment.id}/analysis/all`):Promise.resolve(null),
-    ]).then(([a,ta])=>{setAnalysis(a);setTeacherAnalysis(ta);setLoading(false)}).catch(()=>setLoading(false))
+      api.get(`/api/assignments/${assignment.id}/analysis/me`).catch(()=>null),
+      isStudent ? api.get(`/api/assignments/${assignment.id}/submission/me`).catch(()=>null) : Promise.resolve(null),
+      user.role==='teacher'?api.get(`/api/assignments/${assignment.id}/analysis/all`).catch(()=>null):Promise.resolve(null),
+    ]).then(([a,sub,ta])=>{ setAnalysis(a); setSubmission(sub); setTeacherAnalysis(ta); setLoading(false) })
   },[assignment.id])
+
+  const questions=assignment.questions_json?.questions||[]
+
+  function startEditSubmission() {
+    // Prefill text answers from existing submission
+    if (submission?.answers) {
+      const map = {}
+      ;(Array.isArray(submission.answers) ? submission.answers : JSON.parse(submission.answers||'[]'))
+        .forEach(x => { map[x.q_num] = x.answer_text })
+      setAnswers(map)
+    }
+    setEditing(true)
+  }
 
   const submitText=async()=>{
     setSubmitting(true)
     try{
       const ansArr=Object.entries(answers).map(([q_num,answer_text])=>({q_num:parseInt(q_num),answer_text}))
-      await api.post(`/api/assignments/${assignment.id}/submit`,{answers:JSON.stringify(ansArr)})
-      setSubmitted(true)
+      const saved = await api.post(`/api/assignments/${assignment.id}/submit`,{answers:JSON.stringify(ansArr)})
+      setSubmission(saved || { answers: ansArr }); setEditing(false)
     } catch(e){ alert(e.message) }
     setSubmitting(false)
   }
@@ -12366,13 +12421,23 @@ function AssignmentDetail({ assignment, user, onBack }) {
       const form=new FormData(); form.append('pdf',pdfFile)
       const tok=localStorage.getItem('bs_token')
       const r=await fetch(`${API_URL}/api/assignments/${assignment.id}/submit`,{method:'POST',headers:{Authorization:`Bearer ${tok}`},body:form})
-      if(!r.ok){ const d=await r.json(); throw new Error(d.error) }
-      setSubmitted(true)
+      const d=await r.json().catch(()=>({}))
+      if(!r.ok) throw new Error(d.error||'Upload failed')
+      setSubmission(d.submission || d || { media_url:'uploaded' }); setEditing(false); setPdfFile(null)
     } catch(e){ alert(e.message) }
     setSubmitting(false)
   }
 
-  const questions=assignment.questions_json?.questions||[]
+  const deleteSubmission=async()=>{
+    if(!window.confirm('Delete your submission? You can resubmit before the deadline.')) return
+    try{
+      await api.del(`/api/assignments/${assignment.id}/submission`)
+      setSubmission(null); setAnswers({}); setPdfFile(null); setEditing(false)
+    } catch(e){ alert(e.message) }
+  }
+
+  const showForm = isStudent && !isPast && !analysis && (!submission || editing)
+
   return (
     <div style={{ padding:24, maxWidth:760, margin:'0 auto', fontFamily:"'Nunito',sans-serif" }}>
       <GhostBtn small onClick={onBack} style={{ marginBottom:16 }}>← Back</GhostBtn>
@@ -12387,10 +12452,29 @@ function AssignmentDetail({ assignment, user, onBack }) {
         {assignment.question_paper_text&&<div style={{ background:'var(--code-bg)', border:'1px solid var(--border)', borderRadius:10, padding:16, whiteSpace:'pre-wrap', fontFamily:'monospace', fontSize:13, color:'var(--text-h)', maxHeight:300, overflowY:'auto' }}>{assignment.question_paper_text}</div>}
       </Card>
 
-      {/* Student: submission form */}
-      {user.role==='student'&&!isPast&&!submitted&&!analysis&&(
+      {/* Existing submission summary (before deadline, not editing) */}
+      {isStudent && submission && !editing && !isPast && !analysis && (
+        <Card style={{ marginBottom:14, borderLeft:'4px solid #22c55e' }}>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', flexWrap:'wrap', gap:10 }}>
+            <div>
+              <div style={{ fontWeight:700, color:'#6ee7b7', fontSize:14 }}>✅ You've submitted this assignment</div>
+              <div style={{ fontSize:12.5, color:'var(--text)', marginTop:3 }}>You can still edit or delete it until the deadline.</div>
+            </div>
+            <div style={{ display:'flex', gap:8 }}>
+              <GhostBtn small onClick={startEditSubmission}>✏️ Edit</GhostBtn>
+              <button onClick={deleteSubmission} style={{ padding:'6px 12px', borderRadius:8, border:'1px solid rgba(239,68,68,.3)', background:'rgba(239,68,68,.08)', color:'#ef4444', fontSize:12.5, fontWeight:700, cursor:'pointer', fontFamily:"'Nunito',sans-serif" }}>🗑 Delete</button>
+            </div>
+          </div>
+        </Card>
+      )}
+
+      {/* Submission form (new or editing) */}
+      {showForm && (
         <Card style={{ marginBottom:14 }}>
-          <h3 style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:15, color:'var(--text-h)', margin:'0 0 16px' }}>Your Submission</h3>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:16 }}>
+            <h3 style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:15, color:'var(--text-h)', margin:0 }}>{editing?'Edit Your Submission':'Your Submission'}</h3>
+            {editing&&<GhostBtn small onClick={()=>{setEditing(false);setAnswers({});setPdfFile(null)}}>Cancel edit</GhostBtn>}
+          </div>
           {(assignment.answer_type==='text'||assignment.answer_type==='both')&&questions.map(q=>(
             <div key={q.q_num} style={{ marginBottom:14 }}>
               <div style={{ fontSize:13.5, fontWeight:700, color:'var(--text-h)', marginBottom:6 }}>Q{q.q_num}. {q.question} [{q.max_marks} marks]</div>
@@ -12405,23 +12489,20 @@ function AssignmentDetail({ assignment, user, onBack }) {
             </div>
           )}
           <div style={{ display:'flex', gap:10 }}>
-            {(assignment.answer_type==='text'||assignment.answer_type==='both')&&Object.keys(answers).length>0&&<PrimaryBtn onClick={submitText} disabled={submitting}>{submitting?<><Spinner/> Submitting...</>:'Submit Text Answers'}</PrimaryBtn>}
-            {(assignment.answer_type==='pdf'||assignment.answer_type==='both')&&pdfFile&&<PrimaryBtn onClick={submitPDF} disabled={submitting} color="#F97316">{submitting?<><Spinner/> Uploading...</>:'Upload PDF'}</PrimaryBtn>}
+            {(assignment.answer_type==='text'||assignment.answer_type==='both')&&Object.keys(answers).length>0&&<PrimaryBtn onClick={submitText} disabled={submitting}>{submitting?<><Spinner/> Saving...</>:(editing?'💾 Update Answers':'Submit Text Answers')}</PrimaryBtn>}
+            {(assignment.answer_type==='pdf'||assignment.answer_type==='both')&&pdfFile&&<PrimaryBtn onClick={submitPDF} disabled={submitting} color="#F97316">{submitting?<><Spinner/> Uploading...</>:(editing?'💾 Replace PDF':'Upload PDF')}</PrimaryBtn>}
           </div>
         </Card>
       )}
 
-      {submitted&&<SuccessMsg msg="Submitted! You'll receive AI feedback after the deadline."/>}
-
-      {/* Student: analysis */}
-      {user.role==='student'&&analysis&&(
+      {/* Student analysis (after deadline) */}
+      {isStudent&&analysis&&(
         <Card style={{ borderLeft:'4px solid #22c55e' }}>
           <h3 style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:16, color:'#6ee7b7', margin:'0 0 16px' }}>🤖 AI Feedback</h3>
           <div style={{ display:'flex', gap:16, marginBottom:16, background:'rgba(34,197,94,.1)', padding:'14px 16px', borderRadius:10 }}>
             <div style={{ textAlign:'center' }}><div style={{ fontFamily:"'Sora',sans-serif", fontWeight:900, fontSize:28, color:'#6ee7b7' }}>{analysis.total_marks_awarded}/{analysis.total_marks_max}</div><div style={{ fontSize:11, color:'var(--text)' }}>Total Marks</div></div>
           </div>
           {analysis.overall_feedback&&<p style={{ color:'var(--text-h)', fontSize:14, marginBottom:14, lineHeight:1.7 }}>{analysis.overall_feedback}</p>}
-          {analysis.handwriting_quality&&<div style={{ marginBottom:12, padding:'8px 12px', background:'var(--code-bg)', borderRadius:8, fontSize:13, color:'var(--text-h)' }}>✍️ Handwriting: <strong>{analysis.handwriting_quality}</strong> — {analysis.handwriting_tips}</div>}
           {(analysis.questions_analysis||[]).map((qa,i)=>(
             <Card key={i} style={{ marginBottom:10, borderLeft:`3px solid ${qa.marks_awarded>=qa.marks_max*0.7?'#22c55e':'#f59e0b'}` }}>
               <div style={{ display:'flex', justifyContent:'space-between', marginBottom:6 }}>
@@ -12435,7 +12516,7 @@ function AssignmentDetail({ assignment, user, onBack }) {
         </Card>
       )}
 
-      {/* Teacher: all students analysis */}
+      {/* Teacher summary */}
       {user.role==='teacher'&&teacherAnalysis&&teacherAnalysis.length>0&&(
         <div>
           <h3 style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:16, color:'var(--text-h)', margin:'0 0 14px' }}>📊 Student Results Summary</h3>
@@ -12458,7 +12539,7 @@ function AssignmentDetail({ assignment, user, onBack }) {
       )}
 
       {loading&&<PageSpinner/>}
-      {isPast&&!analysis&&user.role==='student'&&<Card style={{ textAlign:'center', padding:24 }}><div style={{ fontSize:36, marginBottom:8 }}>⏳</div><p style={{ color:'var(--text)', fontSize:14 }}>AI analysis is being prepared. Check back shortly.</p></Card>}
+      {isPast&&!analysis&&isStudent&&<Card style={{ textAlign:'center', padding:24 }}><div style={{ fontSize:36, marginBottom:8 }}>⏳</div><p style={{ color:'var(--text)', fontSize:14 }}>AI analysis is being prepared. Check back shortly.</p></Card>}
     </div>
   )
 }
@@ -12515,21 +12596,40 @@ function AIBuddy({ user }) {
 //  SCHOOL NOTICES
 // ══════════════════════════════════════════════════════════════
 function NoticesPage({ user }) {
-  const [notices,setNotices]=useState([]); const [loading,setLoading]=useState(true); const [creating,setCreating]=useState(false); const [form,setForm]=useState({title:'',content:'',notice_type:'general',target_audience:'all',is_pinned:false}); const [saving,setSaving]=useState(false)
+  const [notices,setNotices]=useState([]); const [loading,setLoading]=useState(true)
+  const [creating,setCreating]=useState(false); const [editingId,setEditingId]=useState(null)
+  const [form,setForm]=useState({title:'',content:'',notice_type:'general',target_audience:'all',is_pinned:false})
+  const [saving,setSaving]=useState(false); const [err,setErr]=useState('')
   useEffect(()=>{ api.get('/api/school/notices').then(setNotices).catch(()=>{}).finally(()=>setLoading(false)) },[])
-  const submit=async()=>{
-    setSaving(true)
-    try{
-      const n=await api.post('/api/school/notices',form);
-      setNotices(p=>[n,...p]);
-      setCreating(false);
-      setForm({title:'',content:'',notice_type:'general',target_audience:'all',is_pinned:false})
-    } catch(e){ alert(e.message) }
+
+  const canCreate = ['admin','principal','teacher'].includes(user.role)
+  const canManageNotice = n =>
+    ['admin','principal'].includes(user.role) || n.created_by === user.id || n.author_id === user.id
+  const TYPES = [{v:'general',l:'📢 General'},{v:'exam',l:'📝 Exam'},{v:'event',l:'🎉 Event'},{v:'holiday',l:'🏖️ Holiday'},{v:'sports',l:'⚽ Sports'},{v:'cultural',l:'🎭 Cultural'}]
+
+  function resetForm(){ setForm({title:'',content:'',notice_type:'general',target_audience:'all',is_pinned:false}); setEditingId(null); setCreating(false); setErr('') }
+  function startEdit(n){ setForm({title:n.title,content:n.content,notice_type:n.notice_type,target_audience:n.target_audience,is_pinned:!!n.is_pinned}); setEditingId(n.id); setCreating(true); setErr('') }
+
+  async function submit() {
+    setSaving(true); setErr('')
+    try {
+      if (editingId) {
+        const updated = await api.put(`/api/school/notices/${editingId}`, form)
+        setNotices(p => p.map(x => x.id === editingId ? { ...x, ...updated, ...form } : x))
+      } else {
+        const n = await api.post('/api/school/notices', form)
+        setNotices(p => [n, ...p])
+      }
+      resetForm()
+    } catch (e) { setErr(e.message) }
     setSaving(false)
   }
 
-  const canCreate = ['admin','principal','teacher'].includes(user.role)
-  const TYPES = [{v:'general',l:'📢 General'},{v:'exam',l:'📝 Exam'},{v:'event',l:'🎉 Event'},{v:'holiday',l:'🏖️ Holiday'},{v:'sports',l:'⚽ Sports'},{v:'cultural',l:'🎭 Cultural'}]
+  async function del(n) {
+    if (!window.confirm(`Delete notice "${n.title}"? This cannot be undone.`)) return
+    try { await api.del(`/api/school/notices/${n.id}`); setNotices(p => p.filter(x => x.id !== n.id)) }
+    catch (e) { alert(e.message) }
+  }
 
   return (
     <div style={{ padding:24, fontFamily:"'Nunito',sans-serif", maxWidth:760, margin:'0 auto' }}>
@@ -12540,26 +12640,21 @@ function NoticesPage({ user }) {
 
       {creating&&(
         <Card style={{ marginBottom:20, borderColor:'#F97316' }}>
-          <h3 style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, color:'var(--text-h)', margin:'0 0 16px', fontSize:15 }}>Create Notice</h3>
+          <h3 style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, color:'var(--text-h)', margin:'0 0 16px', fontSize:15 }}>{editingId?'Edit Notice':'Create Notice'}</h3>
           <Field label="Title"><BSInput value={form.title} onChange={v=>setForm(f=>({...f,title:v}))} placeholder="Notice title..."/></Field>
           <Field label="Content"><BSTextarea value={form.content} onChange={v=>setForm(f=>({...f,content:v}))} rows={4} placeholder="Notice details..."/></Field>
           <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit,minmax(180px,1fr))', gap:12, marginBottom:14 }}>
-            <div>
-              <Label>Type</Label>
-              <BSSelect value={form.notice_type} onChange={v=>setForm(f=>({...f,notice_type:v}))} options={TYPES.map(t=>({value:t.v,label:t.l}))}/>
-            </div>
-            {user.role!=='teacher'&&<div>
-              <Label>Audience</Label>
-              <BSSelect value={form.target_audience} onChange={v=>setForm(f=>({...f,target_audience:v}))} options={[{value:'all',label:'Everyone'},{value:'students',label:'Students only'},{value:'teachers',label:'Teachers only'}]}/>
-            </div>}
+            <div><Label>Type</Label><BSSelect value={form.notice_type} onChange={v=>setForm(f=>({...f,notice_type:v}))} options={TYPES.map(t=>({value:t.v,label:t.l}))}/></div>
+            {user.role!=='teacher'&&<div><Label>Audience</Label><BSSelect value={form.target_audience} onChange={v=>setForm(f=>({...f,target_audience:v}))} options={[{value:'all',label:'Everyone'},{value:'students',label:'Students only'},{value:'teachers',label:'Teachers only'}]}/></div>}
           </div>
           <label style={{ display:'flex', alignItems:'center', gap:8, cursor:'pointer', fontSize:13, color:'var(--text)', fontWeight:600, marginBottom:14 }}>
             <input type="checkbox" checked={form.is_pinned} onChange={e=>setForm(f=>({...f,is_pinned:e.target.checked}))} style={{ accentColor:'var(--accent)' }}/>
             📌 Pin this notice
           </label>
+          <ErrMsg msg={err}/>
           <div style={{ display:'flex', gap:10 }}>
-            <PrimaryBtn onClick={submit} disabled={saving||!form.title||!form.content} color="#F97316">{saving?<><Spinner/> Posting...</>:'📤 Post Notice'}</PrimaryBtn>
-            <GhostBtn onClick={()=>setCreating(false)}>Cancel</GhostBtn>
+            <PrimaryBtn onClick={submit} disabled={saving||!form.title||!form.content} color="#F97316">{saving?<><Spinner/> {editingId?'Saving...':'Posting...'}</>:(editingId?'💾 Save Changes':'📤 Post Notice')}</PrimaryBtn>
+            <GhostBtn onClick={resetForm}>Cancel</GhostBtn>
           </div>
         </Card>
       )}
@@ -12571,10 +12666,11 @@ function NoticesPage({ user }) {
         {notices.map(n=>{
           const typeColors = {general:'#6366F1',exam:'#F59E0B',event:'#10B981',holiday:'#06b6d4',sports:'#EF4444',cultural:'#A855F7'}
           const color = typeColors[n.notice_type]||'#6366F1'
+          const mine = canManageNotice(n)
           return (
             <div key={n.id} style={{ ...T.card, borderLeft:`4px solid ${color}` }}>
-              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
-                <div style={{ flex:1 }}>
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8, gap:10 }}>
+                <div style={{ flex:1, minWidth:0 }}>
                   <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:4, flexWrap:'wrap' }}>
                     {n.is_pinned&&<span style={{ fontSize:12, color:'#F59E0B' }}>📌</span>}
                     <span style={{ fontFamily:"'Sora',sans-serif", fontWeight:800, fontSize:15, color:'var(--text-h)' }}>{n.title}</span>
@@ -12583,6 +12679,12 @@ function NoticesPage({ user }) {
                   <p style={{ color:'var(--text-h)', fontSize:13.5, lineHeight:1.7, margin:'0 0 10px' }}>{n.content}</p>
                   <div style={{ fontSize:11.5, color:'var(--text)' }}>{timeAgo(n.created_at)} · {n.target_audience==='all'?'Everyone':n.target_audience}</div>
                 </div>
+                {mine && (
+                  <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+                    <button onClick={()=>startEdit(n)} title="Edit" style={{ padding:'4px 10px', borderRadius:7, border:'1px solid var(--border)', background:'var(--code-bg)', color:'var(--text-h)', fontSize:12, cursor:'pointer', fontFamily:"'Nunito',sans-serif" }}>✏️</button>
+                    <button onClick={()=>del(n)} title="Delete" style={{ padding:'4px 10px', borderRadius:7, border:'1px solid rgba(239,68,68,.3)', background:'rgba(239,68,68,.08)', color:'#ef4444', fontSize:12, cursor:'pointer', fontFamily:"'Nunito',sans-serif" }}>🗑</button>
+                  </div>
+                )}
               </div>
             </div>
           )
