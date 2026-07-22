@@ -14164,6 +14164,8 @@ Format:
   }
 
   async function submit() {
+    const unanswered = quiz.questions.length - Object.keys(answers).length
+    if (unanswered > 0 && !window.confirm(`You have ${unanswered} unanswered question${unanswered !== 1 ? 's' : ''}. They will be marked wrong. Submit anyway?`)) return
     if (timerId) clearInterval(timerId)
     setSubmitted(true)
     const correct = quiz.questions.filter((q, i) => answers[i] === q.answer).length
@@ -14259,7 +14261,18 @@ Format:
               )
             })}
           </div>
-          {!submitted && <PrimaryBtn onClick={submit} disabled={Object.keys(answers).length < quiz.questions.length} color="#F59E0B" style={{ marginTop: 16 }}>Submit ({Object.keys(answers).length}/{quiz.questions.length} answered) →</PrimaryBtn>}
+          {!submitted && (
+  <div style={{ marginTop: 16 }}>
+    {Object.keys(answers).length < quiz.questions.length && (
+      <div style={{ fontSize: 12.5, color: 'var(--text)', marginBottom: 8, fontWeight: 600 }}>
+        ⚠️ {quiz.questions.length - Object.keys(answers).length} question{quiz.questions.length - Object.keys(answers).length !== 1 ? 's' : ''} unanswered — these will be marked wrong.
+      </div>
+    )}
+    <PrimaryBtn onClick={submit} color="#F59E0B">
+      Submit ({Object.keys(answers).length}/{quiz.questions.length} answered) →
+    </PrimaryBtn>
+  </div>
+)}
         </div>
       )}
       <XPBadge amount="5–50" label="per quiz" />
