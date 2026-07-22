@@ -11059,9 +11059,9 @@ function LandingPage({ onStart }) {
             Where Students<br/>
             <span style={{ background:'linear-gradient(135deg,#818CF8,#A855F7,#06b6d4)', WebkitBackgroundClip:'text', WebkitTextFillColor:'transparent', backgroundClip:'text' }}>Learn, Share & Grow</span>
           </h1>
-          <p style={{ fontSize:'clamp(14px,1.8vw,17px)', color:'var(--text)', lineHeight:1.8, marginBottom:30, maxWidth:520, margin:'0 auto 30px' }}>AI study tools + a student feed — one platform built for Indian students and teachers.</p>
+          <p style={{ fontSize:'clamp(14px,1.8vw,17px)', color:'var(--text)', lineHeight:1.8, marginBottom:30, maxWidth:520, margin:'0 auto 30px' }}>AI study tools + a student feed - one platform built for Indian students and teachers.</p>
           <div style={{ display:'flex', gap:10, justifyContent:'center', flexWrap:'wrap' }}>
-            <button onClick={()=>onStart('signup')} style={{ padding:'13px 34px', borderRadius:10, border:'none', background:'linear-gradient(135deg,#4f46e5,#8B5CF6)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', fontFamily:"'Nunito',sans-serif" }}>🚀 Start Free — 60-Day Trial</button>
+            <button onClick={()=>onStart('signup')} style={{ padding:'13px 34px', borderRadius:10, border:'none', background:'linear-gradient(135deg,#4f46e5,#8B5CF6)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', fontFamily:"'Nunito',sans-serif" }}>🚀 Start Free 60-Day Trial</button>
             <button onClick={()=>onStart('school')} style={{ padding:'12px 22px', borderRadius:10, border:'1px solid var(--accent-border)', background:'var(--accent-bg)', color:'var(--accent)', fontSize:13.5, fontWeight:700, cursor:'pointer', fontFamily:"'Nunito',sans-serif" }}>🏫 School Login</button>
           </div>
         </div>
@@ -15686,160 +15686,86 @@ const labelFor = it => {
 // ══════════════════════════════════════════════════════════════
 //  HISTORY PAGE  (Coursera-style grid)
 // ══════════════════════════════════════════════════════════════
-function HistoryPage({ onNavigate }) {
-  const TOOL_META_H = {
-    notes:      { icon:'📖', label:'Notes',         color:'#10B981' },
-    quiz:       { icon:'🎯', label:'Quiz',          color:'#F59E0B' },
-    paper:      { icon:'📄', label:'Paper',         color:'#A855F7' },
-    flashcards: { icon:'🃏', label:'Flashcards',    color:'#EF4444' },
-    cheatsheet: { icon:'📋', label:'Cheat Sheet',   color:'#F97316' },
-    lessonplan: { icon:'🎓', label:'Lesson Plan',   color:'#7C3AED' },
-    courses:    { icon:'📚', label:'Course Module', color:'#8B5CF6' },
-  }
+// ══════════════════════════════════════════════════════════════
+//  HISTORY PAGE  (chapter containers — like Dashboard, but ALL of them)
+// ══════════════════════════════════════════════════════════════
+function HistoryPage({ onNavigate, onOpenChapter }) {
+  const [groups, setGroups]         = useState([])
+  const [search, setSearch]         = useState('')
+  const [subjectFilter, setSubject] = useState('all')
 
-  const [history,  setHistory]  = useState([])
-  const [loading,  setLoading]  = useState(true)
-  const [page,     setPage]     = useState(1)
-  const [hasMore,  setHasMore]  = useState(true)
-  const [filter,   setFilter]   = useState('all')
-  const [selected, setSelected] = useState(null)   // { item, session }
-  const [sessions, setSessions] = useState([])
+  // Same grouping the dashboard uses — but we never slice it
+  useEffect(() => { setGroups(groupSessionsIntoChapters()) }, [])
 
-  useEffect(() => { setSessions(listAllSessions()) }, [])
+  const subjects = ['all', ...Array.from(new Set(groups.map(g => g.subject)))]
 
-  useEffect(() => {
-    setLoading(true)
-    api.get(`/api/user/history?page=${page}`)
-      .then(data => {
-        setHistory(prev => page===1 ? data : [...prev, ...data])
-        setHasMore(data.length === 50)
-      })
-      .catch(()=>{})
-      .finally(()=>setLoading(false))
-  }, [page])
-
-  const shown   = (filter==='all' ? history : history.filter(h=>h.tool===filter)).filter(h=>h.tool!=='doubt')
-  const grouped = shown.reduce((acc,item) => {
-    const key = new Date(item.created_at).toLocaleDateString('en-IN',{weekday:'long',day:'numeric',month:'long',year:'numeric'})
-    if (!acc[key]) acc[key] = []
-    acc[key].push(item)
-    return acc
-  }, {})
-
-  const hasSessionFor = useCallback(item =>
-    sessions.some(s =>
-      s.tool===item.tool && s.subject===item.subject &&
-      (s.chapter===item.chapter || (item.chapters||[]).some(c=>s.chapter===c||(s.chapters||[]).includes(c))) &&
-      Math.abs(new Date(s.savedAt)-new Date(item.created_at)) < 2*60*60*1000
-    ), [sessions])
-
-  const openItem = useCallback(item => {
-    if (item.tool === 'courses') {
-      onNavigate?.('courses', {
-        subject: item.subject || '',
-        chapter: item.chapter || (item.chapters || [])[0] || '',
-        cls: item.metadata?.cls,
-      })
-      return
+  const shown = groups.filter(g => {
+    if (subjectFilter !== 'all' && g.subject !== subjectFilter) return false
+    if (search.trim()) {
+      const q = search.toLowerCase()
+      return g.chapterName.toLowerCase().includes(q) || g.subject.toLowerCase().includes(q)
     }
-    const sess = findSessionForActivity(item)
-    setSelected({ item, session: sess })
-  }, [onNavigate])
+    return true
+  })
 
-  const tools = ['all', ...Object.keys(TOOL_META_H)]
-
-  function HistoryCard({ item }) {
-    const meta = TOOL_META_H[item.tool] || { icon:'⚡', label:item.tool, color:'#6366F1' }
-    const [hov, setHov] = useState(false)
-    const chapter = item.chapter || (item.chapters||[])[0] || ''
-    return (
-      <div
-        onClick={()=>openItem(item)}
-        onMouseEnter={()=>setHov(true)}
-        onMouseLeave={()=>setHov(false)}
-        style={{
-          position:'relative', width:'100%', aspectRatio:'1 / 1.1',
-          borderRadius:16, cursor:'pointer', padding:'14px 12px 12px',
-          display:'flex', flexDirection:'column', justifyContent:'space-between',
-          background: hov ? `${meta.color}14` : 'var(--bg2)',
-          border: `1.5px solid ${hov ? meta.color+'55' : 'var(--border)'}`,
-          transition:'all .18s ease',
-          transform: hov ? 'translateY(-3px)' : 'none',
-          boxShadow: hov ? `0 8px 28px ${meta.color}20` : '0 1px 8px rgba(15,23,42,.05)',
-          fontFamily:"'Nunito',sans-serif", overflow:'hidden',
-        }}
-      >
-        <div style={{ position:'absolute', top:0, left:0, right:0, height:3, background:`linear-gradient(90deg,${meta.color},transparent)`, borderRadius:'16px 16px 0 0', opacity:hov?1:0, transition:'opacity .18s' }}/>
-        {hasSessionFor(item) && <div style={{ position:'absolute', top:9, right:9, width:7, height:7, borderRadius:'50%', background:meta.color, boxShadow:`0 0 7px ${meta.color}` }}/>}
-        <div style={{ width:42, height:42, borderRadius:11, background:`${meta.color}18`, border:`1px solid ${meta.color}33`, display:'flex', alignItems:'center', justifyContent:'center', fontSize:21, flexShrink:0, marginBottom:7 }}>{meta.icon}</div>
-        <div style={{ flex:1, minHeight:0 }}>
-          <div style={{ fontSize:10.5, fontWeight:800, color:meta.color, textTransform:'uppercase', letterSpacing:'.5px', marginBottom:3 }}>{meta.label}</div>
-          {item.subject && <div style={{ fontSize:12.5, fontWeight:700, color:'var(--text-h)', marginBottom:2, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{item.subject}</div>}
-          {chapter && <div style={{ fontSize:11, color:'var(--text)', lineHeight:1.4, display:'-webkit-box', WebkitLineClamp:2, WebkitBoxOrient:'vertical', overflow:'hidden' }}>{chapter}</div>}
-        </div>
-        <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginTop:8, paddingTop:8, borderTop:'1px solid rgba(255,255,255,.05)' }}>
-          <span style={{ fontSize:10, color:'#475569' }}>{(() => { const diff=(Date.now()-new Date(item.created_at))/1000; if(diff<3600) return `${Math.floor(diff/60)}m ago`; if(diff<86400) return `${Math.floor(diff/3600)}h ago`; return new Date(item.created_at).toLocaleDateString('en-IN',{day:'numeric',month:'short'}) })()}</span>
-          {item.xp_earned>0 && <span style={{ fontSize:10, fontWeight:800, color:'#FCD34D', background:'rgba(252,211,77,.08)', borderRadius:20, padding:'1px 7px' }}>+{item.xp_earned}</span>}
-        </div>
-        <div style={{ position:'absolute', bottom:10, right:10, fontSize:13, color:meta.color, opacity:hov?1:0, transition:'opacity .15s' }}>→</div>
-      </div>
-    )
-  }
+  const totalActivities = groups.reduce((s, g) => s + g.items.length, 0)
 
   return (
-    <div style={{ padding:24, width:'100%', boxSizing:'border-box', fontFamily:"'Nunito',sans-serif", animation:'slideUp .25s ease-out' }}>
-      <PageHeader icon="🕘" title="Activity History" subtitle="Tap any card to replay the full session" color="#6366F1"/>
+    <div style={{ padding: 24, width: '100%', boxSizing: 'border-box', fontFamily: "'Nunito',sans-serif", animation: 'slideUp .25s ease-out' }}>
+      <PageHeader
+        icon="🕘"
+        title="Learning History"
+        subtitle="Every chapter you've studied — tap any to reopen its notes, quizzes & flashcards"
+        color="#6366F1"
+      />
 
-      {/* Filter pills */}
-      <div style={{ display:'flex', gap:7, flexWrap:'wrap', marginBottom:20 }}>
-        {tools.map(t => {
-          const meta = TOOL_META_H[t]
-          return (
-            <button key={t} onClick={()=>setFilter(t)} style={{ padding:'5px 14px', borderRadius:20, border:'none', fontWeight:700, fontSize:12, cursor:'pointer', fontFamily:"'Nunito',sans-serif", background:filter===t?(meta?.color||'#6366F1'):'var(--social-bg)', color:filter===t?'#fff':'var(--text-h)', transition:'all .15s', display:'flex', alignItems:'center', gap:4 }}>
-              {meta ? `${meta.icon} ${meta.label}` : '⚡ All'}
-            </button>
-          )
-        })}
-      </div>
-
-      {/* Legend */}
-      <div style={{ display:'flex', alignItems:'center', gap:16, marginBottom:22, padding:'9px 14px', background:'var(--bg2)', borderRadius:10, border:'1px solid var(--border)', fontSize:12, color:'var(--text)', flexWrap:'wrap' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:6 }}><span style={{ background:'rgba(255,255,255,.95)', color:'#6366F1', borderRadius:20, padding:'2px 9px', fontSize:10.5, fontWeight:800 }}>▶ Replay</span> = full session saved — tap to reopen it</div>
-        <div style={{ display:'flex', alignItems:'center', gap:6 }}>No badge = activity record only (older sessions)</div>
-      </div>
-
-      {loading && page===1 && <PageSpinner/>}
-      {!loading && shown.length===0 && (
-        <div style={{ textAlign:'center', padding:60, color:'var(--text)' }}>
-          <div style={{ fontSize:48, marginBottom:12 }}>🕘</div>
-          <div style={{ fontFamily:"'Sora',sans-serif", fontWeight:700, fontSize:16, color:'var(--text-h)', marginBottom:6 }}>No history yet</div>
-          <p style={{ fontSize:13 }}>Start using AI tools and every session will appear here.</p>
+      {/* Summary strip */}
+      {groups.length > 0 && (
+        <div style={{ display: 'flex', gap: 16, marginBottom: 20, padding: '10px 16px', background: 'var(--bg2)', borderRadius: 10, border: '1px solid var(--border)', fontSize: 12.5, color: 'var(--text)', flexWrap: 'wrap' }}>
+          <span><strong style={{ color: 'var(--text-h)' }}>{groups.length}</strong> chapter{groups.length !== 1 ? 's' : ''} studied</span>
+          <span><strong style={{ color: 'var(--text-h)' }}>{totalActivities}</strong> total session{totalActivities !== 1 ? 's' : ''}</span>
         </div>
       )}
 
-      {/* Grouped grids */}
-      {Object.entries(grouped).map(([date,items]) => (
-        <div key={date} style={{ marginBottom:32 }}>
-          <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
-            <div style={{ height:1, width:14, background:'var(--border)' }}/>
-            <span style={{ fontSize:11, fontWeight:800, color:'var(--text)', textTransform:'uppercase', letterSpacing:'.6px', whiteSpace:'nowrap' }}>{date}</span>
-            <div style={{ height:1, flex:1, background:'var(--border)' }}/>
-            <span style={{ fontSize:11, color:'#1e293b', fontWeight:700 }}>{items.length} session{items.length!==1?'s':''}</span>
+      {/* Search + subject filter */}
+      {groups.length > 0 && (
+        <>
+          <div style={{ position: 'relative', marginBottom: 12, maxWidth: 420 }}>
+            <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search chapters or subjects…"
+              style={{ ...T.input, paddingLeft: 40, fontSize: 14 }} />
+            <span style={{ position: 'absolute', left: 13, top: '50%', transform: 'translateY(-50%)', fontSize: 15, opacity: .5 }}>🔍</span>
           </div>
-          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(260px,1fr))', gap:16 }}>
-            {items.map((item,i) => <HistoryCard key={item.id||i} item={item}/>)}
+          <div style={{ display: 'flex', gap: 7, flexWrap: 'wrap', marginBottom: 22 }}>
+            {subjects.map(s => (
+              <button key={s} onClick={() => setSubject(s)} style={{ padding: '5px 14px', borderRadius: 20, border: 'none', fontWeight: 700, fontSize: 12, cursor: 'pointer', fontFamily: "'Nunito',sans-serif", background: subjectFilter === s ? '#6366F1' : 'var(--social-bg)', color: subjectFilter === s ? '#fff' : 'var(--text-h)', transition: 'all .15s' }}>
+                {s === 'all' ? '📚 All Subjects' : s}
+              </button>
+            ))}
           </div>
-        </div>
-      ))}
+        </>
+      )}
 
-      {hasMore && !loading && shown.length>0 && (
-        <div style={{ textAlign:'center', marginTop:16 }}>
-          <GhostBtn onClick={()=>setPage(p=>p+1)}>Load More</GhostBtn>
+      {/* Empty state */}
+      {groups.length === 0 && (
+        <div style={{ textAlign: 'center', padding: 60, color: 'var(--text)' }}>
+          <div style={{ fontSize: 48, marginBottom: 12 }}>🕘</div>
+          <div style={{ fontFamily: "'Sora',sans-serif", fontWeight: 700, fontSize: 16, color: 'var(--text-h)', marginBottom: 6 }}>No chapters yet</div>
+          <p style={{ fontSize: 13 }}>Generate notes, quizzes or flashcards and each chapter will appear here as a container.</p>
         </div>
       )}
-      {loading && page>1 && <div style={{ display:'flex', justifyContent:'center', padding:16 }}><Spinner size={22}/></div>}
 
-      {selected && <HistorySessionView item={selected.item} session={selected.session} onClose={()=>setSelected(null)}/>}
+      {groups.length > 0 && shown.length === 0 && (
+        <div style={{ textAlign: 'center', padding: 40, color: 'var(--text)' }}>No chapters match your filters.</div>
+      )}
+
+      {/* All chapter containers — same cards the dashboard uses */}
+      {shown.length > 0 && (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill,minmax(240px,1fr))', gap: 16 }}>
+          {shown.map((g, i) => (
+            <ChapterCard key={g.key} group={g} index={i} onOpen={onOpenChapter} />
+          ))}
+        </div>
+      )}
     </div>
   )
 }
@@ -16324,7 +16250,7 @@ export default function App() {
     if (tab === 'feed')       return <SocialFeed user={user} />
     if (tab === 'search')     return <SearchPage currentUser={user} onViewProfile={id => { setViewProfileId(id); setTab('profile') }} onMessage={id => { setMsgUserId(id); setTab('messages') }} />
     if (tab === 'messages')   return <MessagingPage currentUser={user} startWithUserId={msgUserId} onConversationRead={fetchUnread} />
-    if (tab === 'history')    return <HistoryPage onNavigate={(t, pf) => { if (pf) setPrefill(pf); setTab(t) }} />
+    if (tab === 'history')    return <HistoryPage onNavigate={(t, pf) => { if (pf) setPrefill(pf); setTab(t) }} onOpenChapter={setActiveChapterGroup} />
     if (tab === 'video')      return <VideoLearn user={user} />
     if (tab === 'cheatsheet') return <CheatSheetMaker user={user} prefill={prefill} onClearPrefill={clearPrefill} />
     if (tab === 'paper')      return <QPMaker         user={user} prefill={prefill} onClearPrefill={clearPrefill} />
