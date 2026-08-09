@@ -16221,6 +16221,248 @@ function BottomSheet({ isOpen, onClose, title, children }) {
     </>
   )
 }
+
+
+
+// ══════════════════════════════════════════════════════════════
+//  JOIN PAGE — public self-registration via invite link
+// ══════════════════════════════════════════════════════════════
+function JoinPage() {
+  const params = new URLSearchParams(window.location.search)
+  const role   = params.get('join') === 'student' ? 'student' : 'teacher'
+  const school = (params.get('school') || '').toUpperCase()
+  const token  = params.get('t') || ''
+
+  const [form, setForm] = useState({ name: '', identifier: '', password: '', classLevel: '', section: '' })
+  const [busy, setBusy] = useState(false)
+  const [err,  setErr]  = useState('')
+  const [done, setDone] = useState(false)
+  const set = k => v => setForm(f => ({ ...f, [k]: v }))
+
+  const goToLogin = () => { window.location.href = window.location.origin }
+
+  const submit = async () => {
+    setErr('')
+    if (!form.name.trim() || !form.identifier.trim() || !form.password) { setErr('Please fill all required fields.'); return }
+    if (form.password.length < 6) { setErr('Password must be at least 6 characters.'); return }
+    setBusy(true)
+    try {
+      if (role === 'teacher') {
+        await api.post('/api/join/teacher', {
+          schoolCode: school, token, name: form.name, employeeId: form.identifier, password: form.password,
+        })
+      } else {
+        await api.post('/api/join/student', {
+          schoolCode: school, token, name: form.name, rollNumber: form.identifier,
+          classLevel: form.classLevel, section: form.section, password: form.password,
+        })
+      }
+      setDone(true)
+    } catch (e) { setErr(e.message || 'Could not create account.') }
+    setBusy(false)
+  }
+
+  const wrap = { minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 20, background: 'var(--bg)', fontFamily: "'Nunito', sans-serif" }
+  const card = { width: '100%', maxWidth: 440, background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 18, boxShadow: 'var(--shadow-lg, 0 10px 40px rgba(0,0,0,.15))', padding: 28 }
+
+  if (!school || !token) return (
+    <div style={wrap}><div style={card}>
+      <h2 style={{ margin: 0, color: 'var(--text-h)' }}>Invalid link</h2>
+      <p style={{ color: 'var(--text)' }}>This invite link is missing information. Please ask your school for a fresh link.</p>
+    </div></div>
+  )
+
+  if (done) return (
+    <div style={wrap}><div style={{ ...card, textAlign: 'center' }}>
+      <div style={{ fontSize: 46 }}>✅</div>
+      <h2 style={{ margin: '8px 0', color: 'var(--text-h)' }}>You're all set!</h2>
+      <p style={{ color: 'var(--text)' }}>Your account has been created for <b>{school}</b>. You can log in now with your {role === 'teacher' ? 'Teacher ID' : 'Roll Number'} and the password you just chose.</p>
+      <button onClick={goToLogin} style={{ marginTop: 12, padding: '12px 22px', border: 'none', borderRadius: 10, background: 'var(--accent, #6366F1)', color: '#fff', fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif" }}>Go to login</button>
+    </div></div>
+  )
+
+  return (
+    <div style={wrap}><div style={card}>
+      <div style={{ fontSize: 12, fontWeight: 800, letterSpacing: '.5px', textTransform: 'uppercase', color: 'var(--accent, #6366F1)' }}>{role === 'teacher' ? 'Teacher sign-up' : 'Student sign-up'}</div>
+      <h2 style={{ margin: '4px 0 2px', color: 'var(--text-h)' }}>Join {school}</h2>
+      <p style={{ marginTop: 0, color: 'var(--text)', fontSize: 14 }}>Fill this in once and you're done. Choose a password you'll remember.</p>
+
+      <Field label="Full name"><BSInput value={form.name} onChange={set('name')} placeholder="e.g. Anita Sharma" /></Field>
+      <Field label={role === 'teacher' ? 'Teacher ID (create one)' : 'Roll number'}>
+        <BSInput value={form.identifier} onChange={set('identifier')} placeholder={role === 'teacher' ? 'e.g. anita.s' : 'e.g. 24'} />
+      </Field>
+      {role === 'student' && (
+        <div style={{ display: 'flex', gap: 10 }}>
+          <div style={{ flex: 1 }}><Field label="Class"><BSInput value={form.classLevel} onChange={set('classLevel')} placeholder="e.g. 8" /></Field></div>
+          <div style={{ flex: 1 }}><Field label="Section"><BSInput value={form.section} onChange={set('section')} placeholder="e.g. B" /></Field></div>
+        </div>
+      )}
+      <Field label="Password"><BSInput value={form.password} onChange={set('password')} type="password" placeholder="At least 6 characters" /></Field>
+
+      {err && <div style={{ color: '#ef4444', fontSize: 13, marginBottom: 10, fontWeight: 700 }}>{err}</div>}
+      <button onClick={submit} disabled={busy} style={{ width: '100%', padding: '12px', border: 'none', borderRadius: 10, background: 'var(--accent, #6366F1)', color: '#fff', fontWeight: 800, fontSize: 15, cursor: busy ? 'default' : 'pointer', opacity: busy ? .7 : 1, fontFamily: "'Nunito', sans-serif" }}>
+        {busy ? 'Creating…' : 'Create my account'}
+      </button>
+    </div></div>
+  )
+}
+
+// ══════════════════════════════════════════════════════════════
+//  ROSTER PAGE — teachers/principals: invite links, roster, uploads
+// ══════════════════════════════════════════════════════════════
+function RosterPage({ user }) {
+  const [links, setLinks]       = useState(null)
+  const [roster, setRoster]     = useState({ teachers: [], students: [] })
+  const [view, setView]         = useState('teachers')
+  const [loading, setLoading]   = useState(true)
+  const [msg, setMsg]           = useState('')
+  const [editing, setEditing]   = useState(null)
+  const teacherFileRef = useRef(null)
+  const studentFileRef = useRef(null)
+
+  const load = async () => {
+    setLoading(true)
+    try {
+      const [l, r] = await Promise.all([api.get('/api/school/invite-links'), api.get('/api/school/roster')])
+      setLinks(l); setRoster(r)
+    } catch (e) { setMsg(e.message) }
+    setLoading(false)
+  }
+  useEffect(() => { load() }, [])
+
+  const copy = (text, label) => {
+    navigator.clipboard?.writeText(text)
+    setMsg(`${label} link copied!`); setTimeout(() => setMsg(''), 2000)
+  }
+
+  const upload = async (kind, file) => {
+    if (!file) return
+    setMsg(`Uploading ${kind}…`)
+    try {
+      const form = new FormData(); form.append('file', file)
+      const tok = localStorage.getItem('bs_token')
+      const r = await fetch(`${API_URL}/api/school/upload/${kind}`, { method: 'POST', headers: { Authorization: `Bearer ${tok}` }, body: form })
+      const data = await r.json()
+      if (!r.ok) throw new Error(data.error || 'Upload failed')
+      setMsg(`Imported ${data.imported} ${kind}.`); load()
+    } catch (e) { setMsg('Upload failed: ' + e.message) }
+    setTimeout(() => setMsg(''), 3500)
+  }
+
+  const saveEdit = async () => {
+    try {
+      const { type, id, ...fields } = editing
+      await api.put(`/api/school/roster/${type}/${id}`, fields)
+      setEditing(null); load()
+    } catch (e) { setMsg(e.message) }
+  }
+
+  const deactivate = async (type, id) => {
+    if (!window.confirm('Deactivate this account? They will no longer be able to log in.')) return
+    try { await api.del(`/api/school/roster/${type}/${id}`); load() } catch (e) { setMsg(e.message) }
+  }
+
+  const box   = { background: 'var(--bg2)', border: '1px solid var(--border)', borderRadius: 14, padding: 18, marginBottom: 16 }
+  const btn   = { padding: '8px 14px', border: 'none', borderRadius: 8, background: 'var(--accent, #6366F1)', color: '#fff', fontWeight: 800, cursor: 'pointer', fontFamily: "'Nunito', sans-serif", fontSize: 13 }
+  const ghost = { ...btn, background: 'transparent', color: 'var(--text-h)', border: '1px solid var(--border)' }
+  const th    = { textAlign: 'left', padding: '8px 10px', fontSize: 11.5, textTransform: 'uppercase', letterSpacing: '.4px', color: 'var(--text)', borderBottom: '1px solid var(--border)' }
+  const td    = { padding: '8px 10px', fontSize: 13.5, color: 'var(--text-h)', borderBottom: '1px solid var(--border)' }
+
+  const LinkRow = ({ label, link }) => (
+    <div style={{ marginBottom: 12 }}>
+      <div style={{ fontSize: 12.5, fontWeight: 800, color: 'var(--text-h)', marginBottom: 4 }}>{label}</div>
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        <input readOnly value={link} onFocus={e => e.target.select()} style={{ flex: 1, minWidth: 220, padding: '9px 12px', borderRadius: 8, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text)', fontSize: 12.5, fontFamily: 'monospace' }} />
+        <button style={btn} onClick={() => copy(link, label)}>Copy</button>
+      </div>
+    </div>
+  )
+
+  if (loading) return <div style={{ padding: 24, color: 'var(--text)' }}>Loading roster…</div>
+
+  const rows = view === 'teachers' ? roster.teachers : roster.students
+
+  return (
+    <div style={{ padding: 24, maxWidth: 960, margin: '0 auto', fontFamily: "'Nunito', sans-serif" }}>
+      <h1 style={{ margin: '0 0 4px', color: 'var(--text-h)' }}>🏫 Manage School</h1>
+      <p style={{ marginTop: 0, color: 'var(--text)' }}>Invite your teachers and students, or upload a list. You can edit or deactivate anyone here.</p>
+
+      {msg && <div style={{ background: 'var(--accent, #6366F1)', color: '#fff', padding: '10px 14px', borderRadius: 10, marginBottom: 14, fontWeight: 700, fontSize: 13.5 }}>{msg}</div>}
+
+      <div style={box}>
+        <div style={{ fontWeight: 800, color: 'var(--text-h)', marginBottom: 10, fontSize: 15 }}>1 · Share a join link</div>
+        {links && <>
+          <LinkRow label="Teacher join link" link={links.teacherLink} />
+          <LinkRow label="Student join link" link={links.studentLink} />
+          <div style={{ fontSize: 12.5, color: 'var(--text)' }}>Anyone who opens the link types their own name and password — no work for you. Send the teacher link to your staff; teachers send the student link to their class.</div>
+        </>}
+      </div>
+
+      <div style={box}>
+        <div style={{ fontWeight: 800, color: 'var(--text-h)', marginBottom: 6, fontSize: 15 }}>2 · Or upload a list (Excel / CSV)</div>
+        <div style={{ fontSize: 12.5, color: 'var(--text)', marginBottom: 10 }}>
+          Teachers file needs columns: <b>employee_id, name, password</b>. Students file needs: <b>roll_number, name, password</b> (class_level, section optional).
+        </div>
+        <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap' }}>
+          <input ref={teacherFileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={e => upload('teachers', e.target.files[0])} />
+          <input ref={studentFileRef} type="file" accept=".xlsx,.xls,.csv" style={{ display: 'none' }} onChange={e => upload('students', e.target.files[0])} />
+          <button style={ghost} onClick={() => teacherFileRef.current?.click()}>⬆ Upload teachers</button>
+          <button style={ghost} onClick={() => studentFileRef.current?.click()}>⬆ Upload students</button>
+        </div>
+      </div>
+
+      <div style={box}>
+        <div style={{ display: 'flex', gap: 8, marginBottom: 12 }}>
+          <button style={view === 'teachers' ? btn : ghost} onClick={() => setView('teachers')}>Teachers ({roster.teachers.length})</button>
+          <button style={view === 'students' ? btn : ghost} onClick={() => setView('students')}>Students ({roster.students.length})</button>
+        </div>
+        <div style={{ overflowX: 'auto' }}>
+          <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+            <thead><tr>
+              <th style={th}>Name</th>
+              <th style={th}>{view === 'teachers' ? 'Teacher ID' : 'Roll'}</th>
+              {view === 'students' && <th style={th}>Class</th>}
+              <th style={th}>Status</th>
+              <th style={th}></th>
+            </tr></thead>
+            <tbody>
+              {rows.length === 0 && <tr><td style={td} colSpan={5}>No one yet — share a link or upload a list above.</td></tr>}
+              {rows.map(m => {
+                const type = view === 'teachers' ? 'teacher' : 'student'
+                const isEd = editing && editing.type === type && editing.id === m.id
+                return (
+                  <tr key={m.id} style={{ opacity: m.is_active ? 1 : .5 }}>
+                    <td style={td}>{isEd
+                      ? <input value={editing.name} onChange={e => setEditing({ ...editing, name: e.target.value })} style={{ padding: 6, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text-h)' }} />
+                      : m.name}</td>
+                    <td style={td}>{view === 'teachers' ? m.employee_id : m.roll_number}</td>
+                    {view === 'students' && <td style={td}>{isEd
+                      ? <input value={editing.class_level} onChange={e => setEditing({ ...editing, class_level: e.target.value })} style={{ width: 50, padding: 6, borderRadius: 6, border: '1px solid var(--border)', background: 'var(--bg)', color: 'var(--text-h)' }} />
+                      : `${m.class_level || ''}${m.section ? '-' + m.section : ''}`}</td>}
+                    <td style={td}>{m.is_active ? '✅ Active' : '🚫 Inactive'}</td>
+                    <td style={{ ...td, whiteSpace: 'nowrap' }}>
+                      {isEd ? (
+                        <>
+                          <button style={{ ...btn, padding: '5px 10px', marginRight: 6 }} onClick={saveEdit}>Save</button>
+                          <button style={{ ...ghost, padding: '5px 10px' }} onClick={() => setEditing(null)}>Cancel</button>
+                        </>
+                      ) : (
+                        <>
+                          <button style={{ ...ghost, padding: '5px 10px', marginRight: 6 }} onClick={() => setEditing({ type, id: m.id, name: m.name, class_level: m.class_level || '' })}>Edit</button>
+                          {m.is_active && <button style={{ ...ghost, padding: '5px 10px', color: '#ef4444' }} onClick={() => deactivate(type, m.id)}>Deactivate</button>}
+                        </>
+                      )}
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  )
+}
  
 
 
@@ -16284,6 +16526,8 @@ export default function App() {
 
   function clearPrefill() { setPrefill(null) }
 
+  if (new URLSearchParams(window.location.search).get('join')) return <JoinPage />
+
   if (page === 'landing') return (
     <LandingPage onStart={mode => { setInitAuthMode(mode === 'signup' ? 'register' : 'login'); setPage('auth') }} />
   )
@@ -16312,7 +16556,10 @@ export default function App() {
       { id: 'notices',     icon: '📢', label: 'Notices',     color: '#F97316' },
       { id: 'timetable',   icon: '📅', label: 'Timetable',   color: '#06b6d4' },
     ] : []),
-    ...(isTeacher && isSchool ? [{ id: 'school', icon: '🏫', label: 'Analytics', color: '#A855F7' }] : []),
+    ...(isTeacher && isSchool ? [
+      { id: 'roster', icon: '🏫', label: 'Manage School', color: '#A855F7' },
+      { id: 'school', icon: '📊', label: 'Analytics',     color: '#A855F7' },
+    ] : []),
     { id: 'feed',        icon: '📣', label: 'Study Feed',      color: '#6366F1' },
     { id: 'history',     icon: '🕘', label: 'History',         color: '#6366F1' }
   ]
@@ -16373,7 +16620,7 @@ export default function App() {
     if (tab === 'assignments') return <AssignmentsPage user={user} />
     if (tab === 'notices')    return <NoticesPage user={user} />
     if (tab === 'timetable')  return <TimetablePage user={user} />
-    if (tab === 'school')     return <SchoolDashboard user={user} />
+    if (tab === 'roster')     return <RosterPage user={user} />
     return <Dashboard user={user} onNavigate={(t, pf) => { if (pf) setPrefill(pf); setTab(t) }} onOpenChapter={setActiveChapterGroup} />
   }
 
@@ -16495,7 +16742,7 @@ export default function App() {
       </div>
 
       {/* ── AI Buddy (all users) ─────────────────────── */}
-      {user && <TalkingBuddy user={user} />}
+      {/* {user && <TalkingBuddy user={user} />}  // hidden for now */}
 
       {/* ── Chapter Hub overlay ─────────────────────── */}
       {activeChapterGroup && (
