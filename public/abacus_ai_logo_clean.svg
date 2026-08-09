@@ -1,0 +1,87 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Abacus AI logo</title>
+  <desc id="desc">A clean vector symbol combining an abacus and an AI circuit brain.</desc>
+  <defs>
+    <linearGradient id="brain" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#1587ff"/>
+      <stop offset="1" stop-color="#0b47b5"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Abacus frame -->
+  <path d="M455 166H258c-64 0-116 52-116 116v460c0 64 52 116 116 116h197"
+        fill="none" stroke="#082c59" stroke-width="44" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M455 188H268c-53 0-96 43-96 96v456c0 53 43 96 96 96h187"
+        fill="none" stroke="#0b3d77" stroke-width="10" stroke-linecap="round"/>
+
+  <!-- Abacus rods -->
+  <g stroke="#0a315f" stroke-width="22" stroke-linecap="round">
+    <path d="M206 314H470"/>
+    <path d="M206 416H470"/>
+    <path d="M206 518H470"/>
+    <path d="M206 620H470"/>
+    <path d="M206 722H470"/>
+  </g>
+
+  <!-- Abacus beads -->
+  <g>
+    <g fill="#092c56">
+      <ellipse cx="262" cy="314" rx="42" ry="34"/>
+      <ellipse cx="405" cy="416" rx="42" ry="34"/>
+      <ellipse cx="258" cy="518" rx="42" ry="34"/>
+      <ellipse cx="406" cy="620" rx="42" ry="34"/>
+      <ellipse cx="258" cy="722" rx="42" ry="34"/>
+    </g>
+    <g fill="#0f78f2">
+      <ellipse cx="390" cy="314" rx="42" ry="34"/>
+      <ellipse cx="344" cy="416" rx="42" ry="34"/>
+      <ellipse cx="310" cy="518" rx="42" ry="34"/>
+      <ellipse cx="350" cy="620" rx="42" ry="34"/>
+      <ellipse cx="310" cy="722" rx="42" ry="34"/>
+    </g>
+  </g>
+
+  <!-- Brain silhouette -->
+  <path d="M486 215
+           C486 164 527 123 578 123
+           C618 123 652 148 665 184
+           C688 168 716 159 746 159
+           C810 159 862 211 862 275
+           C862 288 860 301 856 313
+           C901 334 932 380 932 433
+           C932 467 920 499 900 524
+           C922 549 935 582 935 618
+           C935 675 895 723 842 736
+           C831 792 782 834 724 834
+           C694 834 667 823 645 806
+           C626 841 588 864 545 864
+           C512 864 486 838 486 805Z"
+        fill="url(#brain)"/>
+
+  <!-- Center divider -->
+  <path d="M486 214V806" stroke="#0a3e8b" stroke-width="24" stroke-linecap="round"/>
+
+  <!-- Circuit traces -->
+  <g fill="none" stroke="#ffffff" stroke-width="18" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M513 294V250L557 206V178"/>
+    <path d="M516 390H560V318L632 246V204"/>
+    <path d="M516 486H592L652 426V328L714 266"/>
+    <path d="M516 486H675L732 429V362"/>
+    <path d="M516 568H625L682 625H742"/>
+    <path d="M516 616L566 666V735"/>
+    <path d="M516 660L626 770"/>
+    <path d="M516 536L584 604L666 522H770L818 474"/>
+  </g>
+
+  <!-- Circuit nodes -->
+  <g fill="#ffffff">
+    <circle cx="557" cy="178" r="20"/>
+    <circle cx="632" cy="204" r="20"/>
+    <circle cx="714" cy="266" r="20"/>
+    <circle cx="732" cy="362" r="20"/>
+    <circle cx="742" cy="625" r="20"/>
+    <circle cx="566" cy="735" r="20"/>
+    <circle cx="626" cy="770" r="20"/>
+    <circle cx="818" cy="474" r="20"/>
+  </g>
+</svg>
