@@ -11792,7 +11792,7 @@ function SearchPage({ currentUser, onViewProfile, onMessage }) {
 // ══════════════════════════════════════════════════════════════
 //  PROFILE PAGE (LinkedIn-style)
 // ══════════════════════════════════════════════════════════════
-function ProfilePage({ userId, currentUser, onMessage, onBack }) {
+function ProfilePage({ userId, currentUser, onMessage, onBack, onUserUpdate }) {
   const [data,     setData]     = useState(null)
   const [loading,  setLoading]  = useState(true)
   const [editMode, setEditMode] = useState(false)
@@ -11810,7 +11810,7 @@ function ProfilePage({ userId, currentUser, onMessage, onBack }) {
     api.get(`/api/profiles/${targetId}`)
       .then(d => {
         setData(d)
-        setForm({ ...(d.profile || {}), class_level: d.user?.class_level || '' })
+        setForm({ ...(d.profile || {}), class_level: d.user?.class_level || '', name: d.user?.name || '' })
         setLoading(false)
       })
       .catch(e => { setErr(e.message); setLoading(false) })
@@ -11829,9 +11829,13 @@ function ProfilePage({ userId, currentUser, onMessage, onBack }) {
         favourite_chapter: form.favourite_chapter, favourite_subject: form.favourite_subject,
         favourite_hobby: form.favourite_hobby, institution: form.institution,
       })
-      // Class lives on the users table — only personal users edit it (school sets it).
-      if (isOwn && currentUser?.type !== 'school') {
-        await api.put('/api/user/profile', { classLevel: form.class_level })
+      // Name + class live on the users table.
+      if (isOwn) {
+        const updated = await api.put('/api/user/profile', {
+          name: form.name,
+          ...(currentUser?.type !== 'school' && { classLevel: form.class_level }),
+        })
+        onUserUpdate?.(updated)  // refresh header, sidebar, everywhere
       }
       setData(d => ({
         ...d,
@@ -11912,6 +11916,11 @@ function ProfilePage({ userId, currentUser, onMessage, onBack }) {
       {/* ── Name + headline + badges ─────────────────────────── */}
       <Card style={{ marginBottom: 14 }}>
         <h2 style={{ fontFamily: "'Sora',sans-serif", fontWeight: 900, color: 'var(--text-h)', margin: '0 0 6px', fontSize: 22 }}>{user?.name}</h2>
+        {isOwn && editMode && (
+          <input value={form.name || ''} onChange={e => setF('name', e.target.value)}
+            placeholder="Your full name"
+            style={{ ...T.input, marginBottom: 10, fontWeight: 700, fontSize: 16 }} />
+        )}
         {editMode ? (
           <input value={form.headline || ''} onChange={e => setF('headline', e.target.value)}
             placeholder={isTeacher ? "Headline — e.g. 'Physics teacher | JEE mentor'" : "Headline — e.g. 'Class 10 student | loves coding'"}
@@ -16604,6 +16613,7 @@ export default function App() {
       <ProfilePage
         userId={viewProfileId || undefined}
         currentUser={user}
+        onUserUpdate={updateUser}
         onBack={() => { setTab(viewProfileId ? 'search' : 'dashboard'); setViewProfileId(null) }}
         onMessage={id => { setMsgUserId(id); setTab('messages') }}
       />
