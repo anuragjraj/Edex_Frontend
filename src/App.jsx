@@ -16621,6 +16621,7 @@ export default function App() {
     if (tab === 'notices')    return <NoticesPage user={user} />
     if (tab === 'timetable')  return <TimetablePage user={user} />
     if (tab === 'roster')     return <RosterPage user={user} />
+    if (tab === 'school')     return <SchoolDashboard user={user} />
     return <Dashboard user={user} onNavigate={(t, pf) => { if (pf) setPrefill(pf); setTab(t) }} onOpenChapter={setActiveChapterGroup} />
   }
 
