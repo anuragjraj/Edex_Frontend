@@ -10171,7 +10171,7 @@ function printQPaper(paper, opts = {}) {
 
 
 
-function downloadText(content, filename = 'Brainspark.txt') {
+function downloadText(content, filename = 'Abacus.txt') {
   const blob = new Blob([content], { type: 'text/plain' })
   const url  = URL.createObjectURL(blob)
   const a    = document.createElement('a')
@@ -10180,7 +10180,7 @@ function downloadText(content, filename = 'Brainspark.txt') {
 }
 
 // REPLACE the old printContent function with this
-function printContent(content, title = 'BrainSpark AI Notes') {
+function printContent(content, title = 'Abacus AI Notes') {
   // Build HTML string (no DOM touching yet — pure string ops, non-blocking)
   const lines = (content || '').split('\n')
   let body = ''
@@ -11044,7 +11044,7 @@ function LandingPage({ onStart }) {
       <nav style={{ padding:'0 5%', height:62, display:'flex', alignItems:'center', justifyContent:'space-between', position:'sticky', top:0, zIndex:100, background:'var(--bg2)', backdropFilter:'blur(20px)', borderBottom:'1px solid var(--border)' }}>
         <div style={{ display:'flex', alignItems:'center', gap:9 }}>
           <div style={{ width:34, height:34, borderRadius:10, background:'linear-gradient(135deg,#6366F1,#8B5CF6)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:18 }}>🧠</div>
-          <span style={{ fontFamily:"'Sora',sans-serif", fontWeight:900, fontSize:17, color:'var(--text-h)' }}>BrainSpark<span style={{ color:'#6366F1' }}> AI</span></span>
+          <span style={{ fontFamily:"'Sora',sans-serif", fontWeight:900, fontSize:17, color:'var(--text-h)' }}>Abacus<span style={{ color:'#6366F1' }}> AI </span></span>
         </div>
         <div style={{ display:'flex', gap:8 }}>
           <button onClick={()=>onStart('signin')} style={{ padding:'7px 16px', borderRadius:9, border:'1px solid var(--border)', background:'transparent', color:'var(--text)', fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:"'Nunito',sans-serif" }}>Sign In</button>
@@ -11090,7 +11090,7 @@ function LandingPage({ onStart }) {
         <button onClick={()=>onStart('signup')} style={{ padding:'14px 42px', borderRadius:10, border:'none', background:'linear-gradient(135deg,#4f46e5,#8B5CF6)', color:'#fff', fontSize:15, fontWeight:700, cursor:'pointer', fontFamily:"'Nunito',sans-serif" }}>🚀 Get Started Free</button>
       </section>
       <footer style={{ padding:'18px 5%', borderTop:'1px solid var(--border)', display:'flex', justifyContent:'space-between', alignItems:'center' }}>
-        <span style={{ fontFamily:"'Sora',sans-serif", color:'var(--text)', fontSize:12, fontWeight:700 }}>BrainSpark AI © 2026</span>
+        <span style={{ fontFamily:"'Sora',sans-serif", color:'var(--text)', fontSize:12, fontWeight:700 }}>Abacus AI © 2026</span>
         <span style={{ fontSize:10.5, color:'var(--text-h)' }}>Powered by Claude · OpenAI · Groq · Built for CBSE</span>
       </footer>
     </div>
@@ -11178,7 +11178,7 @@ function AuthPage({ onAuth, initMode }) {
       <div style={{ background:'var(--bg2)', border:'1px solid var(--border)', borderRadius:18, padding:28, width:'100%', maxWidth:430, boxShadow:'var(--shadow-md)' }}>
         <div style={{ textAlign:'center', marginBottom:24 }}>
           <div style={{ width:52, height:52, borderRadius:14, background:'linear-gradient(135deg,#6366F1,#8B5CF6)', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 10px', fontSize:26 }}>🧠</div>
-          <h1 style={{ margin:0, fontFamily:"'Sora',sans-serif", fontWeight:900, fontSize:22, color:'var(--text-h)' }}>BrainSpark<span style={{ color:'#6366F1' }}> AI</span></h1>
+          <h1 style={{ margin:0, fontFamily:"'Sora',sans-serif", fontWeight:900, fontSize:22, color:'var(--text-h)' }}>Abacus<span style={{ color:'#6366F1' }}> AI</span></h1>
           <p style={{ color:'var(--text)', fontSize:13, marginTop:4 }}>Your AI-powered study companion</p>
         </div>
         <div style={{ display:'flex', background:'var(--code-bg)', borderRadius:11, padding:3, marginBottom:18 }}>
@@ -11300,7 +11300,7 @@ function SubscriptionPage({ user, onSuccess, onBack }) {
     try {
       await loadScript('https://checkout.razorpay.com/v1/checkout.js')
       const order = await api.post('/api/subscription/create-order',{planType})
-      const rzp = new window.Razorpay({ key:import.meta.env.VITE_RAZORPAY_KEY_ID, amount:order.amount, currency:'INR', name:'BrainSpark AI', description:order.planLabel, order_id:order.orderId, prefill:{name:user.name,email:user.email}, theme:{color:'#6366F1'},
+      const rzp = new window.Razorpay({ key:import.meta.env.VITE_RAZORPAY_KEY_ID, amount:order.amount, currency:'INR', name:'Abacus AI', description:order.planLabel, order_id:order.orderId, prefill:{name:user.name,email:user.email}, theme:{color:'#6366F1'},
         handler:async({razorpay_payment_id,razorpay_order_id,razorpay_signature})=>{
           try{ await api.post('/api/subscription/verify',{orderId:razorpay_order_id,paymentId:razorpay_payment_id,signature:razorpay_signature,planType}); onSuccess() }
           catch(e){ setErr('Payment verification failed.') }
@@ -16633,7 +16633,7 @@ export default function App() {
         <div style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer' }} onClick={() => setTab('dashboard')}>
           <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg,#6366F1,#8B5CF6)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 18 }}>🧠</div>
           <span style={{ fontFamily: "'Sora', sans-serif", fontWeight: 900, fontSize: 17, color: 'var(--text-h)' }}>
-            BrainSpark<span style={{ color: '#818CF8' }}> AI</span>
+            Abacus<span style={{ color: '#818CF8' }}> AI</span>
           </span>
           {isSchool && user.schools && (
             <span style={{ fontSize: 11.5, color: 'var(--accent)', fontWeight: 700, background: 'var(--accent-bg)', padding: '2px 10px', borderRadius: 20, border: '1px solid var(--accent-border)' }}>
