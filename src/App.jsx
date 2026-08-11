@@ -11102,7 +11102,8 @@ function LandingPage({ onStart }) {
 // ══════════════════════════════════════════════════════════════
 function AuthPage({ onAuth, initMode }) {
   useFonts()
-  const [tab,    setTab]    = useState(initMode==='school'?'school':'personal')
+  // const [tab,    setTab]    = useState(initMode==='school'?'school':'personal')
+const [tab,    setTab]    = useState('school')  // school-only for now
   const [role,   setRole]   = useState(initMode==='teacher'?'teacher':'student')
   const [mode,   setMode]   = useState('login')
   const [form,   setForm]   = useState({ name:'', email:'', password:'', schoolCode:'', identifier:'', confirmPassword:'' })
@@ -11181,11 +11182,13 @@ function AuthPage({ onAuth, initMode }) {
           <h1 style={{ margin:0, fontFamily:"'Sora',sans-serif", fontWeight:900, fontSize:22, color:'var(--text-h)' }}>Abacus<span style={{ color:'#6366F1' }}> AI</span></h1>
           <p style={{ color:'var(--text)', fontSize:13, marginTop:4 }}>Your AI-powered study companion</p>
         </div>
-        <div style={{ display:'flex', background:'var(--code-bg)', borderRadius:11, padding:3, marginBottom:18 }}>
-          {[['personal','Personal'],['school','🏫 School']].map(([t,l])=>(
-            <button key={t} onClick={()=>{setTab(t);setErr('')}} style={{ flex:1, padding:'8px', borderRadius:9, border:'none', fontWeight:700, fontSize:13.5, cursor:'pointer', fontFamily:"'Nunito',sans-serif", background:tab===t?'var(--bg2)':'transparent', color:tab===t?'var(--text-h)':'var(--text)', boxShadow:tab===t?'var(--shadow-sm)':'none', transition:'all .2s' }}>{l}</button>
-          ))}
-        </div>
+        {/*
+<div style={{ display:'flex', background:'var(--code-bg)', borderRadius:11, padding:3, marginBottom:18 }}>
+  {[['personal','Personal'],['school','🏫 School']].map(([t,l])=>(
+    <button key={t} onClick={()=>{setTab(t);setErr('')}} style={{ flex:1, padding:'8px', borderRadius:9, border:'none', fontWeight:700, fontSize:13.5, cursor:'pointer', fontFamily:"'Nunito',sans-serif", background:tab===t?'var(--bg2)':'transparent', color:tab===t?'var(--text-h)':'var(--text)', boxShadow:tab===t?'var(--shadow-sm)':'none', transition:'all .2s' }}>{l}</button>
+  ))}
+</div>
+*/}
         <div style={{ display:'flex', gap:8, marginBottom:18 }}>
           {[['student','🎒 Student'],['teacher','👨‍🏫 Teacher']].map(([r,l])=>(
             <button key={r} onClick={()=>setRole(r)} style={{ flex:1, padding:'8px 12px', borderRadius:9, border:`2px solid ${role===r?'var(--accent)':'var(--border)'}`, fontWeight:700, fontSize:13, cursor:'pointer', fontFamily:"'Nunito',sans-serif", background:role===r?'var(--accent-bg)':'transparent', color:role===r?'var(--accent)':'#64748b', transition:'all .2s' }}>{l}</button>
